@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # Lint, testes e build do front. Não precisa das libs de GUI, então roda rápido
+  # em um SO só e barra a maioria dos erros antes da matriz cara.
+  check:
+    name: Lint e testes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Formatação (Rust)
+        run: cargo fmt --all --check
+      - name: Clippy
+        run: cargo clippy --workspace --exclude aisense-app --all-targets -- -D warnings
+      - name: Biome
+        run: pnpm exec biome ci .
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Testes do core
+        run: cargo test --workspace --exclude aisense-app
+      - name: Testes do front (inclui contraste dos temas)
+        run: pnpm --filter @aisense/desktop test --run
+
+      # Os tipos TypeScript são gerados a partir do Rust (ts-rs). Se alguém mudou um
+      # struct e esqueceu de rodar `pnpm gen:types`, o diff aparece aqui.
+      - name: Tipos gerados estão em dia
+        run: git diff --exit-code apps/desktop/src/types/generated
+
+      - name: Build do front
+        run: pnpm build
+
+  # Build real do app nos 3 SOs. Só aqui entram as dependências de GUI.
+  desktop:
+    name: Build do app (${{ matrix.os }})
+    needs: check
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Dependências de sistema (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libsoup-3.0-dev \
+            patchelf
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+      - name: Compilar o app
+        run: cargo build -p aisense-app

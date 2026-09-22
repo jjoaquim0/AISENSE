@@ -1,0 +1,17 @@
+[package]
+name = "aisense-mcp"
+description = "Servidor MCP stdio que expõe o barramento como ferramentas."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "aisense-mcp"
+path = "src/main.rs"
+
+[dependencies]
+aisense-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true

@@ -1,0 +1,33 @@
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+license = "MIT"
+repository = "https://github.com/jjoaquim0/AISENSE"
+authors = ["AISENSE"]
+
+[workspace.dependencies]
+aisense-core = { path = "crates/aisense-core" }
+aisense-pty = { path = "crates/aisense-pty" }
+aisense-store = { path = "crates/aisense-store" }
+aisense-ipc = { path = "crates/aisense-ipc" }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "io-util"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+ts-rs = "11"
+ulid = "1"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
+panic = "abort"

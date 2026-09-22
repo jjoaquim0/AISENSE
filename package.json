@@ -1,0 +1,21 @@
+{
+  "name": "aisense",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "dev": "pnpm --filter @aisense/desktop dev",
+    "build": "pnpm --filter @aisense/desktop build",
+    "app": "tauri dev --config crates/aisense-app/tauri.conf.json",
+    "app:build": "tauri build --config crates/aisense-app/tauri.conf.json",
+    "gen:types": "cargo test --workspace --exclude aisense-app export_bindings",
+    "lint": "biome check . && cargo fmt --all --check && cargo clippy --workspace --exclude aisense-app --all-targets -- -D warnings",
+    "lint:fix": "biome check --write . && cargo fmt --all",
+    "test": "pnpm --filter @aisense/desktop test --run && cargo test --workspace --exclude aisense-app",
+    "typecheck": "pnpm --filter @aisense/desktop typecheck"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.0.0",
+    "@tauri-apps/cli": "^2.0.0"
+  }
+}

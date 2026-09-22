@@ -11,58 +11,66 @@ design system, para que nenhuma fase seguinte perca tempo com encanamento.
 
 ## Tarefas
 
-### [ ] F00-01 — Estrutura do monorepo
+### [x] F00-01 — Estrutura do monorepo
 Criar o workspace Cargo com os 7 crates (só com `lib.rs` vazio e as dependências entre eles
 declaradas conforme a regra `app → core → {pty, store, ipc}`) e o workspace pnpm com `apps/desktop`.
 Configurar `rustfmt.toml`, `clippy.toml`, `biome.json`, `.editorconfig`, `.gitignore`.
 **Aceite:** `cargo build --workspace` e `pnpm install` passam limpos.
 
-### [ ] F00-02 — App Tauri iniciando
+### [~] F00-02 — App Tauri iniciando
 Configurar `tauri.conf.json` (identificador, janela 1440×900, mínimo 1024×640, allowlist mínima
 conforme [11 — Segurança](../11-seguranca.md)) e o bootstrap do Vite + React 19 + TypeScript strict.
 **Aceite:** `pnpm dev` abre a janela com "AISENSE" renderizado pelo React. Depende de F00-01.
+> **Parcial:** scaffold, `tauri.conf.json`, comando `app_info` e CSP prontos. O build da janela não foi verificado — o ambiente de desenvolvimento usado não tem WebKit/GTK. Verificar em máquina com GUI ou pelo job `desktop` do CI.
 
-### [ ] F00-03 — Tokens de design em CSS
+### [~] F00-03 — Tokens de design em CSS
 `apps/desktop/src/styles/tokens.css` com todos os tokens primitivos e semânticos de
 [08 — Design System](../08-design-system.md), nos dois temas. Configurar Tailwind 4 com `@theme`
 mapeando os tokens. Empacotar Inter Variable e JetBrains Mono como WOFF2 local.
 **Aceite:** uma página de amostra mostra a escala tipográfica e a paleta, e nenhuma cor literal
 aparece fora de `tokens.css`. Depende de F00-02.
+> **Parcial:** todos os tokens e as fontes empacotadas (Inter Variable + JetBrains Mono, offline). Falta a página de amostra da escala tipográfica e da paleta — sai junto com F00-06.
 
-### [ ] F00-04 — Alternância de tema sem flash
+### [~] F00-04 — Alternância de tema sem flash
 Store zustand de tema (`claro`/`escuro`/`sistema`), script inline no `index.html` aplicando
 `data-theme` antes da primeira pintura, listener de `prefers-color-scheme`.
 **Aceite:** reabrir o app no tema escuro não pisca branco em nenhum momento. Depende de F00-03.
+> **Parcial:** script inline no `index.html` e store `useTheme` prontos. A ausência de flash precisa de verificação visual em máquina com GUI.
 
-### [ ] F00-05 — Teste de contraste em CI
+### [x] F00-05 — Teste de contraste em CI
 `contrast.test.ts` que percorre todos os pares semânticos (texto sobre fundo) nos dois temas e
 falha abaixo de 4.5:1 (3:1 para ≥18px).
 **Aceite:** o teste roda no CI e falha propositalmente se alguém escurecer `--fg-secondary`.
 Depende de F00-03.
+> 54 pares verificados nos dois temas. Reprovou `--fg-muted` (4,45:1) e `--border-strong` (1,8:1) na primeira execução; os **tokens** foram corrigidos, não o teste.
 
-### [ ] F00-06 — Componentes base do design system
+### [~] F00-06 — Componentes base do design system
 `Button`, `IconButton`, `Input`, `Badge`, `StatusDot`, `Tooltip`, `Dialog`, `DropdownMenu`, `Tabs`,
 `ScrollArea`, `EmptyState`, `Kbd` sobre Radix + CVA.
 **Aceite:** uma rota `/dev/kitchen-sink` (só em dev) mostra todos, e todos são navegáveis por
 teclado com anel de foco visível. Depende de F00-03.
+> **Parcial:** `Button` e `StatusDot` prontos. Faltam Input, Dialog, DropdownMenu, Tabs, Tooltip, ScrollArea, EmptyState, Kbd, IconButton e a rota `/dev/kitchen-sink`.
 
-### [ ] F00-07 — Shell da aplicação
+### [~] F00-07 — Shell da aplicação
 Layout global de [09 — Telas](../09-telas-e-fluxos.md#estrutura-global-da-janela): trilho de 48px,
 sidebar redimensionável, área principal, inspetor colapsável, barra de título integrada.
 Persistir tamanhos no localStorage.
 **Aceite:** o layout responde ao redimensionamento sem scroll horizontal e os painéis colapsam por
 atalho. Depende de F00-06.
+> **Parcial:** layout de trilho + sidebar + área principal e barra de título. Faltam inspetor, redimensionamento por arraste e persistência dos tamanhos.
 
-### [ ] F00-08 — Ponte tipada Rust ⇄ TypeScript
+### [x] F00-08 — Ponte tipada Rust ⇄ TypeScript
 Configurar `ts-rs`, um comando Tauri de exemplo (`app_info`) e o script
 `pnpm gen:types` que roda o export e grava em `src/types/generated/`.
 **Aceite:** alterar um struct em Rust e rodar `pnpm gen:types` atualiza o `.ts`; o CI falha se os
 tipos gerados estiverem desatualizados. Depende de F00-02.
+> `ts-rs` exportando para `apps/desktop/src/types/generated/`, script `pnpm gen:types` e verificação de diff no CI. `AppInfo` mora no core justamente para a geração não depender de compilar a janela.
 
-### [ ] F00-09 — CI nos 3 sistemas operacionais
+### [~] F00-09 — CI nos 3 sistemas operacionais
 GitHub Actions: matriz macOS/Ubuntu/Windows rodando `cargo fmt --check`, `cargo clippy -D warnings`,
 `cargo test`, `biome ci`, `vitest run` e build do Tauri. Cache de cargo e pnpm.
 **Aceite:** um PR de teste fica verde nos três SOs em menos de 15 min. Depende de F00-02.
+> **Parcial:** workflow escrito com dois estágios (lint/testes rápidos e matriz dos 3 SOs). Ainda não executou — validar no primeiro PR.
 
 ## Critérios de saída
 - [ ] `pnpm dev` abre o app nos 3 SOs

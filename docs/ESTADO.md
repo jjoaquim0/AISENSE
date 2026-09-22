@@ -19,7 +19,7 @@ A documentação completa de produto, arquitetura, design e plano de execução 
 
 | Fase | Status | Tarefas |
 |---|---|---|
-| 00 — Fundação | 🟨 Em andamento | 0/9 |
+| 00 — Fundação | 🟨 Em andamento | 3 feitas, 6 parciais de 9 |
 | 01 — Terminal Core | ⬜ Não iniciada | 0/8 |
 | 02 — Equipes e Agentes | ⬜ Não iniciada | 0/9 |
 | 03 — Sala da Equipe | ⬜ Não iniciada | 0/9 |
@@ -34,8 +34,23 @@ Legenda: ⬜ não iniciada · 🟨 em andamento · ✅ concluída · 🟥 bloque
 
 ## Em andamento agora
 
-**Fase 00 — Fundação.** Scaffold do monorepo em construção. Próxima tarefa livre: ver a lista em
-[fases/FASE-00-fundacao.md](fases/FASE-00-fundacao.md).
+**Fase 00 — Fundação.** O esqueleto está de pé e verificado no que dava para verificar:
+
+| Verificado aqui | Resultado |
+|---|---|
+| `cargo test --workspace --exclude aisense-app` | ✅ 13 testes |
+| `pnpm --filter @aisense/desktop test --run` | ✅ 54 testes de contraste |
+| `pnpm lint` (biome + rustfmt + clippy `-D warnings`) | ✅ limpo |
+| `pnpm build` (tsc + vite) | ✅ 229 kB JS / 38 kB CSS |
+| `cargo build -p aisense-app` (janela Tauri) | ⚠️ **não verificado** |
+
+O ambiente de desenvolvimento usado não tem WebKit/GTK, então o crate `aisense-app` não compila
+nele. Isso **não** indica problema no código: é dependência de sistema. Em Linux instale
+`libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libsoup-3.0-dev patchelf`;
+em macOS e Windows não é preciso nada além do toolchain. O job `desktop` do CI faz essa verificação.
+
+**Próximo passo:** fechar as 5 tarefas parciais da Fase 00 (ver as notas `>` em cada uma) —
+em especial F00-06 (resto dos componentes) e F00-07 (inspetor e redimensionamento).
 
 ## Decisões já tomadas (não reabrir sem ADR)
 

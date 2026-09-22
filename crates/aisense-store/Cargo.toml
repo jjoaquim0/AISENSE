@@ -1,0 +1,13 @@
+[package]
+name = "aisense-store"
+description = "Persistência SQLite e migrações."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+aisense-core.workspace = true
+thiserror.workspace = true
+tracing.workspace = true

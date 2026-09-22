@@ -48,7 +48,7 @@ igualmente claro em qualquer matiz. Isso é o que permite a paleta de agentes fi
 --gray-0:  oklch(0.99 0.002 265);   --gray-50:  oklch(0.97 0.004 265);
 --gray-100:oklch(0.94 0.006 265);   --gray-200: oklch(0.89 0.008 265);
 --gray-300:oklch(0.80 0.010 265);   --gray-400: oklch(0.66 0.012 265);
---gray-500:oklch(0.55 0.014 265);   --gray-600: oklch(0.44 0.014 265);
+--gray-500:oklch(0.54 0.014 265);   --gray-600: oklch(0.44 0.014 265);
 --gray-700:oklch(0.33 0.014 265);   --gray-800: oklch(0.25 0.014 265);
 --gray-850:oklch(0.21 0.014 265);   --gray-900: oklch(0.17 0.014 265);
 --gray-950:oklch(0.13 0.012 265);
@@ -78,14 +78,19 @@ igualmente claro em qualquer matiz. Isso é o que permite a paleta de agentes fi
 | `--fg-secondary` | `gray-600` | `gray-300` | Texto de apoio |
 | `--fg-muted` | `gray-500` | `gray-400` | Metadados, placeholder |
 | `--border-subtle` | `gray-200` | `gray-800` | Divisórias |
-| `--border-strong` | `gray-300` | `gray-700` | Contorno de input |
+| `--border-strong` | `gray-400` | `gray-500` | Contorno de input (3:1, WCAG 1.4.11) |
 | `--accent` | `brand-600` | `brand-400` | Ação primária |
 | `--accent-fg` | `gray-0` | `gray-950` | Texto sobre accent |
 | `--ring` | `brand-500` | `brand-400` | Anel de foco |
 
-**Contraste:** todo par texto/fundo é validado em AA (4.5:1 para corpo, 3:1 para ≥18px).
-Há um teste automatizado em `apps/desktop/src/styles/__tests__/contrast.test.ts` que falha o CI
-se algum par semântico cair abaixo do mínimo. Isso não é opcional.
+**Contraste:** todo par texto/fundo é validado em AA (4.5:1 para corpo, 3:1 para ≥18px e para
+elementos de interface não textuais — indicadores de estado, anel de foco e contorno de campo,
+conforme WCAG 1.4.11). O teste `apps/desktop/src/styles/__tests__/contrast.test.ts` verifica 54
+pares nos dois temas e falha o CI abaixo do mínimo. Isso não é opcional: já reprovou
+`--fg-muted` (4,45:1) e `--border-strong` (1,8:1) na primeira execução, e os tokens é que mudaram.
+
+O teste também garante que as 8 cores de agente têm **peso visual parecido** (variação de contraste
+menor que 2×): com 9 terminais na tela, uma cor muito mais pesada que as outras desequilibra o mosaico.
 
 ### Paleta de identidade dos agentes
 

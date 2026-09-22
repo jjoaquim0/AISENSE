@@ -1,0 +1,17 @@
+[package]
+name = "aisense-cli"
+description = "Binário `aisense` injetado no PATH de cada terminal de agente."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "aisense"
+path = "src/main.rs"
+
+[dependencies]
+aisense-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
