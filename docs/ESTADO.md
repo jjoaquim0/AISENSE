@@ -43,12 +43,14 @@ Legenda: ⬜ não iniciada · 🟨 em andamento · ✅ concluída · 🟥 bloque
 | `pnpm typecheck` | ✅ limpo |
 | `pnpm lint` (biome + rustfmt + clippy `-D warnings`) | ✅ limpo |
 | `pnpm build` (tsc + vite) | ✅ 301 kB JS / 44 kB CSS |
-| `cargo build -p aisense-app` (janela Tauri) | ⚠️ **não verificado** |
+| `cargo build -p aisense-app` (janela Tauri) | ✅ compila (deps de sistema instaladas) |
+| `cargo clippy --workspace --all-targets -- -D warnings` | ✅ limpo, agora incluindo o app |
 
-O ambiente de desenvolvimento usado não tem WebKit/GTK, então o crate `aisense-app` não compila
-nele. Isso **não** indica problema no código: é dependência de sistema. Em Linux instale
+As dependências de GUI foram instaladas no ambiente, então `aisense-app` **compila e passa no
+clippy**. O que continua sem verificação é o comportamento visual: não há tela aqui, então a janela
+nunca foi aberta. Em Linux as deps são
 `libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libsoup-3.0-dev patchelf`;
-em macOS e Windows não é preciso nada além do toolchain. O job `desktop` do CI faz essa verificação.
+em macOS e Windows basta o toolchain.
 
 **Nada visual foi conferido por um par de olhos.** Tema, layout, ausência de flash, anel de foco e
 navegação por teclado estão implementados conforme a especificação, mas ninguém abriu a janela.
@@ -65,7 +67,7 @@ depende de janela, não.
 |---|---|
 | PTY, ring buffer, log, coalescência, gerenciador (Rust) | ✅ 48 testes, processos reais |
 | Tipos de transporte e conversão de cor | ✅ testados |
-| Comandos Tauri (casca fina) | ⚠️ escritos, **não compilados** (sem WebKit/GTK) |
+| Comandos Tauri (casca fina) | ✅ compilam e passam no clippy |
 | `<Terminal />`, tema, reidratação, busca | ⚠️ escritos, **nunca executados** |
 
 Três decisões desta fase que valem lembrar:
@@ -149,4 +151,5 @@ Bugs encontrados pelos próprios testes, todos corrigidos na origem:
 | 2026-09-22 | Claude | Fase 01: PTY, ring buffer, log e coalescência em Rust, com 33 testes |
 | 2026-09-22 | Claude | Fase 01: gerenciador de sessões, ponte Tauri, paleta ANSI testada, `<Terminal />` com xterm.js. 62 testes Rust + 99 front |
 | 2026-09-22 | Claude | PR #3 aberto. CI vermelho revelou uma corrida na entrega de saída do PTY (perda silenciosa + ordem do evento de término); corrigida na origem com teste de regressão |
+| 2026-09-22 | Claude | CI dos 3 SOs pegou erro de compilação no `aisense-app` (conversão de erro) e ícones ausentes. Deps de GUI instaladas no ambiente: o app agora compila e é lintado localmente |
 | 2026-09-22 | Claude | D6 aprovada: docs 15, 16 e 17 escritos, gate de revisão no doc 13, e 6 tarefas novas distribuídas pelas Fases 02, 04, 05 e 06. Início da Fase 01 |

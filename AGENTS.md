@@ -68,12 +68,30 @@ O front-end só fala com o Rust por comandos e eventos Tauri — nunca por HTTP,
 
 ```bash
 pnpm install          # dependências do front
-pnpm dev              # app em modo dev (Vite + Tauri watch)
-pnpm build            # build de produção
-pnpm lint             # eslint + prettier + clippy + rustfmt
+pnpm dev              # só o front (Vite), sem janela
+pnpm app              # app completo em modo dev (Tauri)
+pnpm build            # build do front
+pnpm lint             # biome + rustfmt + clippy
 pnpm test             # vitest + cargo test
 cargo test -p aisense-core   # testes de um crate só
 ```
+
+### Verificando o crate `aisense-app`
+
+`pnpm lint` e `pnpm test` **excluem `aisense-app`** para funcionarem em qualquer máquina.
+Esse crate precisa das bibliotecas de GUI do sistema. Se você mexeu nele, instale-as e compile —
+senão só o CI vai descobrir que não compila:
+
+```bash
+# Linux (Debian/Ubuntu)
+sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev \
+  libayatana-appindicator3-dev librsvg2-dev libsoup-3.0-dev patchelf
+
+cargo clippy -p aisense-app --all-targets -- -D warnings
+cargo build -p aisense-app
+```
+
+No macOS e no Windows basta o toolchain do Rust.
 
 ## 6. Quando estiver em dúvida
 

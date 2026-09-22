@@ -44,19 +44,10 @@ pub fn pty_spawn(
     manager: State<'_, Manager>,
     request: SpawnRequest,
 ) -> Result<(), CommandError> {
-    let mut spec = PtySpawn::new(&request.command).size(TerminalSize {
-        rows: request.rows,
-        cols: request.cols,
-    });
-    spec.args = request.args;
-    spec.env = request.env;
-    spec.cwd = request.cwd.map(Into::into);
-    spec.log_path = request.log_path.map(Into::into);
-
+    let agent_id = request.agent_id.clone();
+    let spec: PtySpawn = request.into();
     let sink = Arc::new(TauriSink { app });
-    manager
-        .spawn(request.agent_id, spec, sink)
-        .map_err(Into::into)
+    manager.spawn(agent_id, spec, sink).map_err(pty_error)
 }
 
 #[tauri::command]
@@ -65,9 +56,7 @@ pub fn pty_write(
     agent_id: String,
     data: String,
 ) -> Result<(), CommandError> {
-    manager
-        .write(&agent_id, data.as_bytes())
-        .map_err(Into::into)
+    manager.write(&agent_id, data.as_bytes()).map_err(pty_error)
 }
 
 #[tauri::command]
@@ -79,7 +68,7 @@ pub fn pty_resize(
 ) -> Result<(), CommandError> {
     manager
         .resize(&agent_id, TerminalSize { rows, cols })
-        .map_err(Into::into)
+        .map_err(pty_error)
 }
 
 #[tauri::command]
