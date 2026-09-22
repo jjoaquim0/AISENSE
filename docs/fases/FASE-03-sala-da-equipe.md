@@ -60,7 +60,7 @@ Abas Visão, Config e Logs (as abas Skills e Caixa entram nas fases 4 e 5).
 **Aceite:** a aba Logs mostra a transcrição com busca e exportação. Depende de F03-02.
 
 ## Critérios de saída
-- [ ] 9 terminais simultâneos com performance dentro do orçamento de [03 — Stack](../03-stack.md#orçamento-de-performance-metas-verificáveis-na-fase-7)
+- [ ] 9 terminais simultâneos com performance dentro do orçamento de [03 — Stack](../03-stack.md#orçamento-de-performance-metas-verificáveis-na-fase-8)
 - [ ] Estado de cada agente visível e correto
 - [ ] Layout persistido por equipe
 - [ ] Navegação inteiramente por teclado

@@ -61,7 +61,7 @@ Nenhum agente pode, sozinho:
 - editar skills;
 - ler ou escrever fora do workdir da equipe através do AISENSE.
 
-O agente `@maestro` **propõe** ("sugiro criar um `@qa`") e a UI mostra a proposta com
+O agente `@coordenador` **propõe** ("sugiro criar um `@qa`") e a UI mostra a proposta com
 [Aceitar] / [Recusar]. Isso é deliberado: agente que cria agente é como recursão sem caso base.
 
 ## Atualizações

@@ -59,12 +59,30 @@ nome, seletor de runtime mostrando disponibilidade, atribuição de cor e seçã
 **Aceite:** validação impede handle duplicado antes de submeter; editar agente rodando avisa que
 exige reinício. Depende de F02-05, F02-03.
 
+### [ ] F02-10 — Bancadas (`git worktree` por agente)
+Modos `shared` e `per-agent` por equipe, com exceção por agente. Criação, reutilização e validação
+do worktree; fallback para `shared` com aviso quando o diretório não é git ou o Git é antigo.
+Cópia dos arquivos ignorados declarados em `aisense.toml` e execução do `bench.setup`.
+Remoção sempre por `git worktree remove`, recusando quando há mudanças não commitadas.
+Ver [16 — Bancadas](../16-bancadas.md).
+**Aceite:** dois agentes de uma equipe `per-agent` editam o mesmo arquivo sem se atropelar; excluir
+um agente com trabalho pendente é recusado com mensagem clara. Depende de F02-06.
+
+### [ ] F02-11 — `aisense.toml` (comandos do projeto)
+Parser, validação e detecção automática que **propõe** um arquivo (nunca cria sozinho) a partir de
+`pnpm-lock.yaml`, `Cargo.toml`, `pyproject.toml` ou `Makefile`.
+Ver [17 — Comandos do Projeto](../17-comandos-do-projeto.md).
+**Aceite:** TOML inválido é reportado com caminho e linha sem derrubar o app; a proposta aparece na
+UI com o conteúdo gerado para revisão.
+
 ## Critérios de saída
 - [ ] CRUD completo de equipes e agentes, persistido
 - [ ] Runtimes detectados e adaptadores carregando de disco
 - [ ] Agente sobe com o comando e o ambiente corretos
 - [ ] Política de reinício funcionando
 - [ ] Modelos de equipe criando squads prontos
+- [ ] Bancadas isolando agentes em `per-agent`, com fallback seguro quando não há git
+- [ ] `aisense.toml` lido e proposto automaticamente
 
 ## Riscos
 | Risco | Mitigação |

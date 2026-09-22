@@ -96,7 +96,7 @@ diretório de trabalho (seletor nativo), cor e ícone.
 | **Vazio** | — |
 | **Dupla Dev** | `@dev` (implementador) + `@revisor` (revisor-rigoroso) |
 | **Squad completo** | `@arquiteto`, `@backend`, `@frontend`, `@revisor` |
-| **Pesquisa** | `@maestro`, 3× `@pesquisador`, `@sintetizador` |
+| **Pesquisa** | `@coordenador`, 3× `@pesquisador`, `@sintetizador` |
 | **Operação** | `@monitor` (shell, longa duração) + `@triagem` |
 
 Cada modelo já vem com runtime sugerido, skills e cores atribuídas. O usuário ajusta no passo 3.
@@ -288,8 +288,8 @@ Abas no painel direito, sobre o agente selecionado:
 
  EMBUTIDAS                             SUAS
  ┌────────────────────┐ ┌────────────┐ ┌────────────────────┐
- │ trabalho-em-equipe │ │ maestro    │ │ rust-idiomatico    │
- │ sempre ativa       │ │ orquestra  │ │ v2.0.1 · 3 agentes │
+ │ trabalho-em-equipe │ │ coordenador    │ │ rust-idiomatico    │
+ │ sempre ativa       │ │ coordena  │ │ v2.0.1 · 3 agentes │
  │ 🔒                 │ │ 1 agente   │ │ [editar] [dup]     │
  └────────────────────┘ └────────────┘ └────────────────────┘
 ```
@@ -299,12 +299,32 @@ e a barra inferior mostra quantos agentes usam e quais precisarão reiniciar.
 
 ---
 
-## T8 — Quadro de tarefas
+## T8 — Quadro Kanban ⭐
 
-Kanban com colunas `A fazer · Fazendo · Bloqueada · Revisão · Feita`. Cards mostram título,
-avatar do responsável (cor do agente) e origem (criada por `@maestro` / por você).
-Arrastar muda o status e **emite mensagem de sistema ao responsável** — o agente fica sabendo.
-Alimentado tanto pela UI quanto por `aisense task add`.
+Uma tela por equipe. **Especificação completa em [13 — Quadro Kanban](13-quadro-kanban.md)** —
+aqui fica só o resumo visual.
+
+```
+┌ Quadro — Squad Produto ─── [+ Cartão] [filtros ▾] [⚙ colunas] [automações] ───┐
+│ A FAZER (4)      FAZENDO (2/4)    BLOQUEADA (1)   REVISÃO (1)   FEITA (12)     │
+│ ┌────────────┐   ┌────────────┐   ┌───────────┐   ┌──────────┐  ┌───────────┐ │
+│ │▏OAuth em   │   │▏Middleware │   │▏Remover   │   │▏Endpoint │  │▏Migração  │ │
+│ │ /users     │   │ de refresh │   │ legacy_id │   │ /auth    │  │ de schema │ │
+│ │ ▲alta  ⛓2  │   │ ✓2/4  💬3  │   │ ⚠ aguarda │   │ @backend │  │ ✓ há 1h   │ │
+│ │ sem dono   │   │ @backend   │   │ decisão   │   │ →@revisor│  │           │ │
+│ └────────────┘   └────────────┘   └───────────┘   └──────────┘  └───────────┘ │
+└────────────────────────────────────────────────────────────────────────────────┘
+```
+
+- Colunas configuráveis com **limite de WIP aplicado** (não decorativo).
+- Borda do cartão na cor do responsável — mesmo código visual dos terminais.
+- Ícones: `▲` prioridade · `⛓` dependências · `✓n/m` checklist · `💬n` comentários · `⚠` bloqueio.
+- Arrastar aplica exatamente as mesmas regras da CLI, incluindo WIP e automações.
+- Cartão que muda pisca por 400 ms: dá para ver os agentes trabalhando ao vivo.
+- Contador no topo: "3 cartões mudaram desde que você saiu".
+- Detalhe do cartão: Markdown, checklist, thread de comentários com agentes, dependências
+  navegáveis, links de PR/commit e histórico imutável.
+- Tudo alimentado igualmente pela UI e por `aisense task ...` / ferramentas MCP.
 
 ---
 
@@ -330,7 +350,7 @@ Busca difusa, resultados recentes no topo, atalho exibido à direita de cada ite
 
 ---
 
-## Fluxos críticos (E2E da Fase 7)
+## Fluxos críticos (E2E da Fase 8)
 
 | # | Fluxo | Passos |
 |---|---|---|

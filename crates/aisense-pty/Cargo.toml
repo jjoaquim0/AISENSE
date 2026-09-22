@@ -1,0 +1,19 @@
+[package]
+name = "aisense-pty"
+description = "Gestão de PTY, ring buffer e detecção de estado."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+bytes.workspace = true
+portable-pty.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time", "sync"] }

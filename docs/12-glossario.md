@@ -27,8 +27,21 @@ Sinônimo é fonte de confusão para agentes que entram no meio do projeto.
 | **Sala da Equipe** | `TeamRoom` | Tela principal, com os 4 modos de vista |
 | **Vista** | `View` | Grid, Foco, Fluxo ou Timeline |
 | **Linha do tempo** | `Timeline` | Vista cronológica de todas as mensagens da equipe |
-| **Maestro** | `maestro` | Papel (via skill) de agente orquestrador. **Não** é um tipo especial de agente |
-| **Quadro** | `TaskBoard` | Kanban de tarefas da equipe |
+| **Coordenador** | `coordenador` | Papel (via skill) de agente coordenador. **Não** é um tipo especial de agente |
+| **Quadro** | `Board` | Kanban da equipe. Uma equipe, um quadro. É a memória compartilhada |
+| **Coluna** | `Column` | Etapa do quadro, com tipo semântico e limite de WIP |
+| **Cartão** | `Card` / `Task` | Unidade de trabalho no quadro |
+| **Pegar** | `claim` | Um agente assumir um cartão sem dono. Operação atômica |
+| **Limite de WIP** | `wip_limit` | Máximo de cartões simultâneos numa coluna. Aplicado, não sugerido |
+| **Automação** | `Automation` | Regra declarativa do quadro (gatilho → ação), de conjunto fechado |
+| **Gate de revisão** | `approval gate` | Exigência de aprovação (de outro agente) para o cartão avançar |
+| **Comando do projeto** | `project command` | Entrada de `aisense.toml` executável por `aisense run` |
+| **Bancada** | `Workbench` | `git worktree` com branch próprio, por agente — ver [doc 16](16-bancadas.md) |
+| **Formação** | `Formation` | (proposto) Modelo exportável de equipe inteira — ver doc 14 |
+| **Agendamento** | `Schedule` | (proposto) Disparo de trabalho por horário ou intervalo — ver doc 14 |
+| **Prévia ao vivo** | `LivePreview` | (proposto) Painel com o app em execução — ver doc 14 |
+| **Repasse** | `hand-off` | (proposto) Regra que manda o trabalho de um agente ao próximo — ver doc 14 |
+| **Nota da equipe** | `Note` | Markdown compartilhado como memória da equipe — ver [doc 15](15-notas-da-equipe.md) |
 | **Estado do agente** | `AgentState` | `stopped · starting · idle · busy · awaiting_input · failed` |
 | **Detector de estado** | `StateDetector` | Heurística que infere o estado pela saída do PTY |
 | **Ring buffer** | `RingBuffer` | Últimas N linhas de saída mantidas em RAM no Rust |
@@ -45,3 +58,5 @@ Sinônimo é fonte de confusão para agentes que entram no meio do projeto.
 | "plugin" para skill | **skill** |
 | "sessão" para agente | **agente** (sessão é a execução de PTY) |
 | "worker", "thread" para agente | **agente** |
+| "partitura", "andar", "portal", "rotina", "ombro" | Vocabulário de outra ferramenta. Use **formação**, **bancada**, **prévia ao vivo**, **agendamento**, **resumo de ausência** |
+| "maestro", "regente" e a metáfora musical em geral | **coordenador**. A identidade do AISENSE é de equipe de engenharia, não de orquestra |

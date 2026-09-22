@@ -1,0 +1,2 @@
+# Falha em unwrap/expect fora de testes é aplicada via lint no lib.rs de cada crate.
+too-many-arguments-threshold = 8

@@ -10,22 +10,25 @@ redimensionar a janela e ver o terminal se ajustar, rolar o histórico, buscar t
 
 ## Tarefas
 
-### [ ] F01-01 — Spawn de PTY multiplataforma
+### [x] F01-01 — Spawn de PTY multiplataforma
 `aisense-pty`: `PtyHandle` com `spawn(cmd, args, cwd, env, size)`, `write`, `resize`, `kill`, `wait`.
 Usar `portable-pty`. Leitura em `spawn_blocking`, saída para um canal `broadcast`.
 **Aceite:** teste que sobe `echo hello`, captura a saída e confirma o exit code nos 3 SOs.
+> `PtySession` sobre `portable-pty`, com `spawn`/`write`/`resize`/`kill`/`wait`/`subscribe`. Leitura numa thread própria (I/O de PTY é bloqueante) e `clone_killer()` antes de mover o filho para a thread de espera — assim parar o agente não depende dela. **Verificado só em Linux neste ambiente**; macOS e Windows (ConPTY) dependem do job `desktop` do CI. 13 testes de integração, incluindo `stty size` (prova que o tamanho chega ao processo, o que TUIs exigem) e propagação de ambiente.
 
-### [ ] F01-02 — Ring buffer e log em arquivo
+### [x] F01-02 — Ring buffer e log em arquivo
 Buffer circular das últimas N linhas (default 10.000, configurável) em RAM, mais gravação
 append-only em `~/.aisense/logs/<id>.log`. API `snapshot()` devolvendo o buffer para reidratação.
 **Aceite:** gerar 100.000 linhas e confirmar memória estável e as últimas 10.000 no snapshot.
 Depende de F01-01.
+> Ring buffer com limite por linhas **e** por bytes, reconstrução byte a byte (ANSI e UTF-8 preservados) e contador de descarte para a UI poder avisar que o histórico foi truncado. Log append-only separado, com rotação de uma geração. Um teste prova a divisão de papéis: a linha que o ring já descartou continua no arquivo.
 
-### [ ] F01-03 — Coalescedor de saída
+### [x] F01-03 — Coalescedor de saída
 Agregar chunks numa janela de 16 ms antes de emitir para a UI. Parar de emitir quando o painel
 está marcado como invisível (o buffer continua acumulando no Rust).
 **Aceite:** um comando que cospe 10 MB gera ≤60 eventos/s; com o painel invisível, gera zero.
 Depende de F01-02.
+> `Batcher` com lógica pura recebendo o instante por parâmetro — testes determinísticos, sem `sleep`. Primeiro chunk sai na hora (senão o eco do que você digita atrasaria 16 ms); o resto agrupa por janela. Painel invisível não emite nada e nada represado é despejado ao voltar, porque o front reidrata pelo snapshot. Teste confirma ≤64 lotes por segundo de saída contínua.
 
 ### [ ] F01-04 — Comandos e eventos Tauri de PTY
 `pty_spawn`, `pty_write`, `pty_resize`, `pty_kill`, `pty_snapshot`, `pty_set_visible`;

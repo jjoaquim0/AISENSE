@@ -11,7 +11,8 @@ Para entender o projeto pela primeira vez, leia nesta sequência (≈45 min):
 2. [02 — Arquitetura](02-arquitetura.md) — como as peças se encaixam
 3. [03 — Stack Tecnológica](03-stack.md) — o que usamos e por quê
 4. [07 — Barramento de Comunicação](07-barramento-comunicacao.md) — o coração do produto
-5. [09 — Telas e Fluxos](09-telas-e-fluxos.md) — como o usuário vive isso
+5. [13 — Quadro Kanban](13-quadro-kanban.md) — a memória compartilhada da equipe
+6. [09 — Telas e Fluxos](09-telas-e-fluxos.md) — como o usuário vive isso
 
 ## Referência completa
 
@@ -30,6 +31,10 @@ Para entender o projeto pela primeira vez, leia nesta sequência (≈45 min):
 | [06 — Sistema de Skills](06-sistema-de-skills.md) | Formato, resolução, materialização e injeção no boot |
 | [07 — Barramento de Comunicação](07-barramento-comunicacao.md) | Protocolo, IPC, CLI `aisense`, MCP, entrega de mensagens |
 | [11 — Segurança](11-seguranca.md) | Segredos, permissões, sandbox, superfície de ataque |
+| [13 — Quadro Kanban](13-quadro-kanban.md) | Quadro por equipe, API dos agentes, automações, gate de revisão |
+| [15 — Notas da Equipe](15-notas-da-equipe.md) | Memória compartilhada em Markdown, escrita concorrente segura |
+| [16 — Bancadas](16-bancadas.md) | `git worktree` por agente, para não se atropelarem |
+| [17 — Comandos do Projeto](17-comandos-do-projeto.md) | `aisense.toml`: como rodar, testar e lintar |
 
 ### Interface
 | Doc | Conteúdo |
@@ -42,6 +47,7 @@ Para entender o projeto pela primeira vez, leia nesta sequência (≈45 min):
 |---|---|
 | [10 — Padrões de Código](10-padroes-de-codigo.md) | Convenções Rust/TS, erros, testes, commits, PRs |
 | [12 — Glossário](12-glossario.md) | Vocabulário canônico do projeto |
+| [14 — Ideias: software house](14-ideias-software-house.md) | Backlog priorizado, análise do Maestri, o que não fazer |
 | [ESTADO.md](ESTADO.md) | **Estado vivo**: fase atual, progresso, decisões pendentes |
 
 ### Decisões (ADR)
@@ -64,8 +70,9 @@ Para entender o projeto pela primeira vez, leia nesta sequência (≈45 min):
 | [03](fases/FASE-03-sala-da-equipe.md) | Sala da Equipe | 02 |
 | [04](fases/FASE-04-skills.md) | Sistema de Skills | 02 |
 | [05](fases/FASE-05-barramento.md) | Barramento de Comunicação | 03, 04 |
-| [06](fases/FASE-06-orquestracao.md) | Orquestração | 05 |
-| [07](fases/FASE-07-acabamento.md) | Acabamento | 06 |
-| [08](fases/FASE-08-distribuicao.md) | Distribuição | 07 |
+| [06](fases/FASE-06-quadro-kanban.md) | Quadro Kanban | 05 |
+| [07](fases/FASE-07-coordenacao.md) | Coordenação | 06 |
+| [08](fases/FASE-08-acabamento.md) | Acabamento | 07 |
+| [09](fases/FASE-09-distribuicao.md) | Distribuição | 08 |
 
 Visão geral do plano e critérios de "pronto": [fases/README.md](fases/README.md).

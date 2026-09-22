@@ -1,0 +1,123 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/inter';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+@import './tokens.css';
+
+/* Expõe os tokens ao Tailwind: `bg-surface`, `text-muted`, `border-subtle`... */
+@theme inline {
+  --color-base: var(--bg-base);
+  --color-surface: var(--bg-surface);
+  --color-raised: var(--bg-raised);
+  --color-terminal: var(--bg-terminal);
+  --color-hover: var(--bg-hover);
+  --color-active: var(--bg-active);
+
+  --color-primary: var(--fg-primary);
+  --color-secondary: var(--fg-secondary);
+  --color-muted: var(--fg-muted);
+
+  --color-subtle: var(--border-subtle);
+  --color-strong: var(--border-strong);
+
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-ring: var(--ring);
+
+  --color-idle: var(--state-idle);
+  --color-busy: var(--state-busy);
+  --color-awaiting: var(--state-awaiting);
+  --color-failed: var(--state-failed);
+  --color-stopped: var(--state-stopped);
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+}
+
+/* Escala tipográfica de docs/08-design-system.md */
+@utility text-display {
+  font-size: 28px;
+  line-height: 34px;
+  font-weight: 600;
+  letter-spacing: -0.011em;
+}
+@utility text-title {
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 600;
+  letter-spacing: -0.011em;
+}
+@utility text-heading {
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 600;
+}
+@utility text-body {
+  font-size: 13.5px;
+  line-height: 20px;
+  font-weight: 400;
+}
+@utility text-label {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+}
+@utility text-caption {
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 500;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg-base);
+  color: var(--fg-primary);
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  line-height: 20px;
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+  /* Interface de app: o texto do cromo não é selecionável; conteúdo reabilita. */
+  user-select: none;
+  transition: background-color var(--duration-normal) ease-out,
+    color var(--duration-normal) ease-out;
+}
+
+/* Anel de foco consistente em tudo que é interativo (docs/08 — acessibilidade) */
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+::selection {
+  background: color-mix(in oklch, var(--accent) 30%, transparent);
+}
+
+/* Barra de rolagem discreta, coerente com o tema */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

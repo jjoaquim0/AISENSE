@@ -189,7 +189,7 @@ aisense task done tsk_01J8XYZ
 | Skill | Para quê |
 |---|---|
 | `trabalho-em-equipe` | Comunicação entre agentes (sempre ativa) |
-| `maestro` | Papel de orquestrador: quebra objetivo em tarefas e distribui |
+| `coordenador` | Papel de coordenador: quebra objetivo em tarefas e distribui |
 | `revisor-rigoroso` | Revisão focada em correção |
 | `implementador` | Implementa tarefa pequena e avisa o revisor ao terminar |
 | `pesquisador` | Pesquisa e publica achados estruturados em canal |

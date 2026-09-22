@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="system">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AISENSE</title>
+    <script>
+      // Aplica o tema ANTES da primeira pintura. Sem isto, reabrir o app no tema
+      // escuro pisca branco (docs/08-design-system.md — F00-04).
+      (() => {
+        try {
+          const saved = localStorage.getItem('aisense.theme');
+          const theme = saved === 'light' || saved === 'dark' ? saved : 'system';
+          document.documentElement.dataset.theme = theme;
+          const dark =
+            theme === 'dark' ||
+            (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.style.backgroundColor = dark ? '#1b1c22' : '#f5f5f7';
+        } catch {
+          // localStorage bloqueado (modo privado): segue com o padrão do sistema.
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

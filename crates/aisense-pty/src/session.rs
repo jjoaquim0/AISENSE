@@ -1,0 +1,553 @@
+//! Uma sessão de PTY: processo vivo, leitura contínua e histórico.
+
+use std::io::{Read, Write};
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+
+use bytes::Bytes;
+use portable_pty::{ChildKiller, CommandBuilder, MasterPty, PtySize};
+use tokio::sync::{broadcast, watch};
+
+use crate::error::PtyError;
+use crate::log::SessionLog;
+use crate::ring::RingBuffer;
+
+/// Quantos chunks ficam represados para quem assina a saída antes de haver perda.
+/// Perder aqui não perde histórico: o ring buffer continua completo.
+const BROADCAST_CAPACITY: usize = 512;
+const READ_CHUNK: usize = 8 * 1024;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TerminalSize {
+    pub rows: u16,
+    pub cols: u16,
+}
+
+impl Default for TerminalSize {
+    fn default() -> Self {
+        Self { rows: 24, cols: 80 }
+    }
+}
+
+impl From<TerminalSize> for PtySize {
+    fn from(size: TerminalSize) -> Self {
+        Self {
+            rows: size.rows.max(1),
+            cols: size.cols.max(1),
+            pixel_width: 0,
+            pixel_height: 0,
+        }
+    }
+}
+
+/// Tudo que é preciso para subir um processo de agente.
+#[derive(Debug, Clone)]
+pub struct PtySpawn {
+    pub command: String,
+    pub args: Vec<String>,
+    pub cwd: Option<PathBuf>,
+    pub env: Vec<(String, String)>,
+    pub size: TerminalSize,
+    /// Onde gravar a transcrição completa. `None` guarda só o ring buffer.
+    pub log_path: Option<PathBuf>,
+}
+
+impl PtySpawn {
+    pub fn new(command: impl Into<String>) -> Self {
+        Self {
+            command: command.into(),
+            args: Vec::new(),
+            cwd: None,
+            env: Vec::new(),
+            size: TerminalSize::default(),
+            log_path: None,
+        }
+    }
+
+    pub fn log_path(mut self, path: impl Into<PathBuf>) -> Self {
+        self.log_path = Some(path.into());
+        self
+    }
+
+    pub fn arg(mut self, arg: impl Into<String>) -> Self {
+        self.args.push(arg.into());
+        self
+    }
+
+    pub fn cwd(mut self, cwd: impl Into<PathBuf>) -> Self {
+        self.cwd = Some(cwd.into());
+        self
+    }
+
+    pub fn env(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.env.push((key.into(), value.into()));
+        self
+    }
+
+    pub fn size(mut self, size: TerminalSize) -> Self {
+        self.size = size;
+        self
+    }
+}
+
+pub struct PtySession {
+    master: Mutex<Box<dyn MasterPty + Send>>,
+    writer: Mutex<Box<dyn Write + Send>>,
+    killer: Mutex<Box<dyn ChildKiller + Send + Sync>>,
+    output: broadcast::Sender<Bytes>,
+    ring: Arc<Mutex<RingBuffer>>,
+    exit: watch::Receiver<Option<i32>>,
+    running: Arc<AtomicBool>,
+}
+
+impl std::fmt::Debug for PtySession {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PtySession")
+            .field("running", &self.is_running())
+            .finish()
+    }
+}
+
+impl PtySession {
+    /// Sobe o processo num PTY e começa a bombear a saída para o ring buffer e para
+    /// quem estiver assinando.
+    pub fn spawn(spec: PtySpawn) -> Result<Self, PtyError> {
+        Self::spawn_with_ring(spec, RingBuffer::default())
+    }
+
+    pub fn spawn_with_ring(spec: PtySpawn, ring: RingBuffer) -> Result<Self, PtyError> {
+        if let Some(cwd) = &spec.cwd {
+            if !cwd.is_dir() {
+                return Err(PtyError::MissingWorkdir(cwd.clone()));
+            }
+        }
+
+        let pty_system = portable_pty::native_pty_system();
+        let pair = pty_system
+            .openpty(spec.size.into())
+            .map_err(|error| PtyError::OpenPty(error.to_string()))?;
+
+        let mut command = CommandBuilder::new(&spec.command);
+        for arg in &spec.args {
+            command.arg(arg);
+        }
+        if let Some(cwd) = &spec.cwd {
+            command.cwd(cwd);
+        }
+        for (key, value) in &spec.env {
+            command.env(key, value);
+        }
+
+        let mut child = pair
+            .slave
+            .spawn_command(command)
+            .map_err(|error| PtyError::Spawn {
+                command: spec.command.clone(),
+                source: std::io::Error::other(error.to_string()),
+            })?;
+
+        // Soltar o lado escravo é o que faz a leitura enxergar EOF quando o processo
+        // termina. Sem isto, a thread de leitura fica pendurada para sempre.
+        drop(pair.slave);
+
+        let killer = child.clone_killer();
+        let reader = pair
+            .master
+            .try_clone_reader()
+            .map_err(|error| PtyError::OpenPty(error.to_string()))?;
+        let writer = pair
+            .master
+            .take_writer()
+            .map_err(|error| PtyError::OpenPty(error.to_string()))?;
+
+        let (output, _) = broadcast::channel(BROADCAST_CAPACITY);
+        let (exit_tx, exit_rx) = watch::channel(None);
+        let ring = Arc::new(Mutex::new(ring));
+        let running = Arc::new(AtomicBool::new(true));
+
+        // Falha ao abrir o log não impede o agente de rodar: perder a transcrição é
+        // ruim, não deixar o agente subir é pior.
+        let log = spec
+            .log_path
+            .as_ref()
+            .and_then(|path| match SessionLog::create(path) {
+                Ok(log) => Some(log),
+                Err(error) => {
+                    tracing::warn!(%error, path = %path.display(), "log da sessão desabilitado");
+                    None
+                }
+            });
+
+        spawn_reader(reader, output.clone(), Arc::clone(&ring), log);
+
+        // A espera pelo processo é bloqueante e mora na própria thread; o `killer` foi
+        // clonado antes, então parar o agente não depende desta thread.
+        let running_for_waiter = Arc::clone(&running);
+        std::thread::Builder::new()
+            .name("aisense-pty-wait".into())
+            .spawn(move || {
+                let code = match child.wait() {
+                    Ok(status) => i32::try_from(status.exit_code()).unwrap_or(-1),
+                    Err(error) => {
+                        tracing::warn!(%error, "falha ao aguardar o processo do agente");
+                        -1
+                    }
+                };
+                running_for_waiter.store(false, Ordering::SeqCst);
+                let _ = exit_tx.send(Some(code));
+            })
+            .map_err(|error| PtyError::Spawn {
+                command: spec.command.clone(),
+                source: error,
+            })?;
+
+        Ok(Self {
+            master: Mutex::new(pair.master),
+            writer: Mutex::new(writer),
+            killer: Mutex::new(killer),
+            output,
+            ring,
+            exit: exit_rx,
+            running,
+        })
+    }
+
+    /// Assina a saída. Cada assinante recebe os chunks a partir de agora; o que veio
+    /// antes está no `snapshot`.
+    pub fn subscribe(&self) -> broadcast::Receiver<Bytes> {
+        self.output.subscribe()
+    }
+
+    /// Envia bytes para o processo, como se tivessem sido digitados.
+    pub fn write(&self, data: &[u8]) -> Result<(), PtyError> {
+        if !self.is_running() {
+            return Err(PtyError::Closed);
+        }
+        let mut writer = self.writer.lock().map_err(|_| PtyError::Closed)?;
+        writer.write_all(data).map_err(PtyError::Write)?;
+        writer.flush().map_err(PtyError::Write)
+    }
+
+    pub fn resize(&self, size: TerminalSize) -> Result<(), PtyError> {
+        let master = self.master.lock().map_err(|_| PtyError::Closed)?;
+        master
+            .resize(size.into())
+            .map_err(|error| PtyError::Resize(error.to_string()))
+    }
+
+    /// Todo o histórico retido, para reidratar o terminal na interface.
+    pub fn snapshot(&self) -> Vec<u8> {
+        self.ring
+            .lock()
+            .map(|ring| ring.snapshot())
+            .unwrap_or_default()
+    }
+
+    pub fn dropped_entries(&self) -> u64 {
+        self.ring
+            .lock()
+            .map(|ring| ring.dropped())
+            .unwrap_or_default()
+    }
+
+    pub fn is_running(&self) -> bool {
+        self.running.load(Ordering::SeqCst)
+    }
+
+    pub fn exit_code(&self) -> Option<i32> {
+        *self.exit.borrow()
+    }
+
+    pub fn kill(&self) -> Result<(), PtyError> {
+        let mut killer = self.killer.lock().map_err(|_| PtyError::Closed)?;
+        killer.kill().map_err(PtyError::Write)
+    }
+
+    /// Aguarda o processo terminar e devolve o exit code.
+    pub async fn wait(&self) -> i32 {
+        let mut exit = self.exit.clone();
+        loop {
+            if let Some(code) = *exit.borrow() {
+                return code;
+            }
+            if exit.changed().await.is_err() {
+                return -1;
+            }
+        }
+    }
+}
+
+fn spawn_reader(
+    mut reader: Box<dyn Read + Send>,
+    output: broadcast::Sender<Bytes>,
+    ring: Arc<Mutex<RingBuffer>>,
+    mut log: Option<SessionLog>,
+) {
+    // Leitura de PTY é bloqueante, então mora numa thread própria e não numa task
+    // do Tokio (regra R6 / docs/10-padroes-de-codigo.md).
+    let spawned = std::thread::Builder::new()
+        .name("aisense-pty-read".into())
+        .spawn(move || {
+            let mut buffer = [0u8; READ_CHUNK];
+            loop {
+                match reader.read(&mut buffer) {
+                    Ok(0) => break,
+                    Ok(count) => {
+                        let chunk = &buffer[..count];
+                        if let Ok(mut ring) = ring.lock() {
+                            ring.push(chunk);
+                        }
+                        if let Some(log) = log.as_mut() {
+                            if let Err(error) = log.append(chunk) {
+                                tracing::warn!(%error, "falha ao gravar o log da sessão");
+                            }
+                        }
+                        // Sem assinante, `send` devolve erro — é o caso normal quando o
+                        // painel está fechado, e o histórico já foi para o ring buffer.
+                        let _ = output.send(Bytes::copy_from_slice(chunk));
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+                    Err(error) => {
+                        tracing::debug!(%error, "leitura do PTY encerrada");
+                        break;
+                    }
+                }
+            }
+        });
+
+    if let Err(error) = spawned {
+        tracing::error!(%error, "não foi possível iniciar a thread de leitura do PTY");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+
+    use std::time::{Duration, Instant};
+
+    use super::*;
+    use crate::ring::DEFAULT_MAX_BYTES;
+
+    /// Um comando de shell que funciona nos três sistemas.
+    fn shell(script: &str) -> PtySpawn {
+        if cfg!(windows) {
+            PtySpawn::new("cmd").arg("/C").arg(script)
+        } else {
+            PtySpawn::new("sh").arg("-c").arg(script)
+        }
+    }
+
+    /// Procura uma linha exata na saída.
+    ///
+    /// Um PTY traduz `\n` em `\r\n` (termios `ONLCR`), então procurar por
+    /// `"linha 1\n"` **não** casa. E procurar só por `"linha 1"` casaria com
+    /// `"linha 10"`. Esta armadilha vale para qualquer código que analise saída de
+    /// terminal — incluindo o detector de estado da Fase 03.
+    fn has_line(haystack: &str, line: &str) -> bool {
+        haystack.contains(&format!("{line}\r\n")) || haystack.contains(&format!("{line}\n"))
+    }
+
+    /// Espera o texto aparecer na saída. PTY é assíncrono por natureza: não dá para
+    /// ler logo depois do spawn e esperar que já esteja lá.
+    async fn wait_for(session: &PtySession, needle: &str) -> String {
+        let deadline = Instant::now() + Duration::from_secs(10);
+        loop {
+            let text = String::from_utf8_lossy(&session.snapshot()).into_owned();
+            if text.contains(needle) {
+                return text;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "esperava encontrar {needle:?} na saída, mas veio: {text:?}"
+            );
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    }
+
+    #[tokio::test]
+    async fn captura_a_saida_do_processo() {
+        let session = PtySession::spawn(shell("echo ola-do-terminal")).unwrap();
+        let output = wait_for(&session, "ola-do-terminal").await;
+        assert!(output.contains("ola-do-terminal"), "{output:?}");
+        assert_eq!(session.wait().await, 0);
+    }
+
+    #[tokio::test]
+    async fn propaga_o_codigo_de_saida() {
+        let session = PtySession::spawn(shell("exit 3")).unwrap();
+        assert_eq!(session.wait().await, 3);
+        assert!(!session.is_running());
+        assert_eq!(session.exit_code(), Some(3));
+    }
+
+    #[tokio::test]
+    async fn escreve_no_processo_como_se_fosse_digitado() {
+        let session = PtySession::spawn(shell("cat")).unwrap();
+        session.write(b"linha digitada\n").unwrap();
+        let output = wait_for(&session, "linha digitada").await;
+        assert!(output.contains("linha digitada"), "{output:?}");
+        session.kill().unwrap();
+    }
+
+    #[tokio::test]
+    async fn entrega_a_saida_a_quem_assina() {
+        let session = PtySession::spawn(shell("cat")).unwrap();
+        let mut stream = session.subscribe();
+
+        session.write(b"pelo-broadcast\n").unwrap();
+
+        let received = tokio::time::timeout(Duration::from_secs(10), async {
+            let mut seen = String::new();
+            while let Ok(chunk) = stream.recv().await {
+                seen.push_str(&String::from_utf8_lossy(&chunk));
+                if seen.contains("pelo-broadcast") {
+                    return seen;
+                }
+            }
+            seen
+        })
+        .await
+        .expect("assinante deveria receber a saída");
+
+        assert!(received.contains("pelo-broadcast"), "{received:?}");
+        session.kill().unwrap();
+    }
+
+    #[tokio::test]
+    async fn o_processo_enxerga_o_tamanho_do_terminal() {
+        // Se o tamanho não chegasse ao processo, TUIs como htop desenhariam errado.
+        let session = PtySession::spawn(shell("stty size").size(TerminalSize {
+            rows: 40,
+            cols: 132,
+        }))
+        .unwrap();
+        let output = wait_for(&session, "40").await;
+        assert!(
+            output.contains("40 132"),
+            "esperava '40 132', veio: {output:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn redimensionar_nao_falha_com_a_sessao_viva() {
+        let session = PtySession::spawn(shell("cat")).unwrap();
+        session
+            .resize(TerminalSize {
+                rows: 50,
+                cols: 200,
+            })
+            .unwrap();
+        session.kill().unwrap();
+    }
+
+    #[tokio::test]
+    async fn kill_encerra_um_processo_que_ficaria_parado() {
+        let session = PtySession::spawn(shell("sleep 60")).unwrap();
+        assert!(session.is_running());
+        session.kill().unwrap();
+
+        let code = tokio::time::timeout(Duration::from_secs(10), session.wait())
+            .await
+            .expect("kill deveria encerrar o processo");
+        assert_ne!(code, 0, "processo morto não sai com sucesso");
+        assert!(!session.is_running());
+    }
+
+    #[tokio::test]
+    async fn escrever_em_sessao_encerrada_devolve_erro_com_dica() {
+        let session = PtySession::spawn(shell("exit 0")).unwrap();
+        session.wait().await;
+
+        let error = session.write(b"tarde demais\n").unwrap_err();
+        assert!(matches!(error, PtyError::Closed));
+        assert!(error.hint().is_some(), "erro precisa dizer o que fazer");
+    }
+
+    #[tokio::test]
+    async fn diretorio_de_trabalho_inexistente_falha_antes_de_subir_o_processo() {
+        let error = PtySession::spawn(shell("echo oi").cwd("/nao/existe/mesmo")).unwrap_err();
+        assert!(matches!(error, PtyError::MissingWorkdir(_)));
+        assert!(error.hint().is_some());
+    }
+
+    #[tokio::test]
+    async fn comando_inexistente_devolve_erro_acionavel() {
+        let spawn = PtySpawn::new("comando-que-nao-existe-aisense");
+        let result = PtySession::spawn(spawn);
+
+        // Em alguns sistemas o erro aparece no spawn; em outros, o processo sobe e
+        // morre em seguida. Os dois caminhos precisam terminar em falha visível.
+        match result {
+            Err(error) => assert!(error.hint().is_some(), "erro precisa dizer o que fazer"),
+            Ok(session) => assert_ne!(session.wait().await, 0, "deveria falhar ao executar"),
+        }
+    }
+
+    #[tokio::test]
+    async fn o_ambiente_chega_ao_processo() {
+        // É assim que AISENSE_TOKEN e AISENSE_AGENT_HANDLE chegam ao agente.
+        let session = PtySession::spawn(
+            shell("echo handle=$AISENSE_AGENT_HANDLE").env("AISENSE_AGENT_HANDLE", "backend"),
+        )
+        .unwrap();
+        let output = wait_for(&session, "handle=backend").await;
+        assert!(output.contains("handle=backend"), "{output:?}");
+    }
+
+    #[tokio::test]
+    async fn grava_a_transcricao_completa_em_arquivo() {
+        // O ring buffer só guarda as últimas linhas; o log guarda tudo. Este teste
+        // prova que a linha que o ring já descartou continua no arquivo.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("agente.log");
+
+        let session = PtySession::spawn_with_ring(
+            shell("for i in $(seq 1 300); do echo linha $i; done").log_path(&path),
+            RingBuffer::new(10, DEFAULT_MAX_BYTES),
+        )
+        .unwrap();
+
+        assert_eq!(session.wait().await, 0);
+        tokio::time::sleep(Duration::from_millis(200)).await;
+
+        let transcript = std::fs::read_to_string(&path).unwrap();
+        assert!(
+            has_line(&transcript, "linha 1"),
+            "o começo precisa estar no log"
+        );
+        assert!(has_line(&transcript, "linha 300"), "o fim também");
+
+        let snapshot = String::from_utf8_lossy(&session.snapshot()).into_owned();
+        assert!(
+            !has_line(&snapshot, "linha 1"),
+            "o ring buffer já descartou o começo"
+        );
+        assert!(has_line(&snapshot, "linha 300"), "mas manteve o fim");
+    }
+
+    #[tokio::test]
+    async fn aguenta_saida_volumosa_sem_estourar_a_memoria() {
+        let session = PtySession::spawn_with_ring(
+            shell("for i in $(seq 1 20000); do echo linha $i; done"),
+            RingBuffer::new(500, DEFAULT_MAX_BYTES),
+        )
+        .unwrap();
+
+        assert_eq!(session.wait().await, 0);
+        // Dá um instante para a thread de leitura drenar o que sobrou no buffer do PTY.
+        tokio::time::sleep(Duration::from_millis(200)).await;
+
+        let snapshot = session.snapshot();
+        assert!(
+            snapshot.len() < 256 * 1024,
+            "reteve {} bytes",
+            snapshot.len()
+        );
+        assert!(
+            session.dropped_entries() > 0,
+            "deveria ter descartado linhas antigas"
+        );
+    }
+}
