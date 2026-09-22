@@ -24,6 +24,8 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 ts-rs = "11"
 ulid = "1"
+portable-pty = "0.9"
+bytes = "1"
 
 [profile.release]
 codegen-units = 1
