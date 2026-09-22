@@ -38,7 +38,7 @@ Legenda: ⬜ não iniciada · 🟨 em andamento · ✅ concluída · 🟥 bloque
 
 | Verificado aqui | Resultado |
 |---|---|
-| `cargo test --workspace --exclude aisense-app` | ✅ 62 testes (14 core + 48 pty) |
+| `cargo test --workspace --exclude aisense-app` | ✅ 63 testes (14 core + 49 pty) |
 | `pnpm --filter @aisense/desktop test --run` | ✅ 99 testes (67 de contraste/cor + 5 de layout + 6 de decodificação, entre outros) |
 | `pnpm typecheck` | ✅ limpo |
 | `pnpm lint` (biome + rustfmt + clippy `-D warnings`) | ✅ limpo |
@@ -76,6 +76,22 @@ Três decisões desta fase que valem lembrar:
    do jeito ingênuo.
 3. Tipo que vira TypeScript **nunca** mora em `aisense-app` — senão `pnpm gen:types` passa a exigir
    compilar a janela. Virou a regra R5 em `AGENTS.md`.
+
+**Uma corrida que só o CI pegou.** A suíte passava 100% localmente e quebrou no runner do GitHub.
+Eram dois defeitos somados, ambos de ordenação, e nenhum deles era "flake":
+
+1. O receptor do canal `broadcast` era criado **depois** da thread de leitura começar. Um canal
+   broadcast descarta em silêncio o que é enviado sem receptores inscritos, então a saída de um
+   processo rápido (`echo`) se perdia. Agora o receptor principal nasce dentro do `spawn`, antes da
+   leitura, e é entregue uma única vez por `take_output()`.
+2. O evento de término era ordenado por **tempo** (`sleep(50ms)` depois do processo morrer) na
+   esperança de que a saída já tivesse sido drenada. Sob carga não bastava, e a última linha —
+   normalmente a mensagem de erro que explica a falha — chegava depois do painel já marcado como
+   parado. Agora a ordem é **causal**: o término só é anunciado depois do EOF da leitura e da
+   drenagem completa.
+
+Guarda de regressão: `nao_perde_a_saida_de_um_processo_instantaneo` roda o cenário 10 vezes.
+A suíte foi executada 20 vezes seguidas sem falha antes de reenviar.
 
 Bugs encontrados pelos próprios testes, todos corrigidos na origem:
 1. O corte de 64 KB do ring buffer só valia ao *continuar* uma entrada; um `push` único e grande
@@ -132,4 +148,5 @@ Bugs encontrados pelos próprios testes, todos corrigidos na origem:
 | 2026-09-22 | Claude | Vocabulário próprio (fim da metáfora musical: `@maestro` → `@coordenador`); F00-03, F00-06 e F00-07 concluídas |
 | 2026-09-22 | Claude | Fase 01: PTY, ring buffer, log e coalescência em Rust, com 33 testes |
 | 2026-09-22 | Claude | Fase 01: gerenciador de sessões, ponte Tauri, paleta ANSI testada, `<Terminal />` com xterm.js. 62 testes Rust + 99 front |
+| 2026-09-22 | Claude | PR #3 aberto. CI vermelho revelou uma corrida na entrega de saída do PTY (perda silenciosa + ordem do evento de término); corrigida na origem com teste de regressão |
 | 2026-09-22 | Claude | D6 aprovada: docs 15, 16 e 17 escritos, gate de revisão no doc 13, e 6 tarefas novas distribuídas pelas Fases 02, 04, 05 e 06. Início da Fase 01 |

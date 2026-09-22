@@ -96,8 +96,17 @@ pub struct PtySession {
     writer: Mutex<Box<dyn Write + Send>>,
     killer: Mutex<Box<dyn ChildKiller + Send + Sync>>,
     output: broadcast::Sender<Bytes>,
+    /// Receptor criado **antes** da thread de leitura começar, entregue uma única vez
+    /// ao consumidor principal. Sem isto há perda de saída: um canal broadcast
+    /// descarta o que é enviado sem nenhum receptor inscrito, e um processo rápido
+    /// (`echo oi`) termina antes de alguém conseguir se inscrever.
+    primary: Mutex<Option<broadcast::Receiver<Bytes>>>,
     ring: Arc<Mutex<RingBuffer>>,
     exit: watch::Receiver<Option<i32>>,
+    /// Vira `true` quando a leitura do PTY encontra EOF, ou seja, quando **toda** a
+    /// saída já foi entregue. É o sinal que permite ordenar o evento de término
+    /// depois da última linha, sem depender de tempo.
+    reader_done: watch::Receiver<bool>,
     running: Arc<AtomicBool>,
 }
 
@@ -161,8 +170,9 @@ impl PtySession {
             .take_writer()
             .map_err(|error| PtyError::OpenPty(error.to_string()))?;
 
-        let (output, _) = broadcast::channel(BROADCAST_CAPACITY);
+        let (output, primary) = broadcast::channel(BROADCAST_CAPACITY);
         let (exit_tx, exit_rx) = watch::channel(None);
+        let (reader_tx, reader_rx) = watch::channel(false);
         let ring = Arc::new(Mutex::new(ring));
         let running = Arc::new(AtomicBool::new(true));
 
@@ -179,7 +189,7 @@ impl PtySession {
                 }
             });
 
-        spawn_reader(reader, output.clone(), Arc::clone(&ring), log);
+        spawn_reader(reader, output.clone(), Arc::clone(&ring), log, reader_tx);
 
         // A espera pelo processo é bloqueante e mora na própria thread; o `killer` foi
         // clonado antes, então parar o agente não depende desta thread.
@@ -204,17 +214,37 @@ impl PtySession {
 
         Ok(Self {
             master: Mutex::new(pair.master),
+            primary: Mutex::new(Some(primary)),
             writer: Mutex::new(writer),
             killer: Mutex::new(killer),
             output,
             ring,
             exit: exit_rx,
+            reader_done: reader_rx,
             running,
         })
     }
 
-    /// Assina a saída. Cada assinante recebe os chunks a partir de agora; o que veio
-    /// antes está no `snapshot`.
+    /// Sinaliza quando a leitura do PTY terminou (EOF): a partir daí não vem mais
+    /// saída nenhuma. Quem entrega a saída à interface usa isto para só anunciar o
+    /// término depois de drenar tudo.
+    pub fn reader_done(&self) -> watch::Receiver<bool> {
+        self.reader_done.clone()
+    }
+
+    /// Receptor principal da saída, garantido sem perda desde o primeiro byte.
+    ///
+    /// Só pode ser retirado uma vez — é do consumidor que entrega a saída à
+    /// interface. Para observadores adicionais, use `subscribe`.
+    pub fn take_output(&self) -> Option<broadcast::Receiver<Bytes>> {
+        self.primary
+            .lock()
+            .ok()
+            .and_then(|mut primary| primary.take())
+    }
+
+    /// Assina a saída como observador. Recebe os chunks **a partir de agora**; o que
+    /// veio antes está no `snapshot`.
     pub fn subscribe(&self) -> broadcast::Receiver<Bytes> {
         self.output.subscribe()
     }
@@ -283,7 +313,9 @@ fn spawn_reader(
     output: broadcast::Sender<Bytes>,
     ring: Arc<Mutex<RingBuffer>>,
     mut log: Option<SessionLog>,
+    done: watch::Sender<bool>,
 ) {
+    let done_on_failure = done.clone();
     // Leitura de PTY é bloqueante, então mora numa thread própria e não numa task
     // do Tokio (regra R6 / docs/10-padroes-de-codigo.md).
     let spawned = std::thread::Builder::new()
@@ -314,10 +346,15 @@ fn spawn_reader(
                     }
                 }
             }
+            // Não vem mais saída. Precisa valer para todo caminho de saída do laço,
+            // inclusive o de erro: quem espera este sinal ficaria preso para sempre.
+            let _ = done.send(true);
         });
 
     if let Err(error) = spawned {
         tracing::error!(%error, "não foi possível iniciar a thread de leitura do PTY");
+        // A thread não subiu: ninguém mais sinalizaria o fim da leitura.
+        let _ = done_on_failure.send(true);
     }
 }
 

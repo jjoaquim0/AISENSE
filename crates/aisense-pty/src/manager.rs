@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
 use bytes::Bytes;
-use tokio::sync::broadcast::error::RecvError;
+use tokio::sync::broadcast::error::{RecvError, TryRecvError};
 
 use crate::batch::Batcher;
 use crate::error::PtyError;
@@ -83,13 +83,17 @@ impl PtyManager {
         let session = Arc::new(PtySession::spawn_with_ring(spec, ring)?);
         let batcher = Arc::new(Mutex::new(Batcher::with_default_window()));
 
+        // Receptor criado dentro do `spawn`, antes da thread de leitura começar.
+        // Inscrever-se aqui seria tarde demais: um `echo` rápido já teria enviado a
+        // saída para um canal sem receptores, e ela seria descartada em silêncio.
+        let stream = session.take_output().unwrap_or_else(|| session.subscribe());
         tokio::spawn(pump(
             agent_id.clone(),
-            session.subscribe(),
+            Arc::clone(&session),
+            stream,
             Arc::clone(&batcher),
-            Arc::clone(&sink),
+            sink,
         ));
-        tokio::spawn(watch_exit(agent_id.clone(), Arc::clone(&session), sink));
 
         let mut sessions = self.sessions.write().map_err(|_| PtyError::Closed)?;
         sessions.insert(agent_id, Managed { session, batcher });
@@ -193,52 +197,64 @@ impl PtyManager {
     }
 }
 
-/// Lê a saída da sessão, agrupa por janela e entrega ao destino.
+/// Lê a saída da sessão, agrupa por janela, entrega ao destino e — só então —
+/// anuncia o término.
+///
+/// A ordem entre "última linha" e "processo encerrado" é **causal**, não temporal:
+/// esperamos o EOF da leitura e drenamos o que restou antes de emitir a saída. Uma
+/// versão anterior dormia 50 ms na esperança de que desse tempo, e a corrida
+/// aparecia sob carga — justamente escondendo a mensagem de erro que explica a falha.
 async fn pump(
     agent_id: String,
+    session: Arc<PtySession>,
     mut stream: tokio::sync::broadcast::Receiver<Bytes>,
     batcher: Arc<Mutex<Batcher>>,
     sink: Arc<dyn OutputSink>,
 ) {
-    loop {
+    let mut reader_done = session.reader_done();
+    let mut finished = *reader_done.borrow();
+
+    while !finished {
         // O tempo de espera é o que falta para o próximo lote; sem nada pendente,
         // dorme até chegar algo. Nunca segura o lock atravessando um `await`.
-        let delay = {
-            match batcher.lock() {
-                Ok(batcher) => batcher
-                    .time_until_ready(Instant::now())
-                    .unwrap_or(IDLE_POLL),
-                Err(_) => break,
-            }
+        let delay = match batcher.lock() {
+            Ok(batcher) => batcher
+                .time_until_ready(Instant::now())
+                .unwrap_or(IDLE_POLL),
+            Err(_) => return,
         };
 
         tokio::select! {
             received = stream.recv() => match received {
-                Ok(chunk) => {
-                    if let Ok(mut batcher) = batcher.lock() {
-                        batcher.push(&chunk);
-                    }
-                }
+                Ok(chunk) => push(&batcher, &chunk),
                 Err(RecvError::Lagged(skipped)) => {
-                    // A interface ficou para trás. O histórico está íntegro no ring
+                    // A interface ficou para trás. O histórico segue íntegro no ring
                     // buffer, e o próximo snapshot corrige a tela.
                     tracing::debug!(%agent_id, skipped, "saída do PTY descartada por atraso");
                 }
-                Err(RecvError::Closed) => break,
+                Err(RecvError::Closed) => finished = true,
             },
+            changed = reader_done.changed() => {
+                finished = changed.is_err() || *reader_done.borrow();
+            }
             () = tokio::time::sleep(delay) => {}
         }
 
-        let batch = match batcher.lock() {
-            Ok(mut batcher) => batcher.poll(Instant::now()),
-            Err(_) => break,
-        };
-        if let Some(batch) = batch {
-            sink.data(&agent_id, batch);
+        emit_ready(&agent_id, &batcher, sink.as_ref());
+    }
+
+    // A leitura acabou, mas ainda pode haver chunks no canal. Drena sem bloquear.
+    loop {
+        match stream.try_recv() {
+            Ok(chunk) => push(&batcher, &chunk),
+            Err(TryRecvError::Lagged(skipped)) => {
+                tracing::debug!(%agent_id, skipped, "saída do PTY descartada por atraso");
+            }
+            Err(TryRecvError::Empty | TryRecvError::Closed) => break,
         }
     }
 
-    // O processo terminou: entrega o que sobrou. Normalmente é a mensagem de erro.
+    // Tudo entregue — inclusive as últimas linhas, que normalmente são o erro.
     let remaining = match batcher.lock() {
         Ok(mut batcher) => batcher.drain(Instant::now()),
         Err(_) => None,
@@ -246,14 +262,24 @@ async fn pump(
     if let Some(remaining) = remaining {
         sink.data(&agent_id, remaining);
     }
+
+    sink.exit(&agent_id, session.wait().await);
 }
 
-async fn watch_exit(agent_id: String, session: Arc<PtySession>, sink: Arc<dyn OutputSink>) {
-    let code = session.wait().await;
-    // Dá à tarefa de bombeamento o tempo de drenar antes de anunciar a saída, para o
-    // evento de término não chegar antes das últimas linhas.
-    tokio::time::sleep(Duration::from_millis(50)).await;
-    sink.exit(&agent_id, code);
+fn push(batcher: &Mutex<Batcher>, chunk: &[u8]) {
+    if let Ok(mut batcher) = batcher.lock() {
+        batcher.push(chunk);
+    }
+}
+
+fn emit_ready(agent_id: &str, batcher: &Mutex<Batcher>, sink: &dyn OutputSink) {
+    let batch = match batcher.lock() {
+        Ok(mut batcher) => batcher.poll(Instant::now()),
+        Err(_) => None,
+    };
+    if let Some(batch) = batch {
+        sink.data(agent_id, batch);
+    }
 }
 
 #[cfg(test)]
@@ -339,6 +365,28 @@ mod tests {
             chunks.iter().all(|(id, _)| id == "agt_1"),
             "o id do agente vai junto"
         );
+    }
+
+    #[tokio::test]
+    async fn nao_perde_a_saida_de_um_processo_instantaneo() {
+        // Regressão: o receptor era criado depois da thread de leitura começar, e um
+        // `echo` terminava antes de alguém estar inscrito. Um canal broadcast
+        // descarta em silêncio o que é enviado sem receptores, então a saída sumia —
+        // de forma intermitente, que é o pior jeito de sumir.
+        for rodada in 0..10 {
+            let manager = PtyManager::new();
+            let recorder = Arc::new(Recorder::default());
+            let marca = format!("instantaneo-{rodada}");
+
+            manager
+                .spawn(
+                    "agt_rapido",
+                    shell(&format!("echo {marca}")),
+                    recorder.clone(),
+                )
+                .unwrap();
+            wait_until(|| recorder.text().contains(&marca)).await;
+        }
     }
 
     #[tokio::test]
