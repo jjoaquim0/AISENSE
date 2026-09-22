@@ -89,5 +89,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
 
+      - name: Clippy do app
+        run: cargo clippy -p aisense-app --all-targets -- -D warnings
+
       - name: Compilar o app
         run: cargo build -p aisense-app

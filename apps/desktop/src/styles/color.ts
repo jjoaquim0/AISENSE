@@ -63,3 +63,22 @@ export function contrastRatio(foreground: Oklch, background: Oklch): number {
   const [lighter, darker] = a > b ? [a, b] : [b, a];
   return (lighter + 0.05) / (darker + 0.05);
 }
+
+/** Componente sRGB linear → com gama, no formato de 8 bits. */
+function encodeGamma(channel: number): number {
+  const value = channel <= 0.0031308 ? channel * 12.92 : 1.055 * channel ** (1 / 2.4) - 0.055;
+  return Math.round(Math.min(1, Math.max(0, value)) * 255);
+}
+
+/**
+ * OKLCH → `#rrggbb`.
+ *
+ * O xterm.js não entende `oklch()`: ele aceita hex, `rgb()` e nomes. Como nossos
+ * tokens são todos OKLCH, a conversão acontece aqui antes de montar o tema do
+ * terminal.
+ */
+export function toHex(color: Oklch): string {
+  const [r, g, b] = oklchToLinearRgb(color);
+  const hex = [r, g, b].map((channel) => encodeGamma(channel).toString(16).padStart(2, '0'));
+  return `#${hex.join('')}`;
+}

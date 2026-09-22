@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { contrastRatio } from '@/styles/color';
+import { contrastRatio, parseOklch, toHex } from '@/styles/color';
 import { loadTheme, type ThemeName } from './tokens';
 
 /**
@@ -85,5 +85,103 @@ describe.each(THEMES)('contraste no tema %s', (theme) => {
       spread,
       `variação de contraste entre as cores de agente: ${spread.toFixed(2)}x`,
     ).toBeLessThan(2);
+  });
+});
+
+/**
+ * Cores ANSI do terminal.
+ *
+ * É aqui que quase todo tema falha: a paleta ANSI padrão tem azul e preto
+ * ilegíveis sobre fundo escuro, e o agente escreve caminho de arquivo e erro
+ * justamente nessas cores.
+ *
+ * `ansi-black` (no escuro) e `ansi-white` (no claro) ficam de fora: em terminal
+ * elas são cor de **fundo**, não de texto, e exigir contraste delas contra o
+ * próprio fundo não faria sentido.
+ */
+const ANSI_TEXT_COLORS = [
+  '--ansi-red',
+  '--ansi-green',
+  '--ansi-yellow',
+  '--ansi-blue',
+  '--ansi-magenta',
+  '--ansi-cyan',
+  '--ansi-bright-red',
+  '--ansi-bright-green',
+  '--ansi-bright-yellow',
+  '--ansi-bright-blue',
+  '--ansi-bright-magenta',
+  '--ansi-bright-cyan',
+];
+
+describe.each(THEMES)('cores ANSI do terminal no tema %s', (theme) => {
+  const tokens = loadTheme(theme);
+
+  const ratioOnTerminal = (token: string): number => {
+    const color = tokens[token];
+    const background = tokens['--bg-terminal'];
+    if (!color) throw new Error(`Token ANSI ausente no tema ${theme}: ${token}`);
+    if (!background) throw new Error('--bg-terminal ausente');
+    return contrastRatio(color, background);
+  };
+
+  it.each(ANSI_TEXT_COLORS)('%s é legível sobre o fundo do terminal', (token) => {
+    const ratio = ratioOnTerminal(token);
+    expect(
+      ratio,
+      `${token} sobre --bg-terminal no tema ${theme}: ${ratio.toFixed(2)}:1`,
+    ).toBeGreaterThanOrEqual(TEXT_MIN);
+  });
+
+  it('a cor de texto padrão do terminal é legível', () => {
+    const token = theme === 'dark' ? '--ansi-white' : '--ansi-black';
+    expect(ratioOnTerminal(token)).toBeGreaterThanOrEqual(TEXT_MIN);
+  });
+
+  it('cinza escuro (usado em texto apagado) ainda é legível', () => {
+    // Muitos programas usam ansi-bright-black para texto secundário.
+    expect(ratioOnTerminal('--ansi-bright-black')).toBeGreaterThanOrEqual(UI_MIN);
+  });
+
+  it('as 16 cores são distinguíveis entre si', () => {
+    const seen = new Map<string, string>();
+    for (const token of [...ANSI_TEXT_COLORS, '--ansi-black', '--ansi-white']) {
+      const color = tokens[token];
+      if (!color) throw new Error(`Token ANSI ausente: ${token}`);
+      const key = `${color.l.toFixed(3)}|${color.c.toFixed(3)}|${color.h.toFixed(1)}`;
+      const previous = seen.get(key);
+      expect(previous, `${token} e ${previous} são a mesma cor`).toBeUndefined();
+      seen.set(key, token);
+    }
+  });
+});
+
+describe('toHex', () => {
+  const hex = (value: string): string => {
+    const color = parseOklch(value);
+    if (!color) throw new Error(`OKLCH inválido: ${value}`);
+    return toHex(color);
+  };
+
+  it('converte os extremos', () => {
+    expect(hex('oklch(1 0 0)')).toBe('#ffffff');
+    expect(hex('oklch(0 0 0)')).toBe('#000000');
+  });
+
+  it('produz sempre 7 caracteres', () => {
+    for (const token of Object.values(loadTheme('dark'))) {
+      expect(toHex(token)).toMatch(/^#[0-9a-f]{6}$/);
+    }
+  });
+
+  it('recorta cores fora do gamut em vez de gerar valor inválido', () => {
+    // Croma alto demais para o gamut sRGB; precisa sair como cor válida mesmo assim.
+    expect(hex('oklch(0.7 0.4 150)')).toMatch(/^#[0-9a-f]{6}$/);
+  });
+
+  it('mantém a ordem de luminosidade', () => {
+    const escuro = Number.parseInt(hex('oklch(0.2 0 0)').slice(1), 16);
+    const claro = Number.parseInt(hex('oklch(0.8 0 0)').slice(1), 16);
+    expect(claro).toBeGreaterThan(escuro);
   });
 });

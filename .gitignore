@@ -9,6 +9,9 @@ dist/
 
 # Tauri
 /apps/desktop/src-tauri/target
+# Esquemas de ACL gerados pelo tauri-build a cada compilação: versioná-los só cria
+# ruído de diff, e o linter reprovaria a formatação deles.
+/crates/aisense-app/gen/
 /apps/desktop/src/types/generated/*.d.ts.map
 
 # Dados locais do AISENSE (nunca versionar)
