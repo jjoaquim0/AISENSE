@@ -35,7 +35,7 @@ Funciona via CLI `aisense` (serve para qualquer IA em qualquer terminal) e via M
 | Perfil | Uso típico |
 |---|---|
 | **Dev solo / indie** | Dupla "implementador + revisor" trabalhando no mesmo repositório |
-| **Tech lead** | Um agente por serviço, com um maestro distribuindo tarefas |
+| **Tech lead** | Um agente por serviço, com um coordenador distribuindo tarefas |
 | **Pesquisador** | Agentes coletando de fontes diferentes e um sintetizador consolidando |
 | **Operações/DevOps** | Terminais de longa duração monitorando, com um agente triando alertas |
 
@@ -62,8 +62,8 @@ Estes três casos são o critério de sucesso do v1. Se eles funcionam bem, o pr
 `aisense ask @revisor "revisa o diff de HEAD~1"`. `@revisor` (Codex, com a skill "revisão rigorosa")
 analisa e responde. `@dev` recebe a resposta e corrige. O humano só lê a linha do tempo.
 
-### CU-2 — Maestro distribuindo trabalho
-`@maestro` recebe do humano "migre a autenticação para OAuth". Ele quebra em tarefas no quadro,
+### CU-2 — Coordenador distribuindo trabalho
+`@coordenador` recebe do humano "migre a autenticação para OAuth". Ele quebra em tarefas no quadro,
 atribui `@backend`, `@frontend` e `@docs`, acompanha status e avisa quando tudo fecha.
 
 ### CU-3 — Pesquisa paralela com síntese

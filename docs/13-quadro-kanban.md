@@ -15,7 +15,7 @@ reinicia e ninguém mais enxerga. Com quadro:
 | "Em que pé está aquilo?" | `aisense board` responde em texto, para o humano e para a IA |
 | Agente reiniciou e perdeu o fio | O cartão continua lá, com histórico e comentários |
 | Trabalho que depende de outro | Dependências explícitas (`--blocked-by`) |
-| Maestro virando gargalo | O agente puxa trabalho da coluna em vez de esperar ser mandado |
+| Coordenador virando gargalo | O agente puxa trabalho da coluna em vez de esperar ser mandado |
 | Você voltou depois de 2 horas | O quadro mostra o que mudou, sem ler 9 terminais |
 
 O quadro é criado **automaticamente** junto com a equipe. Não existe equipe sem quadro.
@@ -146,7 +146,7 @@ O quadro **não é uma ilha**: toda mudança relevante vira mensagem de sistema 
 | Comentário no seu cartão | Responsável + criador + participantes do thread |
 | Cartão que te bloqueava foi concluído | Responsáveis dos cartões dependentes |
 | Seu cartão entrou em Revisão | Quem for definido na automação da coluna |
-| Cartão parado em Fazendo > N horas | Responsável, e depois o maestro |
+| Cartão parado em Fazendo > N horas | Responsável, e depois o coordenador |
 
 A notificação respeita o `delivery_mode` do agente (caixa, injeção ou hook) —
 mesma máquina de entrega de [07 — Barramento](07-barramento-comunicacao.md).
@@ -173,7 +173,7 @@ then   = [{ assign = "actor" }]           # quem moveu vira responsável
 when     = "card_stale"
 column   = "doing"
 after_h  = 4
-then     = [{ notify = "@maestro", message = "cartão parado há 4h" }]
+then     = [{ notify = "@coordenador", message = "cartão parado há 4h" }]
 
 [[automation]]
 when   = "card_enters"

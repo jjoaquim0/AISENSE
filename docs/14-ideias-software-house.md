@@ -7,30 +7,39 @@
 > **Nada aqui entra no escopo sem sair desta lista e virar fase.** Este documento existe para
 > registrar a ideia com a análise feita — não para ser implementado por conta própria.
 
-## O que aprendemos com o Maestri
+## Sobre a inspiração
 
-O [Maestri](https://www.themaestri.app/en) é um app nativo de macOS/Windows que organiza agentes de
-código (Claude Code, Codex, Gemini, OpenCode) num canvas infinito, onde terminais são nós que você
-conecta com uma linha e passam a se prompter mutuamente via orquestração de PTY.
+O [Maestri](https://www.themaestri.app/en) é a referência que o usuário citou: um app nativo que
+organiza agentes de código (Claude Code, Codex, Gemini, OpenCode) como nós numa tela, conectados
+entre si. Estudamos o que ele resolve bem e a lista abaixo reflete isso.
 
-Cinco ideias dele que valem adotar, com o nome que damos a cada uma aqui:
+**Vocabulário é nosso.** Nenhum nome de recurso do AISENSE reaproveita a terminologia do Maestri,
+nem a metáfora musical que é a identidade dele. Os nomes abaixo são os definitivos — quem for
+implementar usa estes, em código e em interface. Se você reconheceu uma ideia parecida em outra
+ferramenta, o nome dela não entra aqui.
 
-| No Maestri | No AISENSE | Por que vale | Prioridade |
-|---|---|---|---|
-| Notas markdown como fonte da verdade | **Notas da equipe** | Memória que sobrevive ao reinício do agente | 🔴 v1 |
-| Andares (cópias isoladas do repo) | **Bancadas** (git worktree por agente) | Impede agentes se atropelarem no mesmo checkout | 🔴 v1 |
-| Conectar agentes com uma linha | **Conexões no canvas** | A topologia da equipe vira configuração visual | 🟡 v1.1 |
-| Partituras (+257 templates) | **Formações** | Montar um squad inteiro em um clique, e compartilhar | 🟡 v1.1 |
-| Rotinas (tarefas agendadas) | **Rotinas** | Monitorar CI, triar, fazer deploy sem você pedir | 🟡 v1.1 |
-| Ombro (resumo do que passou) | **Resumo de ausência** | Voltar depois de 2h sem ler 9 terminais | 🟡 v1.1 |
-| Portais (preview ao vivo) | **Portais** | O agente verifica o que construiu, não só compila | 🟢 pós-v1 |
-
-Onde nos diferenciamos de propósito: o Maestri conecta terminais para um agente **digitar no
+Onde nos diferenciamos de propósito: no Maestri, conectar dois terminais faz um agente **digitar no
 terminal do outro**. No AISENSE a conversa passa por um **barramento com mensagens persistidas,
 recibos e auditoria** ([ADR 0004](adr/0004-protocolo-do-barramento.md)) — e a injeção em stdin é só
 um dos três modos de entrega, com todas as travas de [ADR 0006](adr/0006-entrega-de-mensagens.md).
 Isso nos dá linha do tempo, `ask`/`reply` com correlação e proteção anti-laço, que digitar no
 terminal alheio não dá.
+
+### Resumo dos recursos propostos
+
+| Recurso | O que é | Prioridade |
+|---|---|---|
+| **Notas da equipe** | Markdown compartilhado que sobrevive ao reinício do agente | 🔴 v1 |
+| **Bancadas** | `git worktree` por agente, para não se atropelarem no mesmo checkout | 🔴 v1 |
+| **Comandos do projeto** | `aisense.toml` dizendo como rodar, testar e lintar | 🔴 v1 |
+| **Gate de revisão** | Cartão só fecha se outro agente aprovar | 🔴 v1 |
+| **Formações** | Equipe inteira exportável e importável em um arquivo | 🟡 v1.1 |
+| **Biblioteca de papéis** | Papel reutilizável, separado das skills | 🟡 v1.1 |
+| **Conexões e repasses** | Topologia da equipe como configuração visual | 🟡 v1.1 |
+| **Agendamentos** | Disparar trabalho por horário ou intervalo | 🟡 v1.1 |
+| **Resumo de ausência** | O que mudou enquanto você esteve fora | 🟡 v1.1 |
+| **Métricas da equipe** | Vazão, tempo de ciclo, retrabalho | 🟡 v1.1 |
+| **Prévia ao vivo** | Painel com o app em execução, para o agente conferir o que fez | 🟢 pós-v1 |
 
 ---
 
@@ -57,7 +66,7 @@ branch próprio (`aisense/backend`), criado no start do agente e removido no fim
 
 - A equipe escolhe: **checkout compartilhado** (padrão, simples) ou **bancada por agente**.
 - O quadro mostra em qual branch cada cartão está sendo feito.
-- Ao concluir, o agente abre PR ou o maestro faz o merge.
+- Ao concluir, o agente abre PR ou o coordenador faz o merge.
 
 Sem isso, "equipe de agentes" só funciona com um agente escrevendo por vez. **Esta é, na minha
 avaliação, a funcionalidade de maior impacto desta lista inteira.**
@@ -86,7 +95,7 @@ e no nosso caso é barata: o quadro já sabe quem fez e quem revisou.
 
 ## 🟡 Candidatos a v1.1
 
-### 5. Formações (partituras)
+### 5. Formações
 Exportar uma equipe inteira — agentes, papéis, skills, colunas do quadro, automações, conexões —
 como um `.aisense-formacao.json` que outra pessoa importa e roda. É o que faz a ferramenta virar
 comunidade: "baixe a formação Squad React + API Rust".
@@ -96,15 +105,15 @@ Hoje `role` é um campo de texto no agente. Vira biblioteca reutilizável, separ
 **papel = quem o agente é** (Arquiteto, Revisor, QA); **skill = como ele faz algo específico**.
 Um papel referencia skills. Facilita montar equipes sem reescrever instrução.
 
-### 7. Conexões e handoffs no canvas
+### 7. Conexões e repasses
 A vista Fluxo deixa de ser só observação e vira configuração: você desenha a linha
-`@dev → @revisor` e define o handoff ("ao concluir um cartão, mande para revisão do @revisor").
-Opcionalmente restringe quem fala com quem — topologia em estrela (tudo passa pelo maestro) ou malha.
+`@dev → @revisor` e define o repasse ("ao concluir um cartão, mande para revisão do @revisor").
+Opcionalmente restringe quem fala com quem — topologia em estrela (tudo passa pelo coordenador) ou malha.
 
-### 8. Rotinas (tarefas agendadas)
-Cron por equipe: "todo dia 9h, `@triagem` lê as issues novas e cria cartões";
-"a cada 15 min, `@monitor` checa o CI e abre cartão se quebrou".
-Reaproveita todo o barramento — é só um disparador.
+### 8. Agendamentos
+Disparadores por horário ou intervalo, por equipe: "todo dia 9h, `@triagem` lê as issues novas e
+cria cartões"; "a cada 15 min, `@monitor` checa o CI e abre cartão se quebrou".
+Reaproveita todo o barramento — é só um gatilho a mais.
 
 ### 9. Resumo de ausência
 Ao voltar depois de N minutos: o que cada agente fez, o que mudou no quadro, o que está bloqueado,
@@ -130,7 +139,7 @@ quando o runtime reportar uso. (Ver D2 em [ESTADO.md](ESTADO.md) — depende do 
 
 | Ideia | Descrição |
 |---|---|
-| **Portais** | Painel com webview do app em desenvolvimento; o agente tira screenshot e verifica o próprio trabalho |
+| **Prévia ao vivo** | Painel com o app em desenvolvimento rodando; o agente tira screenshot e confere o próprio trabalho |
 | **Revisão adversarial** | Executor e revisor obrigatoriamente de fornecedores diferentes (Claude implementa, Codex revisa) — diversidade reduz ponto cego comum |
 | **Sprints e ciclos** | Agrupar cartões em ciclos com meta e data, com retrospectiva automática |
 | **Templates de cartão** | Formulários por tipo (bug, feature, chore) com campos e checklist obrigatórios |
@@ -161,11 +170,13 @@ Registrado para não voltar à mesa a cada ciclo:
 ## Sequência sugerida depois do v1
 
 ```
-v1.0  Fases 00-09 (documentadas)  →  equipes, terminais, skills, barramento, quadro, orquestração
+v1.0  Fases 00-09 (documentadas)  →  equipes, terminais, skills, barramento, quadro, coordenação
 v1.1  Notas + Bancadas + Comandos do projeto + Gate de revisão      ← itens 🔴 que não couberem no v1
-v1.2  Formações + Papéis + Conexões + Rotinas + Resumo de ausência
+v1.2  Formações + Papéis + Conexões + Agendamentos + Resumo de ausência
 v1.3  Métricas + Git/PR + Orçamento
-v2.0  Portais + Sprints + Integrações externas
+v2.0  Prévia ao vivo + Sprints + Integrações externas
 ```
 
-**Sources:** [Maestri](https://www.themaestri.app/en) · [Maestri no Product Hunt](https://www.producthunt.com/products/maestri) · [Guia do Maestri (pt-BR)](https://github.com/arthurspk/guiadomaestri)
+**Fontes consultadas:** [Maestri](https://www.themaestri.app/en) ·
+[Product Hunt](https://www.producthunt.com/products/maestri) ·
+[Guia em pt-BR](https://github.com/arthurspk/guiadomaestri)

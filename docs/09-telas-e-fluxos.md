@@ -96,7 +96,7 @@ diretório de trabalho (seletor nativo), cor e ícone.
 | **Vazio** | — |
 | **Dupla Dev** | `@dev` (implementador) + `@revisor` (revisor-rigoroso) |
 | **Squad completo** | `@arquiteto`, `@backend`, `@frontend`, `@revisor` |
-| **Pesquisa** | `@maestro`, 3× `@pesquisador`, `@sintetizador` |
+| **Pesquisa** | `@coordenador`, 3× `@pesquisador`, `@sintetizador` |
 | **Operação** | `@monitor` (shell, longa duração) + `@triagem` |
 
 Cada modelo já vem com runtime sugerido, skills e cores atribuídas. O usuário ajusta no passo 3.
@@ -288,8 +288,8 @@ Abas no painel direito, sobre o agente selecionado:
 
  EMBUTIDAS                             SUAS
  ┌────────────────────┐ ┌────────────┐ ┌────────────────────┐
- │ trabalho-em-equipe │ │ maestro    │ │ rust-idiomatico    │
- │ sempre ativa       │ │ orquestra  │ │ v2.0.1 · 3 agentes │
+ │ trabalho-em-equipe │ │ coordenador    │ │ rust-idiomatico    │
+ │ sempre ativa       │ │ coordena  │ │ v2.0.1 · 3 agentes │
  │ 🔒                 │ │ 1 agente   │ │ [editar] [dup]     │
  └────────────────────┘ └────────────┘ └────────────────────┘
 ```

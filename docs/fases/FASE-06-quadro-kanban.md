@@ -86,7 +86,7 @@ com validação (sem TOML na mão, mas com visualização do TOML gerado).
 ## Riscos
 | Risco | Mitigação |
 |---|---|
-| Agentes criando cartão demais e poluindo o quadro | Limite de cartões criados por agente por hora; a skill `maestro` instrui a agrupar |
+| Agentes criando cartão demais e poluindo o quadro | Limite de cartões criados por agente por hora; a skill `coordenador` instrui a agrupar |
 | Automação em laço (A move para X, que move para Y, que move para X) | Contador de profundidade por evento, com corte e aviso na linha do tempo |
 | `aisense board` ficar grande demais para o contexto | Saída resumida por padrão, com `--full` explícito; limite de linhas por coluna |
 | Divergência entre regra da UI e da CLI | Regra vive só no core; UI e CLI são fachadas. Teste de contrato em F06-05 |

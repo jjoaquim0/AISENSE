@@ -46,7 +46,7 @@ stdin (fallback "leia .aisense/BOOT.md e siga"). Registrar qual caminho foi usad
 Depende de F04-05, F03-01.
 
 ### [ ] F04-07 — Skills embutidas
-Escrever `trabalho-em-equipe`, `maestro`, `revisor-rigoroso`, `implementador`, `pesquisador`,
+Escrever `trabalho-em-equipe`, `coordenador`, `revisor-rigoroso`, `implementador`, `pesquisador`,
 `sintetizador` e `documentador` conforme [06](../06-sistema-de-skills.md#biblioteca-de-skills-embutidas-do-v1).
 **Aceite:** `trabalho-em-equipe` entra em todos os agentes automaticamente e não aparece na lista
 de atribuição. Depende de F04-01.

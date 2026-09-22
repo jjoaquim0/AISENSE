@@ -26,7 +26,7 @@ A documentação completa de produto, arquitetura, design e plano de execução 
 | 04 — Sistema de Skills | ⬜ Não iniciada | 0/8 |
 | 05 — Barramento | ⬜ Não iniciada | 0/11 |
 | 06 — Quadro Kanban | ⬜ Não iniciada | 0/10 |
-| 07 — Orquestração | ⬜ Não iniciada | 0/6 |
+| 07 — Coordenação | ⬜ Não iniciada | 0/6 |
 | 08 — Acabamento | ⬜ Não iniciada | 0/9 |
 | 09 — Distribuição | ⬜ Não iniciada | 0/7 |
 

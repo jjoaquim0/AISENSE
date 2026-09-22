@@ -28,8 +28,8 @@ FASE 5 ─ Barramento
 FASE 6 ─ Quadro Kanban
    │     ★ "o agente puxa trabalho do quadro sozinho"
    ▼
-FASE 7 ─ Orquestração
-   │     ★ "o maestro distribui e o canvas mostra o fluxo"
+FASE 7 ─ Coordenação
+   │     ★ "o coordenador distribui e o canvas mostra o fluxo"
    ▼
 FASE 8 ─ Acabamento
    │     ★ "está bonito, rápido e acessível"

@@ -33,7 +33,7 @@
     "targets": "all",
     "category": "DeveloperTool",
     "shortDescription": "Crie times de IA de maneira fácil e gerenciável.",
-    "longDescription": "AISENSE monta, opera e orquestra equipes de agentes de IA em terminais reais que conversam entre si.",
+    "longDescription": "AISENSE monta, opera e coordena equipes de agentes de IA em terminais reais que conversam entre si.",
     "icon": ["icons/32x32.png", "icons/128x128.png", "icons/icon.icns", "icons/icon.ico"]
   }
 }

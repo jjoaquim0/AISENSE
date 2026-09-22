@@ -68,7 +68,7 @@ Para entender o projeto pela primeira vez, leia nesta sequência (≈45 min):
 | [04](fases/FASE-04-skills.md) | Sistema de Skills | 02 |
 | [05](fases/FASE-05-barramento.md) | Barramento de Comunicação | 03, 04 |
 | [06](fases/FASE-06-quadro-kanban.md) | Quadro Kanban | 05 |
-| [07](fases/FASE-07-orquestracao.md) | Orquestração | 06 |
+| [07](fases/FASE-07-coordenacao.md) | Coordenação | 06 |
 | [08](fases/FASE-08-acabamento.md) | Acabamento | 07 |
 | [09](fases/FASE-09-distribuicao.md) | Distribuição | 08 |
 
