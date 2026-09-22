@@ -20,7 +20,7 @@ A documentação completa de produto, arquitetura, design e plano de execução 
 | Fase | Status | Tarefas |
 |---|---|---|
 | 00 — Fundação | 🟨 Em andamento | 6 feitas, 3 parciais de 9 |
-| 01 — Terminal Core | 🟨 Em andamento | 3/8 |
+| 01 — Terminal Core | 🟨 Em andamento | 4 feitas, 4 parciais de 8 |
 | 02 — Equipes e Agentes | ⬜ Não iniciada | 0/11 |
 | 03 — Sala da Equipe | ⬜ Não iniciada | 0/9 |
 | 04 — Sistema de Skills | ⬜ Não iniciada | 0/9 |
@@ -38,8 +38,8 @@ Legenda: ⬜ não iniciada · 🟨 em andamento · ✅ concluída · 🟥 bloque
 
 | Verificado aqui | Resultado |
 |---|---|
-| `cargo test --workspace --exclude aisense-app` | ✅ 46 testes (13 core + 33 pty) |
-| `pnpm --filter @aisense/desktop test --run` | ✅ 59 testes (54 de contraste + 5 de layout) |
+| `cargo test --workspace --exclude aisense-app` | ✅ 62 testes (14 core + 48 pty) |
+| `pnpm --filter @aisense/desktop test --run` | ✅ 99 testes (67 de contraste/cor + 5 de layout + 6 de decodificação, entre outros) |
 | `pnpm typecheck` | ✅ limpo |
 | `pnpm lint` (biome + rustfmt + clippy `-D warnings`) | ✅ limpo |
 | `pnpm build` (tsc + vite) | ✅ 301 kB JS / 44 kB CSS |
@@ -58,16 +58,33 @@ amostra do design system nos dois temas — isso já valida a maior parte sem pr
 **Restam na Fase 00:** F00-02, F00-04 e F00-09, todas bloqueadas pela mesma coisa — precisam de um
 ambiente com GUI ou de uma execução do CI.
 
-**Fase 01 — Terminal Core.** O núcleo em Rust está pronto e testado (F01-01 a F01-03): PTY real,
-ring buffer, log em arquivo e coalescência. As 5 tarefas restantes (F01-04 a F01-08) são a ponte
-Tauri e o xterm.js — dependem de GUI, então param aqui.
+**Fase 01 — Terminal Core.** Tudo escrito. O que dava para verificar, está verificado; o que
+depende de janela, não.
 
-Dois bugs encontrados pelos próprios testes nesta fase, ambos corrigidos na origem:
-1. O corte de 64 KB do ring buffer só valia ao *continuar* uma entrada, não ao criar uma nova; um
-   `push` único e grande virava uma entrada monolítica.
-2. O teste do log falhou porque o PTY traduz `\n` em `\r\n` (termios `ONLCR`). O teste estava
-   errado, não o código — mas a armadilha ficou documentada no próprio arquivo, porque ela vai
-   morder de novo no detector de estado da Fase 03.
+| Camada | Situação |
+|---|---|
+| PTY, ring buffer, log, coalescência, gerenciador (Rust) | ✅ 48 testes, processos reais |
+| Tipos de transporte e conversão de cor | ✅ testados |
+| Comandos Tauri (casca fina) | ⚠️ escritos, **não compilados** (sem WebKit/GTK) |
+| `<Terminal />`, tema, reidratação, busca | ⚠️ escritos, **nunca executados** |
+
+Três decisões desta fase que valem lembrar:
+1. O `PtyManager` mora em `aisense-pty`, não no crate do Tauri, para a lógica com estado e
+   concorrência ser testável sem abrir janela. O app ficou como casca.
+2. Os bytes do PTY trafegam em **base64**, não como texto: um caractere UTF-8 pode ser partido
+   entre duas leituras e virar `�` se convertido cedo demais. Há teste que demonstra a corrupção
+   do jeito ingênuo.
+3. Tipo que vira TypeScript **nunca** mora em `aisense-app` — senão `pnpm gen:types` passa a exigir
+   compilar a janela. Virou a regra R5 em `AGENTS.md`.
+
+Bugs encontrados pelos próprios testes, todos corrigidos na origem:
+1. O corte de 64 KB do ring buffer só valia ao *continuar* uma entrada; um `push` único e grande
+   virava uma entrada monolítica.
+2. O `⌘F` estava num `onKeyDown` do elemento de fora, que quase nunca dispararia — o xterm move o
+   foco para um textarea escondido. Passou para o `attachCustomKeyEventHandler`.
+3. O teste do log falhou porque o PTY traduz `\n` em `\r\n` (termios `ONLCR`). O teste estava
+   errado, não o código — mas a armadilha ficou documentada, porque vai morder de novo no detector
+   de estado da Fase 03.
 
 ## Decisões já tomadas (não reabrir sem ADR)
 
@@ -114,4 +131,5 @@ Dois bugs encontrados pelos próprios testes nesta fase, ambos corrigidos na ori
 | 2026-09-22 | Claude | Início da Fase 00: scaffold do monorepo |
 | 2026-09-22 | Claude | Vocabulário próprio (fim da metáfora musical: `@maestro` → `@coordenador`); F00-03, F00-06 e F00-07 concluídas |
 | 2026-09-22 | Claude | Fase 01: PTY, ring buffer, log e coalescência em Rust, com 33 testes |
+| 2026-09-22 | Claude | Fase 01: gerenciador de sessões, ponte Tauri, paleta ANSI testada, `<Terminal />` com xterm.js. 62 testes Rust + 99 front |
 | 2026-09-22 | Claude | D6 aprovada: docs 15, 16 e 17 escritos, gate de revisão no doc 13, e 6 tarefas novas distribuídas pelas Fases 02, 04, 05 e 06. Início da Fase 01 |

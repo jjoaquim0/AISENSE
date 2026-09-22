@@ -31,7 +31,7 @@ Execute nesta ordem antes de escrever qualquer linha de código:
 | R2 | **Documento vence código.** Se o código diverge da doc, ou você corrige o código, ou atualiza a doc **na mesma mudança**. Nunca deixe os dois em desacordo. |
 | R3 | **Nada de segredo em disco simples.** Chaves de API vão no keychain do SO. Veja `docs/11-seguranca.md`. |
 | R4 | **Nada de `unwrap()`/`expect()` em caminho de execução.** Erros usam `thiserror` no core e são convertidos na fronteira do Tauri. Exceção: inicialização e testes. |
-| R5 | **Toda chamada de comando Tauri tem tipo compartilhado.** Os tipos vêm de `ts-rs` gerando TypeScript a partir do Rust. Não escreva tipos duplicados à mão. |
+| R5 | **Toda chamada de comando Tauri tem tipo compartilhado.** Os tipos vêm de `ts-rs` gerando TypeScript a partir do Rust; não escreva tipos duplicados à mão. E eles **nunca** moram em `aisense-app`: o `ts-rs` exporta durante os testes, então um tipo definido lá tornaria `pnpm gen:types` dependente de compilar a janela (no Linux, de ter WebKit/GTK). Tipo que vira TypeScript mora em `aisense-core` ou no crate do subsistema. |
 | R6 | **A UI nunca bloqueia.** Qualquer coisa que dure >16 ms roda no core em Rust. |
 | R7 | **Tudo tem tema claro e escuro.** Nenhuma cor literal em componente — só tokens semânticos. Veja `docs/08-design-system.md`. |
 | R8 | **Textos de interface em pt-BR; código, identificadores, commits e nomes de arquivo em inglês.** |

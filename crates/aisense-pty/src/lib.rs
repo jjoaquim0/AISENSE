@@ -8,11 +8,15 @@
 mod batch;
 mod error;
 mod log;
+mod manager;
 mod ring;
 mod session;
+mod wire;
 
 pub use batch::{Batcher, DEFAULT_WINDOW};
 pub use error::PtyError;
 pub use log::{SessionLog, DEFAULT_MAX_LOG_BYTES};
+pub use manager::{OutputSink, PtyManager};
 pub use ring::{RingBuffer, DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES};
 pub use session::{PtySession, PtySpawn, TerminalSize};
+pub use wire::{PtyData, PtyExit, SpawnRequest};

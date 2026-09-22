@@ -18,8 +18,28 @@ fn main() {
 
     tracing::info!(version = aisense_core::VERSION, "AISENSE iniciando");
 
+    let manager: commands::pty::Manager = std::sync::Arc::new(aisense_pty::PtyManager::new());
+    let shutdown_manager = std::sync::Arc::clone(&manager);
+
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![commands::app_info])
+        .manage(manager)
+        .invoke_handler(tauri::generate_handler![
+            commands::app_info,
+            commands::pty::pty_spawn,
+            commands::pty::pty_write,
+            commands::pty::pty_resize,
+            commands::pty::pty_kill,
+            commands::pty::pty_snapshot,
+            commands::pty::pty_set_visible,
+            commands::pty::pty_is_running,
+        ])
+        .on_window_event(move |_window, event| {
+            // Fechar a janela precisa matar os processos dos agentes; senão eles
+            // continuam vivos sem dono, consumindo CPU e segurando arquivos.
+            if matches!(event, tauri::WindowEvent::Destroyed) {
+                shutdown_manager.shutdown();
+            }
+        })
         .run(tauri::generate_context!())
         .expect("falha ao iniciar a janela do AISENSE");
 }

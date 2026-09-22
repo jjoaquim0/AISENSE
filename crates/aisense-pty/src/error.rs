@@ -23,6 +23,12 @@ pub enum PtyError {
 
     #[error("a sessão do terminal já foi encerrada")]
     Closed,
+
+    #[error("o agente {0} já tem uma sessão em execução")]
+    AlreadyRunning(String),
+
+    #[error("nenhuma sessão de terminal para o agente {0}")]
+    UnknownAgent(String),
 }
 
 impl PtyError {
@@ -37,6 +43,8 @@ impl PtyError {
                 Some("Escolha outro diretório de trabalho para a equipe ou para o agente.")
             }
             Self::Closed => Some("Inicie o agente novamente."),
+            Self::AlreadyRunning(_) => Some("Pare o agente antes de iniciá-lo de novo."),
+            Self::UnknownAgent(_) => Some("Inicie o agente para abrir o terminal dele."),
             _ => None,
         }
     }

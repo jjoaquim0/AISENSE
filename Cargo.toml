@@ -26,6 +26,7 @@ ts-rs = "11"
 ulid = "1"
 portable-pty = "0.9"
 bytes = "1"
+base64 = "0.22"
 
 [profile.release]
 codegen-units = 1
