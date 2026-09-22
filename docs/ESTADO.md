@@ -19,21 +19,23 @@ A documentação completa de produto, arquitetura, design e plano de execução 
 
 | Fase | Status | Tarefas |
 |---|---|---|
-| 00 — Fundação | ⬜ Não iniciada | 0/9 |
+| 00 — Fundação | 🟨 Em andamento | 0/9 |
 | 01 — Terminal Core | ⬜ Não iniciada | 0/8 |
 | 02 — Equipes e Agentes | ⬜ Não iniciada | 0/9 |
 | 03 — Sala da Equipe | ⬜ Não iniciada | 0/9 |
 | 04 — Sistema de Skills | ⬜ Não iniciada | 0/8 |
 | 05 — Barramento | ⬜ Não iniciada | 0/11 |
-| 06 — Orquestração | ⬜ Não iniciada | 0/8 |
-| 07 — Acabamento | ⬜ Não iniciada | 0/9 |
-| 08 — Distribuição | ⬜ Não iniciada | 0/7 |
+| 06 — Quadro Kanban | ⬜ Não iniciada | 0/10 |
+| 07 — Orquestração | ⬜ Não iniciada | 0/6 |
+| 08 — Acabamento | ⬜ Não iniciada | 0/9 |
+| 09 — Distribuição | ⬜ Não iniciada | 0/7 |
 
 Legenda: ⬜ não iniciada · 🟨 em andamento · ✅ concluída · 🟥 bloqueada
 
 ## Em andamento agora
 
-_Nada. O repositório está livre — pegue a tarefa `F00-01`._
+**Fase 00 — Fundação.** Scaffold do monorepo em construção. Próxima tarefa livre: ver a lista em
+[fases/FASE-00-fundacao.md](fases/FASE-00-fundacao.md).
 
 ## Decisões já tomadas (não reabrir sem ADR)
 
@@ -42,6 +44,8 @@ _Nada. O repositório está livre — pegue a tarefa `F00-01`._
 - Persistência **SQLite local-first**, sem backend em nuvem no v1 → [ADR 0003](adr/0003-sqlite-local-first.md)
 - Barramento em **NDJSON sobre socket local** (UDS/named pipe) → [ADR 0004](adr/0004-protocolo-do-barramento.md)
 - Skills em **Markdown + frontmatter**, compatíveis com Claude Code → [ADR 0005](adr/0005-skills-markdown.md)
+- **Quadro Kanban é subsistema de primeira classe**, um por equipe, com API completa para agentes
+  (`claim` atômico, WIP aplicado, automações de conjunto fechado) → [13](13-quadro-kanban.md)
 - Entrega de mensagens **híbrida**: caixa de entrada + injeção opcional no PTY → [ADR 0006](adr/0006-entrega-de-mensagens.md)
 - Front em **React 19 + TypeScript + Tailwind 4 + Radix**, terminal com **xterm.js/WebGL**
 
@@ -49,11 +53,12 @@ _Nada. O repositório está livre — pegue a tarefa `F00-01`._
 
 | # | Questão | Quando decidir | Opção padrão se ninguém decidir |
 |---|---|---|---|
-| D1 | Suporte a agentes remotos (SSH / container) | Fase 6 | Fora do v1; arquitetura já deixa o `AgentRuntime` plugável |
-| D2 | Rastreio de custo por agente (tokens/USD) | Fase 7 | Só o que o próprio runtime imprimir no terminal; sem estimativa própria |
+| D1 | Suporte a agentes remotos (SSH / container) | Fase 7 | Fora do v1; arquitetura já deixa o `AgentRuntime` plugável |
+| D2 | Rastreio de custo por agente (tokens/USD) | Fase 8 | Só o que o próprio runtime imprimir no terminal; sem estimativa própria |
 | D3 | Marketplace de skills | Pós-v1 | Import/export de pasta `.zip` apenas |
 | D4 | Modo daemon headless (usar AISENSE sem GUI) | Pós-v1 | O crate `aisense-ipc` já é separado justamente para permitir isso depois |
-| D5 | Telemetria anônima | Fase 8 | Desligada por padrão, opt-in explícito |
+| D5 | Telemetria anônima | Fase 9 | Desligada por padrão, opt-in explícito |
+| D6 | Incluir no v1 os 4 itens 🔴 de [14](14-ideias-software-house.md) (Notas da equipe, Bancadas/worktree, Comandos do projeto, Gate de revisão) | Antes da Fase 04 | **Aguardando decisão do usuário.** Se ninguém decidir, vão para o v1.1 e o v1 sai sem eles |
 
 ## Riscos ativos
 
@@ -69,3 +74,5 @@ _Nada. O repositório está livre — pegue a tarefa `F00-01`._
 | Data | Quem | O que fez |
 |---|---|---|
 | 2026-09-22 | Claude | Levantamento inicial, definição de stack e escrita de toda a documentação base (docs/ 01–12, 6 ADRs, 9 fases) |
+| 2026-09-22 | Claude | Análise do Maestri (referência do usuário); Kanban promovido a subsistema próprio (doc 13 + Fase 06 dedicada); fases 06–08 renumeradas para 07–09; backlog de software house documentado (doc 14) |
+| 2026-09-22 | Claude | Início da Fase 00: scaffold do monorepo |

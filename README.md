@@ -55,9 +55,10 @@ Justificativa completa e alternativas descartadas: [`docs/03-stack.md`](docs/03-
 | 3 | Sala da Equipe: grid, foco, ciclo de vida | [FASE-03](docs/fases/FASE-03-sala-da-equipe.md) |
 | 4 | Sistema de Skills | [FASE-04](docs/fases/FASE-04-skills.md) |
 | 5 | Barramento: agentes conversando entre si | [FASE-05](docs/fases/FASE-05-barramento.md) |
-| 6 | Orquestração: maestro, tarefas, canvas | [FASE-06](docs/fases/FASE-06-orquestracao.md) |
-| 7 | Acabamento: temas, a11y, performance | [FASE-07](docs/fases/FASE-07-acabamento.md) |
-| 8 | Distribuição: instaladores, auto-update | [FASE-08](docs/fases/FASE-08-distribuicao.md) |
+| 6 | Quadro Kanban compartilhado com os agentes | [FASE-06](docs/fases/FASE-06-quadro-kanban.md) |
+| 7 | Orquestração: maestro, canvas, canais | [FASE-07](docs/fases/FASE-07-orquestracao.md) |
+| 8 | Acabamento: temas, a11y, performance | [FASE-08](docs/fases/FASE-08-acabamento.md) |
+| 9 | Distribuição: instaladores, auto-update | [FASE-09](docs/fases/FASE-09-distribuicao.md) |
 
 ## Para agentes de IA que forem desenvolver este projeto
 

@@ -114,7 +114,7 @@ arquivos em disco (sem push, sem request/reply decente).
 | `playwright` | E2E do app empacotado |
 | GitHub Actions | CI nos 3 SOs |
 
-## Orçamento de performance (metas verificáveis na Fase 7)
+## Orçamento de performance (metas verificáveis na Fase 8)
 
 | Métrica | Meta |
 |---|---|

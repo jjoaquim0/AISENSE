@@ -28,7 +28,15 @@ Sinônimo é fonte de confusão para agentes que entram no meio do projeto.
 | **Vista** | `View` | Grid, Foco, Fluxo ou Timeline |
 | **Linha do tempo** | `Timeline` | Vista cronológica de todas as mensagens da equipe |
 | **Maestro** | `maestro` | Papel (via skill) de agente orquestrador. **Não** é um tipo especial de agente |
-| **Quadro** | `TaskBoard` | Kanban de tarefas da equipe |
+| **Quadro** | `Board` | Kanban da equipe. Uma equipe, um quadro. É a memória compartilhada |
+| **Coluna** | `Column` | Etapa do quadro, com tipo semântico e limite de WIP |
+| **Cartão** | `Card` / `Task` | Unidade de trabalho no quadro |
+| **Pegar** | `claim` | Um agente assumir um cartão sem dono. Operação atômica |
+| **Limite de WIP** | `wip_limit` | Máximo de cartões simultâneos numa coluna. Aplicado, não sugerido |
+| **Automação** | `Automation` | Regra declarativa do quadro (gatilho → ação), de conjunto fechado |
+| **Bancada** | `Workbench` | (proposto) `git worktree` isolado por agente — ver doc 14 |
+| **Formação** | `Formation` | (proposto) Modelo exportável de equipe inteira — ver doc 14 |
+| **Nota da equipe** | `Note` | (proposto) Markdown compartilhado como memória — ver doc 14 |
 | **Estado do agente** | `AgentState` | `stopped · starting · idle · busy · awaiting_input · failed` |
 | **Detector de estado** | `StateDetector` | Heurística que infere o estado pela saída do PTY |
 | **Ring buffer** | `RingBuffer` | Últimas N linhas de saída mantidas em RAM no Rust |

@@ -1,6 +1,6 @@
 # Fases de Desenvolvimento
 
-> O projeto é dividido em 9 fases. Cada fase entrega **algo demonstrável** — nada de fase que só
+> O projeto é dividido em 10 fases. Cada fase entrega **algo demonstrável** — nada de fase que só
 > produz abstração. A regra é simples: ao fim de cada fase, dá para abrir o app e mostrar para alguém.
 
 ## Mapa
@@ -25,20 +25,25 @@ FASE 4 ─ Skills           (4 e 3 podem ser paralelas após a 2)
 FASE 5 ─ Barramento
    │     ★ "os agentes conversam entre si"   ← o coração do produto
    ▼
-FASE 6 ─ Orquestração
-   │     ★ "o maestro distribui tarefas e o canvas mostra o fluxo"
+FASE 6 ─ Quadro Kanban
+   │     ★ "o agente puxa trabalho do quadro sozinho"
    ▼
-FASE 7 ─ Acabamento
+FASE 7 ─ Orquestração
+   │     ★ "o maestro distribui e o canvas mostra o fluxo"
+   ▼
+FASE 8 ─ Acabamento
    │     ★ "está bonito, rápido e acessível"
    ▼
-FASE 8 ─ Distribuição
+FASE 9 ─ Distribuição
          ★ "tem instalador nos 3 SOs"
 ```
 
+
 ## Marco de fatiamento vertical
 
-A Fase 5 é o coração. Se for preciso cortar escopo, corte **largura**, nunca profundidade:
-é melhor ter 2 runtimes funcionando com barramento completo do que 6 runtimes que não conversam.
+As Fases 5 e 6 são o coração: sem elas isto é só um gerenciador de terminais bonito.
+Se for preciso cortar escopo, corte **largura**, nunca profundidade — é melhor ter 2 runtimes com
+barramento e quadro completos do que 6 runtimes que não conversam e não compartilham estado.
 
 ## Formato de cada fase
 
@@ -72,6 +77,9 @@ Servem para sequenciar, não para prometer prazo.
 | 3 | 9 | ▰▰▰▰ |
 | 4 | 8 | ▰▰▰ |
 | 5 | 11 | ▰▰▰▰▰▰ |
-| 6 | 8 | ▰▰▰▰ |
-| 7 | 9 | ▰▰▰▰ |
-| 8 | 7 | ▰▰ |
+| 6 | 10 | ▰▰▰▰▰ |
+| 7 | 6 | ▰▰▰ |
+| 8 | 9 | ▰▰▰▰ |
+| 9 | 7 | ▰▰ |
+
+**Total: 86 tarefas.**
