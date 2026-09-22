@@ -29,10 +29,10 @@ terminal alheio não dá.
 
 | Recurso | O que é | Prioridade |
 |---|---|---|
-| **Notas da equipe** | Markdown compartilhado que sobrevive ao reinício do agente | 🔴 v1 |
-| **Bancadas** | `git worktree` por agente, para não se atropelarem no mesmo checkout | 🔴 v1 |
-| **Comandos do projeto** | `aisense.toml` dizendo como rodar, testar e lintar | 🔴 v1 |
-| **Gate de revisão** | Cartão só fecha se outro agente aprovar | 🔴 v1 |
+| **Notas da equipe** | Markdown compartilhado que sobrevive ao reinício do agente | ✅ **no v1** → [doc 15](15-notas-da-equipe.md) |
+| **Bancadas** | `git worktree` por agente, para não se atropelarem no mesmo checkout | ✅ **no v1** → [doc 16](16-bancadas.md) |
+| **Comandos do projeto** | `aisense.toml` dizendo como rodar, testar e lintar | ✅ **no v1** → [doc 17](17-comandos-do-projeto.md) |
+| **Gate de revisão** | Cartão só fecha se outro agente aprovar | ✅ **no v1** → [doc 13](13-quadro-kanban.md#gate-de-revisão) |
 | **Formações** | Equipe inteira exportável e importável em um arquivo | 🟡 v1.1 |
 | **Biblioteca de papéis** | Papel reutilizável, separado das skills | 🟡 v1.1 |
 | **Conexões e repasses** | Topologia da equipe como configuração visual | 🟡 v1.1 |
@@ -43,7 +43,10 @@ terminal alheio não dá.
 
 ---
 
-## 🔴 Recomendado para o v1
+## ✅ Aceitos no v1 (decisão D6)
+
+> As quatro seções abaixo saíram do backlog e viraram tarefas nas Fases 02, 04, 05 e 06.
+> A especificação de cada uma está nos docs 15, 16, 17 e 13.
 
 ### 1. Notas da equipe (memória compartilhada)
 Arquivos Markdown por equipe que qualquer agente lê e escreve, versionados no diretório de trabalho.
@@ -171,7 +174,7 @@ Registrado para não voltar à mesa a cada ciclo:
 
 ```
 v1.0  Fases 00-09 (documentadas)  →  equipes, terminais, skills, barramento, quadro, coordenação
-v1.1  Notas + Bancadas + Comandos do projeto + Gate de revisão      ← itens 🔴 que não couberem no v1
+v1.1  (vago — os 4 itens 🔴 foram promovidos para o v1 pela decisão D6)
 v1.2  Formações + Papéis + Conexões + Agendamentos + Resumo de ausência
 v1.3  Métricas + Git/PR + Orçamento
 v2.0  Prévia ao vivo + Sprints + Integrações externas

@@ -151,6 +151,40 @@ O quadro **não é uma ilha**: toda mudança relevante vira mensagem de sistema 
 A notificação respeita o `delivery_mode` do agente (caixa, injeção ou hook) —
 mesma máquina de entrega de [07 — Barramento](07-barramento-comunicacao.md).
 
+## Gate de revisão
+
+> Aprovado para o v1 (decisão D6 em [ESTADO.md](ESTADO.md)).
+
+Uma coluna pode exigir aprovação antes de deixar o cartão entrar:
+
+```toml
+[[column]]
+slug = "done"
+requires_approval = true        # alguém precisa aprovar
+approver_must_differ = true     # e não pode ser quem fez
+requires_commands = ["lint", "test"]   # comandos de aisense.toml que precisam passar
+```
+
+```bash
+aisense task approve tsk_7K2 --note "testei o fluxo de refresh, está correto"
+aisense task reject  tsk_7K2 --reason "o refresh não invalida o token antigo"
+```
+
+Regras:
+
+1. **Quem fez não aprova.** Com `approver_must_differ`, o responsável recebe `self_approval`
+   e a CLI sugere para quem pedir, olhando os papéis da equipe.
+2. **Rejeitar exige motivo.** Sem `--reason`, recusado — igual a bloquear um cartão.
+3. Rejeitar devolve o cartão para a coluna anterior e notifica o responsável com o motivo.
+4. `requires_commands` roda os comandos de [17 — Comandos do Projeto](17-comandos-do-projeto.md)
+   na bancada do responsável. Falhou, o cartão não passa, e a saída fica anexada ao cartão —
+   o agente lê o erro sem precisar reproduzir.
+5. Aprovação e rejeição entram em `task_activity` com autor e horário. É o registro de quem
+   olhou o quê.
+
+É a prática de time de engenharia que mais reduz retrabalho, e aqui sai barata: o quadro já sabe
+quem fez, e o barramento já sabe avisar.
+
 ## Automações por coluna
 
 Regras declarativas, editáveis na UI, guardadas no quadro:
@@ -216,6 +250,12 @@ ALTER TABLE tasks ADD COLUMN links      TEXT NOT NULL DEFAULT '[]';
 ALTER TABLE tasks ADD COLUMN block_reason TEXT;
 ALTER TABLE tasks ADD COLUMN version    INTEGER NOT NULL DEFAULT 1;     -- trava otimista do claim
 ALTER TABLE tasks ADD COLUMN archived_at INTEGER;
+ALTER TABLE tasks ADD COLUMN approved_by  TEXT REFERENCES agents(id) ON DELETE SET NULL;
+ALTER TABLE tasks ADD COLUMN approved_at  INTEGER;
+
+ALTER TABLE columns ADD COLUMN requires_approval    INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE columns ADD COLUMN approver_must_differ INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE columns ADD COLUMN requires_commands    TEXT NOT NULL DEFAULT '[]';
 
 CREATE TABLE task_dependencies (
   task_id    TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
@@ -282,3 +322,5 @@ A qualidade da mensagem de erro define se a IA se recupera sozinha ou trava:
 | `reason_required` | `Bloquear exige --reason. Diga o que falta e quem pode destravar.` |
 | `unknown_column` | `Coluna 'em-progresso' não existe. Colunas: backlog, todo, doing, blocked, review, done.` |
 | `dependency_cycle` | `Isso criaria um ciclo: tsk_A → tsk_B → tsk_A.` |
+| `self_approval` | `Você fez este cartão, então não pode aprová-lo. Peça a @revisor ou @arquiteto.` |
+| `gate_failed` | `O comando 'test' falhou (exit 1). A saída está anexada ao cartão.` |

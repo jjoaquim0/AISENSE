@@ -34,12 +34,14 @@ Sinônimo é fonte de confusão para agentes que entram no meio do projeto.
 | **Pegar** | `claim` | Um agente assumir um cartão sem dono. Operação atômica |
 | **Limite de WIP** | `wip_limit` | Máximo de cartões simultâneos numa coluna. Aplicado, não sugerido |
 | **Automação** | `Automation` | Regra declarativa do quadro (gatilho → ação), de conjunto fechado |
-| **Bancada** | `Workbench` | (proposto) `git worktree` isolado por agente — ver doc 14 |
+| **Gate de revisão** | `approval gate` | Exigência de aprovação (de outro agente) para o cartão avançar |
+| **Comando do projeto** | `project command` | Entrada de `aisense.toml` executável por `aisense run` |
+| **Bancada** | `Workbench` | `git worktree` com branch próprio, por agente — ver [doc 16](16-bancadas.md) |
 | **Formação** | `Formation` | (proposto) Modelo exportável de equipe inteira — ver doc 14 |
 | **Agendamento** | `Schedule` | (proposto) Disparo de trabalho por horário ou intervalo — ver doc 14 |
 | **Prévia ao vivo** | `LivePreview` | (proposto) Painel com o app em execução — ver doc 14 |
 | **Repasse** | `hand-off` | (proposto) Regra que manda o trabalho de um agente ao próximo — ver doc 14 |
-| **Nota da equipe** | `Note` | (proposto) Markdown compartilhado como memória — ver doc 14 |
+| **Nota da equipe** | `Note` | Markdown compartilhado como memória da equipe — ver [doc 15](15-notas-da-equipe.md) |
 | **Estado do agente** | `AgentState` | `stopped · starting · idle · busy · awaiting_input · failed` |
 | **Detector de estado** | `StateDetector` | Heurística que infere o estado pela saída do PTY |
 | **Ring buffer** | `RingBuffer` | Últimas N linhas de saída mantidas em RAM no Rust |

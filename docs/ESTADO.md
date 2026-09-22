@@ -20,12 +20,12 @@ A documentação completa de produto, arquitetura, design e plano de execução 
 | Fase | Status | Tarefas |
 |---|---|---|
 | 00 — Fundação | 🟨 Em andamento | 6 feitas, 3 parciais de 9 |
-| 01 — Terminal Core | ⬜ Não iniciada | 0/8 |
-| 02 — Equipes e Agentes | ⬜ Não iniciada | 0/9 |
+| 01 — Terminal Core | 🟨 Em andamento | 0/8 |
+| 02 — Equipes e Agentes | ⬜ Não iniciada | 0/11 |
 | 03 — Sala da Equipe | ⬜ Não iniciada | 0/9 |
-| 04 — Sistema de Skills | ⬜ Não iniciada | 0/8 |
-| 05 — Barramento | ⬜ Não iniciada | 0/11 |
-| 06 — Quadro Kanban | ⬜ Não iniciada | 0/10 |
+| 04 — Sistema de Skills | ⬜ Não iniciada | 0/9 |
+| 05 — Barramento | ⬜ Não iniciada | 0/13 |
+| 06 — Quadro Kanban | ⬜ Não iniciada | 0/11 |
 | 07 — Coordenação | ⬜ Não iniciada | 0/6 |
 | 08 — Acabamento | ⬜ Não iniciada | 0/9 |
 | 09 — Distribuição | ⬜ Não iniciada | 0/7 |
@@ -65,6 +65,10 @@ ambiente com GUI ou de uma execução do CI. Nenhuma delas bloqueia o início da
 - Persistência **SQLite local-first**, sem backend em nuvem no v1 → [ADR 0003](adr/0003-sqlite-local-first.md)
 - Barramento em **NDJSON sobre socket local** (UDS/named pipe) → [ADR 0004](adr/0004-protocolo-do-barramento.md)
 - Skills em **Markdown + frontmatter**, compatíveis com Claude Code → [ADR 0005](adr/0005-skills-markdown.md)
+- **Os 4 itens da decisão D6 entram no v1** (aprovado pelo usuário em 2026-09-22): Notas da equipe
+  → [15](15-notas-da-equipe.md), Bancadas → [16](16-bancadas.md), Comandos do projeto
+  → [17](17-comandos-do-projeto.md), Gate de revisão → [13](13-quadro-kanban.md#gate-de-revisão).
+  Viraram tarefas nas Fases 02, 04, 05 e 06 — não são fase nova.
 - **Quadro Kanban é subsistema de primeira classe**, um por equipe, com API completa para agentes
   (`claim` atômico, WIP aplicado, automações de conjunto fechado) → [13](13-quadro-kanban.md)
 - Entrega de mensagens **híbrida**: caixa de entrada + injeção opcional no PTY → [ADR 0006](adr/0006-entrega-de-mensagens.md)
@@ -79,7 +83,7 @@ ambiente com GUI ou de uma execução do CI. Nenhuma delas bloqueia o início da
 | D3 | Marketplace de skills | Pós-v1 | Import/export de pasta `.zip` apenas |
 | D4 | Modo daemon headless (usar AISENSE sem GUI) | Pós-v1 | O crate `aisense-ipc` já é separado justamente para permitir isso depois |
 | D5 | Telemetria anônima | Fase 9 | Desligada por padrão, opt-in explícito |
-| D6 | Incluir no v1 os 4 itens 🔴 de [14](14-ideias-software-house.md) (Notas da equipe, Bancadas/worktree, Comandos do projeto, Gate de revisão) | Antes da Fase 04 | **Aguardando decisão do usuário.** Se ninguém decidir, vão para o v1.1 e o v1 sai sem eles |
+
 
 ## Riscos ativos
 
@@ -98,3 +102,4 @@ ambiente com GUI ou de uma execução do CI. Nenhuma delas bloqueia o início da
 | 2026-09-22 | Claude | Análise do Maestri (referência do usuário); Kanban promovido a subsistema próprio (doc 13 + Fase 06 dedicada); fases 06–08 renumeradas para 07–09; backlog de software house documentado (doc 14) |
 | 2026-09-22 | Claude | Início da Fase 00: scaffold do monorepo |
 | 2026-09-22 | Claude | Vocabulário próprio (fim da metáfora musical: `@maestro` → `@coordenador`); F00-03, F00-06 e F00-07 concluídas |
+| 2026-09-22 | Claude | D6 aprovada: docs 15, 16 e 17 escritos, gate de revisão no doc 13, e 6 tarefas novas distribuídas pelas Fases 02, 04, 05 e 06. Início da Fase 01 |

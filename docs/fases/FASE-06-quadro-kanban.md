@@ -75,6 +75,15 @@ UI para criar, renomear, reordenar e remover colunas, definir `kind` e WIP, e ed
 com validação (sem TOML na mão, mas com visualização do TOML gerado).
 **Aceite:** remover uma coluna com cartões exige escolher para onde movê-los. Depende de F06-08.
 
+### [ ] F06-11 — Gate de revisão
+`requires_approval`, `approver_must_differ` e `requires_commands` por coluna;
+`aisense task approve|reject` com motivo obrigatório na rejeição; execução dos comandos do projeto
+na bancada do responsável, com a saída anexada ao cartão quando falha.
+Ver [13 — Quadro Kanban](../13-quadro-kanban.md#gate-de-revisão).
+**Aceite:** o responsável tentando aprovar o próprio cartão recebe `self_approval`; um gate com
+`test` falhando impede a passagem e o agente consegue ler o erro sem reproduzir.
+Depende de F06-06, F05-13.
+
 ## Critérios de saída
 - [ ] Toda equipe nasce com quadro funcional
 - [ ] Agente cria, lê, atualiza e conclui cartões por CLI e por MCP
@@ -82,6 +91,7 @@ com validação (sem TOML na mão, mas com visualização do TOML gerado).
 - [ ] WIP, dependências e bloqueio com motivo aplicados de verdade
 - [ ] Automações movendo trabalho sem intervenção humana
 - [ ] UI e CLI sempre consistentes (mesma fonte, mesmas regras)
+- [ ] Gate de revisão impedindo autoaprovação e barrando cartão com teste vermelho
 
 ## Riscos
 | Risco | Mitigação |

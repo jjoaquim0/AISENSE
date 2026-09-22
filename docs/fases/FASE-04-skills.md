@@ -57,11 +57,21 @@ import/export, aviso de "N agentes precisam reiniciar", botão "testar em agente
 **Aceite:** editar uma skill em uso mostra o aviso com a lista exata de agentes afetados.
 Depende de F04-02.
 
+### [ ] F04-09 — Notas da equipe
+Armazenamento em `<workdir>/.aisense/notes/`, leitura, `append` atômico (`O_APPEND`) e `write` com
+trava otimista por hash. Índice das notas (título e resumo, não o conteúdo) no `BOOT.md`, dentro do
+orçamento de 12.000 caracteres. Editor na UI reaproveitando o editor de skills.
+Ver [15 — Notas da Equipe](../15-notas-da-equipe.md).
+**Aceite:** dois agentes dando `append` na mesma nota ao mesmo tempo não perdem conteúdo (teste de
+concorrência); `write` com hash desatualizado falha com `stale_note` e mostra o diff.
+Depende de F04-05.
+
 ## Critérios de saída
 - [ ] Agente sobe com identidade e skills aplicadas, sem intervenção
 - [ ] O preview do `BOOT.md` mostra exatamente o que será injetado
 - [ ] Skills do Claude Code funcionam sem conversão
 - [ ] Editar skill avisa quem precisa reiniciar
+- [ ] Notas da equipe legíveis e escrevíveis sem perda sob concorrência
 
 ## Riscos
 | Risco | Mitigação |

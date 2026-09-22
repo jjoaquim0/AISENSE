@@ -31,7 +31,10 @@ Para entender o projeto pela primeira vez, leia nesta sequência (≈45 min):
 | [06 — Sistema de Skills](06-sistema-de-skills.md) | Formato, resolução, materialização e injeção no boot |
 | [07 — Barramento de Comunicação](07-barramento-comunicacao.md) | Protocolo, IPC, CLI `aisense`, MCP, entrega de mensagens |
 | [11 — Segurança](11-seguranca.md) | Segredos, permissões, sandbox, superfície de ataque |
-| [13 — Quadro Kanban](13-quadro-kanban.md) | Quadro por equipe, API dos agentes, automações, integridade |
+| [13 — Quadro Kanban](13-quadro-kanban.md) | Quadro por equipe, API dos agentes, automações, gate de revisão |
+| [15 — Notas da Equipe](15-notas-da-equipe.md) | Memória compartilhada em Markdown, escrita concorrente segura |
+| [16 — Bancadas](16-bancadas.md) | `git worktree` por agente, para não se atropelarem |
+| [17 — Comandos do Projeto](17-comandos-do-projeto.md) | `aisense.toml`: como rodar, testar e lintar |
 
 ### Interface
 | Doc | Conteúdo |

