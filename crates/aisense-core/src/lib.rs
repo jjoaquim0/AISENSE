@@ -7,6 +7,7 @@ mod app_info;
 mod color;
 mod command_error;
 mod ids;
+mod paths;
 pub mod repo;
 pub mod team;
 mod time;
@@ -16,6 +17,7 @@ pub use app_info::AppInfo;
 pub use color::AgentColor;
 pub use command_error::CommandError;
 pub use ids::{AgentId, BoardId, CardId, MessageId, SessionId, SkillId, TeamId};
+pub use paths::DataDir;
 pub use time::{now_ms, Millis};
 pub use validation::ValidationError;
 

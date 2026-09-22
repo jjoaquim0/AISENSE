@@ -27,6 +27,7 @@ ulid = "1"
 portable-pty = "0.9"
 bytes = "1"
 base64 = "0.22"
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite", "migrate", "macros"] }
 
 [profile.release]
 codegen-units = 1

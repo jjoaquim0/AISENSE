@@ -1,30 +1,11 @@
-# 04 — Modelo de Dados
-
-## Entidades
-
-```
-Workspace (implícito, 1 por instalação)
- └── Team ────────┬── Agent ──┬── AgentSkill ──► Skill
-                  │           ├── PtySession (runtime, não persistido integralmente)
-                  │           └── Message (from/to)
-                  ├── Channel ── Message
-                  └── Task ──── atribuída a Agent
-```
-
-## Esquema SQLite
-
-> Migrações em `crates/aisense-store/migrations/NNNN_descricao.sql`, aplicadas na subida do app.
-> `0001_initial.sql` é este esquema; `0002_workbenches.sql` é o adendo de [16 — Bancadas](16-bancadas.md).
-> Os dois `PRAGMA` abaixo **não** ficam na migração (dentro de transação o SQLite os ignora): o
-> `Store` os aplica em toda conexão, junto com `synchronous = NORMAL` e `busy_timeout = 5 s`.
-> Antes de aplicar migração pendente num banco que já tem dados, o `Store` grava uma cópia em
-> `aisense.db.bak-v<versão atual>`.
-> IDs são **ULID** em texto (26 chars): ordenáveis por tempo, bons para índice de mensagens.
-> Timestamps são `INTEGER` em epoch **milissegundos UTC**. Nunca guarde hora local.
-
-```sql
-PRAGMA journal_mode = WAL;
-PRAGMA foreign_keys = ON;
+-- 0001 — esquema inicial (docs/04-modelo-de-dados.md, copiado sem alteração).
+--
+-- Os PRAGMAs do documento (journal_mode = WAL, foreign_keys = ON) NÃO estão aqui:
+-- migrações rodam dentro de transação, onde os dois são ignorados em silêncio.
+-- Eles são aplicados em toda conexão pelo `Store` (src/db.rs).
+--
+-- Migrações são só aditivas. Nunca edite um arquivo já publicado: o checksum dele está
+-- gravado no banco do usuário e a subida falha. Mudou de ideia? Crie a próxima.
 
 -- ─────────────────────────────── EQUIPES ───────────────────────────────
 CREATE TABLE teams (
@@ -166,39 +147,3 @@ CREATE TABLE agent_tokens (
   session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
   expires_at INTEGER NOT NULL
 );
-```
-
-## Invariantes
-
-| # | Invariante | Garantido por |
-|---|---|---|
-| I1 | `handle` é único dentro da equipe e casa com `^[a-z][a-z0-9-]{1,31}$` | `UNIQUE` + validação no core |
-| I2 | Uma mensagem tem exatamente um destino (agente, canal ou broadcast) | `CHECK` |
-| I3 | Toda mensagem entregue tem uma linha em `deliveries` por destinatário | Transação única no `Bus::route` |
-| I4 | Token de IPC só é válido enquanto a sessão está viva | `expires_at` + limpeza no `session end` |
-| I5 | Apagar equipe apaga agentes, canais, mensagens e tarefas | `ON DELETE CASCADE` |
-| I6 | `reply_to` só aponta para mensagem da mesma equipe | Validação no core (SQLite não expressa) |
-| I7 | `agents.env` nunca define variável com prefixo `AISENSE_` (seria possível se passar por outro agente) nem nome fora de `[A-Za-z_][A-Za-z0-9_]*` | Validação no core (`AgentDraft`) |
-| I8 | `handle` não é `all` nem `voce` — o barramento usa esses endereços para a equipe e o humano | Validação no core (`Handle::parse`) |
-
-## Retenção
-
-| Dado | Retenção padrão | Configurável |
-|---|---|---|
-| `messages` | 90 dias | Sim (`config.toml`) |
-| `deliveries` | Junto com a mensagem | — |
-| Logs de PTY em arquivo | 30 dias ou 200 MB por agente, o que vier primeiro | Sim |
-| Ring buffer em RAM | 10.000 linhas por agente | Sim |
-| `sessions` | 200 últimas por agente | Sim |
-
-Limpeza roda no start do app e a cada 6 h, em transação, fora do caminho crítico.
-
-## Tipos compartilhados com o front
-
-Os modelos de domínio (`Team`, `Agent`, `TeamDraft`, `AgentDraft`) serializam em **camelCase**
-(`teamId`, `adapterId`...), que é o que o front espera; o esquema SQL continua em snake_case e a
-tradução é do store. Timestamps viram `number` no TypeScript (epoch ms cabe com folga em 2^53).
-
-Todo struct que cruza a fronteira Tauri é anotado com `#[derive(TS)]` (`ts-rs`) e exportado para
-`apps/desktop/src/types/generated/`. **Não escreva esses tipos à mão no TypeScript** — rode
-`cargo test -p aisense-core export_bindings` para regenerar. Divergência aqui é fonte garantida de bug.
