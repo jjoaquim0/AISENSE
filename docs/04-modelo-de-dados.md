@@ -173,6 +173,8 @@ CREATE TABLE agent_tokens (
 | I4 | Token de IPC só é válido enquanto a sessão está viva | `expires_at` + limpeza no `session end` |
 | I5 | Apagar equipe apaga agentes, canais, mensagens e tarefas | `ON DELETE CASCADE` |
 | I6 | `reply_to` só aponta para mensagem da mesma equipe | Validação no core (SQLite não expressa) |
+| I7 | `agents.env` nunca define variável com prefixo `AISENSE_` (seria possível se passar por outro agente) nem nome fora de `[A-Za-z_][A-Za-z0-9_]*` | Validação no core (`AgentDraft`) |
+| I8 | `handle` não é `all` nem `voce` — o barramento usa esses endereços para a equipe e o humano | Validação no core (`Handle::parse`) |
 
 ## Retenção
 
@@ -187,6 +189,10 @@ CREATE TABLE agent_tokens (
 Limpeza roda no start do app e a cada 6 h, em transação, fora do caminho crítico.
 
 ## Tipos compartilhados com o front
+
+Os modelos de domínio (`Team`, `Agent`, `TeamDraft`, `AgentDraft`) serializam em **camelCase**
+(`teamId`, `adapterId`...), que é o que o front espera; o esquema SQL continua em snake_case e a
+tradução é do store. Timestamps viram `number` no TypeScript (epoch ms cabe com folga em 2^53).
 
 Todo struct que cruza a fronteira Tauri é anotado com `#[derive(TS)]` (`ts-rs`) e exportado para
 `apps/desktop/src/types/generated/`. **Não escreva esses tipos à mão no TypeScript** — rode

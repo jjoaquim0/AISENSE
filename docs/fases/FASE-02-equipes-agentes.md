@@ -11,10 +11,14 @@ reabrir e encontrar tudo no lugar; iniciar um agente e ver o runtime certo subin
 
 ## Tarefas
 
-### [ ] F02-01 — Modelos de domínio
+### [x] F02-01 — Modelos de domínio
 `Team`, `Agent`, `AgentState`, `DeliveryMode`, `RestartPolicy`, IDs tipados (ULID), validações
 (handle `^[a-z][a-z0-9-]{1,31}$`, unicidade na equipe). Traits de repositório definidas no core.
 **Aceite:** testes de validação cobrindo handles inválidos, duplicados e reservados (`all`, `voce`).
+> Feito: `aisense-core/src/{agent,team,repo}/`. Além do pedido: `Handle::suggest` (nome → handle,
+> sem acento) para o T5, `AgentColor::next_free`, `RestartPolicy::should_restart`, transições da
+> máquina de estados, e `InMemoryStore` implementando as portas com cascata e unicidade.
+> Os enums de bancada (`WorkspaceMode`, `Workbench`, doc 16) já entram no modelo.
 
 ### [ ] F02-02 — Store SQLite e migrações
 `aisense-store`: pool SQLx, WAL, migração `0001_initial.sql` com o esquema de
