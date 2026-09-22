@@ -5,8 +5,8 @@
 > Se estiver desatualizado, o próximo agente se perde. Mantenha-o honesto.
 
 **Última atualização:** 2026-09-22
-**Fase atual:** `FASE 00 — Fundação` (não iniciada)
-**Branch de desenvolvimento:** `claude/epic-goldberg-mloopx`
+**Fase atual:** `FASE 02 — Equipes e Agentes` (em andamento; 00 e 01 com pendências só visuais)
+**Branch de desenvolvimento:** `claude/gifted-cray-29owpm`
 
 ---
 
@@ -21,7 +21,7 @@ A documentação completa de produto, arquitetura, design e plano de execução 
 |---|---|---|
 | 00 — Fundação | 🟨 Em andamento | 6 feitas, 3 parciais de 9 |
 | 01 — Terminal Core | 🟨 Em andamento | 4 feitas, 4 parciais de 8 |
-| 02 — Equipes e Agentes | ⬜ Não iniciada | 0/11 |
+| 02 — Equipes e Agentes | 🟨 Em andamento | 3 feitas de 11 |
 | 03 — Sala da Equipe | ⬜ Não iniciada | 0/9 |
 | 04 — Sistema de Skills | ⬜ Não iniciada | 0/9 |
 | 05 — Barramento | ⬜ Não iniciada | 0/13 |
@@ -33,6 +33,30 @@ A documentação completa de produto, arquitetura, design e plano de execução 
 Legenda: ⬜ não iniciada · 🟨 em andamento · ✅ concluída · 🟥 bloqueada
 
 ## Em andamento agora
+
+**Fase 02 — Equipes e Agentes** (iniciada em 2026-09-22 a pedido do usuário). Exceção consciente à
+regra R1: o que resta das Fases 00 e 01 é **só verificação visual/CI** (F00-02, F00-04, F00-09,
+F01-05..08), nada de código faltando, e nada da Fase 02 depende disso. As pendências continuam
+abertas e devem ser fechadas por quem tiver uma máquina com tela.
+
+| Tarefa | Situação |
+|---|---|
+| F02-01 Modelos de domínio | ✅ `Team`, `Agent`, `Handle`, políticas, estados, portas de repositório e `InMemoryStore` |
+| F02-02 Store SQLite e migrações | ✅ `Store::open` com WAL, FKs, backup antes de migrar; o app migra no `setup` |
+| F02-03 Repositórios | ✅ equipe e agente sobre SQLite; mesmo contrato testado contra SQLite e memória |
+
+Verificado aqui: `pnpm lint` e `pnpm test` limpos (62 core + 49 pty + 22 store + 99 front),
+`cargo clippy -p aisense-app -- -D warnings` e `cargo build -p aisense-app` ok.
+
+**Próximas:** F02-04 (carregador de adaptadores) destrava F02-05, F02-06 e F02-07. F02-08 (telas
+de equipe) já pode começar — só depende de F02-03 — mas precisa dos comandos Tauri de equipe,
+que ainda não existem.
+
+Duas decisões desta fase que valem lembrar:
+1. Os modelos serializam em **camelCase** para o front; o SQL segue snake_case e o store traduz.
+2. `agents.env` não aceita chaves `AISENSE_*` — são elas que carregam a identidade do agente no
+   barramento (invariante I7 em `docs/04`).
+
 
 **Fase 00 — Fundação.** O esqueleto está de pé e verificado no que dava para verificar:
 
@@ -153,3 +177,4 @@ Bugs encontrados pelos próprios testes, todos corrigidos na origem:
 | 2026-09-22 | Claude | PR #3 aberto. CI vermelho revelou uma corrida na entrega de saída do PTY (perda silenciosa + ordem do evento de término); corrigida na origem com teste de regressão |
 | 2026-09-22 | Claude | CI dos 3 SOs pegou erro de compilação no `aisense-app` (conversão de erro) e ícones ausentes. Deps de GUI instaladas no ambiente: o app agora compila e é lintado localmente |
 | 2026-09-22 | Claude | D6 aprovada: docs 15, 16 e 17 escritos, gate de revisão no doc 13, e 6 tarefas novas distribuídas pelas Fases 02, 04, 05 e 06. Início da Fase 01 |
+| 2026-09-22 | Claude | Início da Fase 02 (a pedido do usuário, com 00/01 pendentes só de verificação visual). F02-01, F02-02 e F02-03 concluídas: domínio, SQLite com migrações e repositórios |

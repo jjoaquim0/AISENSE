@@ -11,20 +11,30 @@ reabrir e encontrar tudo no lugar; iniciar um agente e ver o runtime certo subin
 
 ## Tarefas
 
-### [ ] F02-01 — Modelos de domínio
+### [x] F02-01 — Modelos de domínio
 `Team`, `Agent`, `AgentState`, `DeliveryMode`, `RestartPolicy`, IDs tipados (ULID), validações
 (handle `^[a-z][a-z0-9-]{1,31}$`, unicidade na equipe). Traits de repositório definidas no core.
 **Aceite:** testes de validação cobrindo handles inválidos, duplicados e reservados (`all`, `voce`).
+> Feito: `aisense-core/src/{agent,team,repo}/`. Além do pedido: `Handle::suggest` (nome → handle,
+> sem acento) para o T5, `AgentColor::next_free`, `RestartPolicy::should_restart`, transições da
+> máquina de estados, e `InMemoryStore` implementando as portas com cascata e unicidade.
+> Os enums de bancada (`WorkspaceMode`, `Workbench`, doc 16) já entram no modelo.
 
-### [ ] F02-02 — Store SQLite e migrações
+### [x] F02-02 — Store SQLite e migrações
 `aisense-store`: pool SQLx, WAL, migração `0001_initial.sql` com o esquema de
 [04 — Modelo de Dados](../04-modelo-de-dados.md), runner de migração na subida do app.
 **Aceite:** banco criado do zero e migração idempotente; teste em `:memory:`. Depende de F02-01.
+> Feito: `aisense-store/src/db.rs` + `migrations/0001_initial.sql` e `0002_workbenches.sql`.
+> O app abre `~/.aisense/aisense.db` (`AISENSE_HOME` sobrescreve) no `setup` do Tauri, antes da
+> janela. Backup automático antes de migrar, conforme o risco listado abaixo.
 
-### [ ] F02-03 — Repositórios de equipe e agente
+### [x] F02-03 — Repositórios de equipe e agente
 Implementações de `TeamRepository` e `AgentRepository` (CRUD, listagem, arquivamento, cascade).
 **Aceite:** testes de integração cobrindo cascade ao apagar equipe e a constraint de handle único.
 Depende de F02-02.
+> Feito: `aisense-store/src/{teams,agents}.rs`. `tests/repositories.rs` roda o **mesmo contrato**
+> contra o SQLite e o `InMemoryStore` do core, para os dois nunca divergirem. Dado inválido no banco
+> (enum desconhecido, handle reservado editado à mão) vira `RepoError::Corrupt`, nunca entidade.
 
 ### [ ] F02-04 — Carregador de adaptadores
 Parse dos TOMLs (embutidos + `~/.aisense/adapters/`), precedência do usuário, validação de schema,

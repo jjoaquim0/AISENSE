@@ -7,7 +7,19 @@
 
 mod commands;
 
+use tauri::Manager;
 use tracing_subscriber::EnvFilter;
+
+/// Abre o banco e aplica as migrações antes da janela existir: se falhar, o app
+/// não deve subir pela metade, com a UI mostrando dados que não persistem.
+fn open_store() -> Result<aisense_store::Store, Box<dyn std::error::Error>> {
+    let data = aisense_core::DataDir::resolve()
+        .ok_or("could not find the user's home directory; set AISENSE_HOME")?;
+    let path = data.database();
+    Ok(tauri::async_runtime::block_on(aisense_store::Store::open(
+        &path,
+    ))?)
+}
 
 fn main() {
     tracing_subscriber::fmt()
@@ -22,6 +34,10 @@ fn main() {
     let shutdown_manager = std::sync::Arc::clone(&manager);
 
     tauri::Builder::default()
+        .setup(|app| {
+            app.manage(open_store()?);
+            Ok(())
+        })
         .manage(manager)
         .invoke_handler(tauri::generate_handler![
             commands::app_info,
