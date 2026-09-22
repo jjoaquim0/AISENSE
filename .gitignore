@@ -1,0 +1,26 @@
+# Rust
+/target
+**/target
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Tauri
+/apps/desktop/src-tauri/target
+/apps/desktop/src/types/generated/*.d.ts.map
+
+# Dados locais do AISENSE (nunca versionar)
+.aisense/
+*.db
+*.db-wal
+*.db-shm
+
+# SO / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.log
