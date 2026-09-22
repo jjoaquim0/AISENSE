@@ -7,7 +7,8 @@
       "**/*.json",
       "!**/dist",
       "!**/target",
-      "!**/src/types/generated"
+      "!**/src/types/generated",
+      "!**/gen/schemas"
     ]
   },
   "formatter": {
