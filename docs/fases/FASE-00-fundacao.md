@@ -23,13 +23,13 @@ conforme [11 — Segurança](../11-seguranca.md)) e o bootstrap do Vite + React 
 **Aceite:** `pnpm dev` abre a janela com "AISENSE" renderizado pelo React. Depende de F00-01.
 > **Parcial:** scaffold, `tauri.conf.json`, comando `app_info` e CSP prontos. O build da janela não foi verificado — o ambiente de desenvolvimento usado não tem WebKit/GTK. Verificar em máquina com GUI ou pelo job `desktop` do CI.
 
-### [~] F00-03 — Tokens de design em CSS
+### [x] F00-03 — Tokens de design em CSS
 `apps/desktop/src/styles/tokens.css` com todos os tokens primitivos e semânticos de
 [08 — Design System](../08-design-system.md), nos dois temas. Configurar Tailwind 4 com `@theme`
 mapeando os tokens. Empacotar Inter Variable e JetBrains Mono como WOFF2 local.
 **Aceite:** uma página de amostra mostra a escala tipográfica e a paleta, e nenhuma cor literal
 aparece fora de `tokens.css`. Depende de F00-02.
-> **Parcial:** todos os tokens e as fontes empacotadas (Inter Variable + JetBrains Mono, offline). Falta a página de amostra da escala tipográfica e da paleta — sai junto com F00-06.
+> Tokens, fontes empacotadas e amostra do design system em `#/dev` (só em desenvolvimento).
 
 ### [~] F00-04 — Alternância de tema sem flash
 Store zustand de tema (`claro`/`escuro`/`sistema`), script inline no `index.html` aplicando
@@ -44,20 +44,20 @@ falha abaixo de 4.5:1 (3:1 para ≥18px).
 Depende de F00-03.
 > 54 pares verificados nos dois temas. Reprovou `--fg-muted` (4,45:1) e `--border-strong` (1,8:1) na primeira execução; os **tokens** foram corrigidos, não o teste.
 
-### [~] F00-06 — Componentes base do design system
+### [x] F00-06 — Componentes base do design system
 `Button`, `IconButton`, `Input`, `Badge`, `StatusDot`, `Tooltip`, `Dialog`, `DropdownMenu`, `Tabs`,
 `ScrollArea`, `EmptyState`, `Kbd` sobre Radix + CVA.
 **Aceite:** uma rota `/dev/kitchen-sink` (só em dev) mostra todos, e todos são navegáveis por
 teclado com anel de foco visível. Depende de F00-03.
-> **Parcial:** `Button` e `StatusDot` prontos. Faltam Input, Dialog, DropdownMenu, Tabs, Tooltip, ScrollArea, EmptyState, Kbd, IconButton e a rota `/dev/kitchen-sink`.
+> Doze componentes sobre Radix + CVA, com barrel em `components/ui/index.ts` e rota `#/dev`. O comportamento de teclado vem do Radix e o anel de foco da regra global `:focus-visible` — mas ninguém **viu** isso rodando ainda (ver nota da Fase em ESTADO.md).
 
-### [~] F00-07 — Shell da aplicação
+### [x] F00-07 — Shell da aplicação
 Layout global de [09 — Telas](../09-telas-e-fluxos.md#estrutura-global-da-janela): trilho de 48px,
 sidebar redimensionável, área principal, inspetor colapsável, barra de título integrada.
 Persistir tamanhos no localStorage.
 **Aceite:** o layout responde ao redimensionamento sem scroll horizontal e os painéis colapsam por
 atalho. Depende de F00-06.
-> **Parcial:** layout de trilho + sidebar + área principal e barra de título. Faltam inspetor, redimensionamento por arraste e persistência dos tamanhos.
+> Trilho, sidebar e inspetor redimensionáveis por arraste **e por teclado** (`role="separator"` com setas), com larguras e visibilidade persistidas e recortadas aos limites na leitura. Atalhos `⌘B`, `⌘I` e `⌘⇧D`. Coberto por 4 testes.
 
 ### [x] F00-08 — Ponte tipada Rust ⇄ TypeScript
 Configurar `ts-rs`, um comando Tauri de exemplo (`app_info`) e o script

@@ -217,6 +217,8 @@ o visual é nosso.
 | `⌘Enter` | Enviar mensagem do compositor |
 | `⌘G` | Alternar modo de vista (Grid → Foco → Fluxo → Timeline) |
 | `⌘B` | Mostrar/ocultar sidebar |
+| `⌘I` | Mostrar/ocultar inspetor |
+| `⌘⇧D` | Alternar tema claro/escuro |
 | `⌘J` | Mostrar/ocultar linha do tempo |
 | `⌘F` | Buscar no terminal focado |
 | `⌘⇧F` | Buscar em todos os terminais e mensagens |
