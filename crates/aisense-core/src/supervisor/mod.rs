@@ -15,7 +15,7 @@ use std::time::{Duration, Instant};
 
 use aisense_pty::{OutputSink, PtyError, PtyManager, PtySpawn, TerminalSize};
 use serde::{Deserialize, Serialize};
-use tokio::sync::watch;
+use tokio::sync::{mpsc, watch};
 use tokio_util::sync::CancellationToken;
 use ts_rs::TS;
 
@@ -29,6 +29,7 @@ use crate::bench::{prepare_workdir, remove_bench, BenchError, Workdir};
 use crate::ids::{AgentId, SessionId, TeamId};
 use crate::project::{load_project, ProjectLookup};
 use crate::repo::{AgentRepository, RepoError, SessionRecord, SessionRepository, TeamRepository};
+use crate::state::{Detection, StateConfidence, StateDetector};
 use crate::time::now_ms;
 
 /// Quanto o término de uma sessão espera o registro do início dela. Só importa
@@ -42,6 +43,8 @@ const SESSION_RECORD_WAIT: Duration = Duration::from_secs(5);
 pub struct AgentStateChanged {
     pub agent_id: AgentId,
     pub state: AgentState,
+    /// `low` quando o estado veio só do silêncio, sem regex casando (`docs/05`).
+    pub confidence: StateConfidence,
 }
 
 /// O que um start decidiu: onde o agente trabalha e alguma ressalva para a UI.
@@ -81,7 +84,13 @@ pub struct AgentStartFailure {
 
 /// Quem precisa saber das mudanças de estado (o app emite `agent:state`).
 pub trait SupervisorObserver: Send + Sync + 'static {
-    fn state_changed(&self, agent_id: &AgentId, state: AgentState);
+    fn state_changed(&self, agent_id: &AgentId, state: AgentState, confidence: StateConfidence);
+}
+
+/// O que chega à tarefa do detector de estado de uma sessão.
+enum DetectorInput {
+    Output(Vec<u8>),
+    Resize(TerminalSize),
 }
 
 /// As portas de que o supervisor precisa, juntas.
@@ -186,6 +195,9 @@ struct Supervised {
     /// Parar o agente cancela o reinício agendado (`docs/02`, "Concorrência").
     cancel: CancellationToken,
     stop_requested: bool,
+    /// Canal para o detector da sessão atual (redimensionamento). `None` quando não
+    /// há processo.
+    detector: Option<mpsc::UnboundedSender<DetectorInput>>,
 }
 
 impl Supervised {
@@ -198,6 +210,7 @@ impl Supervised {
             restart_policy: RestartPolicy::default(),
             cancel: CancellationToken::new(),
             stop_requested: false,
+            detector: None,
         }
     }
 }
@@ -318,6 +331,9 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
             .logs_dir
             .join(format!("{}.log", agent.id.as_str()));
         let (recorded_tx, recorded_rx) = watch::channel(false);
+        // Criado antes do spawn, como o receptor principal do PTY: a saída do boot
+        // fica no canal até a tarefa do detector começar a ler.
+        let (detector_tx, detector_rx) = mpsc::unbounded_channel();
 
         // Registrado antes do spawn: um processo que morre na hora precisa achar a
         // sessão atual, senão o término seria descartado como de uma sessão antiga.
@@ -333,6 +349,7 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
             entry.stop_requested = false;
             entry.restart_policy = agent.restart_policy;
             entry.state = AgentState::Starting;
+            entry.detector = Some(detector_tx.clone());
         }
         self.notify(agent_id, AgentState::Starting);
 
@@ -350,12 +367,22 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
             agent_id: agent_id.clone(),
             session_id: session_id.clone(),
             recorded: recorded_rx,
+            detector: detector_tx,
         });
         if let Err(error) = self.shared.pty.spawn(agent_id.as_str(), spec, hook) {
             self.set_state(agent_id, AgentState::Failed);
             return Err(error.into());
         }
         tracing::info!(agent = %agent_id, adapter = %adapter.id, "agente iniciado");
+        let size = self.shared.config.size;
+        let detector = StateDetector::new(&adapter.state, size.rows, size.cols, Instant::now());
+        tokio::spawn(run_detector(
+            Arc::downgrade(&self.shared),
+            agent_id.clone(),
+            session_id.clone(),
+            detector,
+            detector_rx,
+        ));
 
         let record = SessionRecord {
             id: session_id.clone(),
@@ -372,23 +399,7 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
         }
         let _ = recorded_tx.send(true);
 
-        // Até o detector de estado da Fase 03 existir, processo vivo = ocioso.
-        let became_idle = {
-            let mut agents = self.agents();
-            match agents.get_mut(agent_id) {
-                Some(entry)
-                    if entry.session.as_ref() == Some(&session_id)
-                        && entry.state == AgentState::Starting =>
-                {
-                    entry.state = AgentState::Idle;
-                    true
-                }
-                _ => false,
-            }
-        };
-        if became_idle {
-            self.notify(agent_id, AgentState::Idle);
-        }
+        // Fica em `starting` até o detector ler a primeira tela (F03-01).
         Ok(StartOutcome { workdir })
     }
 
@@ -506,6 +517,7 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
             if entry.session.as_ref() != Some(&session_id) {
                 return; // término de uma sessão que já foi substituída
             }
+            entry.detector = None;
             let ran_for = entry.started.elapsed();
             let restart = !entry.stop_requested && entry.restart_policy.should_restart(Some(code));
             entry.state = if entry.stop_requested || code == 0 {
@@ -542,7 +554,43 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
     }
 
     fn notify(&self, agent_id: &AgentId, state: AgentState) {
-        self.shared.observer.state_changed(agent_id, state);
+        // Transições do supervisor são fatos (subiu, morreu, parou), não heurística.
+        self.shared
+            .observer
+            .state_changed(agent_id, state, StateConfidence::High);
+    }
+
+    /// O painel do agente mudou de tamanho: a tela do detector precisa acompanhar,
+    /// senão uma TUI desenhada para outra largura vira texto quebrado.
+    pub fn resized(&self, agent_id: &AgentId, size: TerminalSize) {
+        if let Some(tx) = self.agents().get(agent_id).and_then(|e| e.detector.clone()) {
+            let _ = tx.send(DetectorInput::Resize(size));
+        }
+    }
+
+    /// Aplica uma decisão do detector. `false` = a sessão já não é a atual (ou o
+    /// processo morreu) e o detector deve parar.
+    fn apply_detection(
+        &self,
+        agent_id: &AgentId,
+        session_id: &SessionId,
+        detection: Detection,
+    ) -> bool {
+        {
+            let mut agents = self.agents();
+            let Some(entry) = agents.get_mut(agent_id) else {
+                return false;
+            };
+            if entry.session.as_ref() != Some(session_id) || !entry.state.is_running() {
+                return false;
+            }
+            entry.state = detection.state;
+        }
+        tracing::debug!(agent = %agent_id, state = ?detection.state, confidence = ?detection.confidence, "estado do agente");
+        self.shared
+            .observer
+            .state_changed(agent_id, detection.state, detection.confidence);
+        true
     }
 }
 
@@ -554,11 +602,17 @@ struct ExitHook<S> {
     agent_id: AgentId,
     session_id: SessionId,
     recorded: watch::Receiver<bool>,
+    detector: mpsc::UnboundedSender<DetectorInput>,
 }
 
 impl<S: SupervisorStore> OutputSink for ExitHook<S> {
     fn data(&self, agent_id: &str, chunk: Vec<u8>) {
         self.inner.data(agent_id, chunk);
+    }
+
+    fn raw(&self, _agent_id: &str, chunk: &[u8]) {
+        // Detector já encerrado (sessão substituída) não é erro.
+        let _ = self.detector.send(DetectorInput::Output(chunk.to_vec()));
     }
 
     fn exit(&self, agent_id: &str, code: i32) {
@@ -575,6 +629,48 @@ impl<S: SupervisorStore> OutputSink for ExitHook<S> {
         tokio::spawn(async move {
             supervisor.on_exit(id, session, code, recorded).await;
         });
+    }
+}
+
+/// Uma tarefa por sessão: alimenta o detector com a saída e acorda nos prazos que
+/// ele pede. Termina quando a sessão acaba ou é substituída.
+async fn run_detector<S: SupervisorStore>(
+    shared: Weak<Shared<S>>,
+    agent_id: AgentId,
+    session_id: SessionId,
+    mut detector: StateDetector,
+    mut input: mpsc::UnboundedReceiver<DetectorInput>,
+) {
+    loop {
+        let deadline = detector.next_deadline();
+        let detection = tokio::select! {
+            received = input.recv() => match received {
+                Some(DetectorInput::Output(chunk)) => detector.feed(&chunk, Instant::now()),
+                Some(DetectorInput::Resize(size)) => {
+                    detector.resize(size.rows, size.cols);
+                    None
+                }
+                None => return,
+            },
+            () = sleep_until(deadline) => detector.tick(Instant::now()),
+        };
+        if let Some(detection) = detection {
+            let Some(shared) = shared.upgrade() else {
+                return;
+            };
+            let supervisor = AgentSupervisor { shared };
+            if !supervisor.apply_detection(&agent_id, &session_id, detection) {
+                return;
+            }
+        }
+    }
+}
+
+/// Dorme até o prazo, ou para sempre quando não há prazo.
+async fn sleep_until(deadline: Option<Instant>) {
+    match deadline {
+        Some(at) => tokio::time::sleep_until(tokio::time::Instant::from_std(at)).await,
+        None => std::future::pending().await,
     }
 }
 

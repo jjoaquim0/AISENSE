@@ -19,7 +19,7 @@ struct Recorder {
 }
 
 impl SupervisorObserver for Recorder {
-    fn state_changed(&self, _agent_id: &AgentId, state: AgentState) {
+    fn state_changed(&self, _agent_id: &AgentId, state: AgentState, _confidence: StateConfidence) {
         self.states.lock().unwrap().push(state);
     }
 }
@@ -48,6 +48,22 @@ fn exits_with(code: i32) -> Vec<String> {
     }
 }
 
+/// Adaptador de teste: roda o comando do agente e reconhece o prompt `pronto>`.
+const PROMPTY: &str = r#"
+id      = "prompty"
+name    = "Prompt de teste"
+command = "$AGENT_COMMAND"
+
+[state]
+idle_regex     = '(?m)^pronto>\s*$'
+busy_regex     = 'trabalhando'
+awaiting_regex = '\(s/n\)'
+quiet_ms       = 150
+
+[inject]
+mode = "none"
+"#;
+
 struct Harness {
     supervisor: AgentSupervisor<InMemoryStore>,
     store: Arc<InMemoryStore>,
@@ -69,9 +85,10 @@ fn harness() -> Harness {
     let pty = Arc::new(PtyManager::new());
     let recorder = Arc::new(Recorder::default());
     let logs = std::env::temp_dir().join(format!("aisense-sup-{}", ulid::Ulid::new()));
+    let mut builtins = BUILTIN_ADAPTERS.to_vec();
+    builtins.push(("prompty.toml", PROMPTY));
     let runtimes = Arc::new(RuntimeRegistry::new(AdapterCatalog::load_from(
-        BUILTIN_ADAPTERS,
-        None,
+        &builtins, None,
     )));
     let supervisor = AgentSupervisor::new(
         Arc::clone(&store),
@@ -160,7 +177,8 @@ async fn start_records_a_session_and_stop_is_final() {
     let id = h.agent(long_running(), RestartPolicy::Always).await;
 
     h.supervisor.start(&id).await.unwrap();
-    assert_eq!(h.supervisor.state(&id), AgentState::Idle);
+    // `sleep` não imprime nada: sem prompt, o detector ainda não decidiu.
+    assert_eq!(h.supervisor.state(&id), AgentState::Starting);
     let sessions = h.sessions(&id).await;
     assert_eq!(sessions.len(), 1);
     assert!(sessions[0]
@@ -178,10 +196,7 @@ async fn start_records_a_session_and_stop_is_final() {
     assert!(sessions[0].ended_at.is_some());
 
     let states = h.recorder.states.lock().unwrap().clone();
-    assert_eq!(
-        states,
-        vec![AgentState::Starting, AgentState::Idle, AgentState::Stopped]
-    );
+    assert_eq!(states, vec![AgentState::Starting, AgentState::Stopped]);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -193,10 +208,8 @@ async fn killing_the_process_externally_restarts_on_crash() {
     // "Externamente": direto no PTY, sem passar pelo supervisor.
     h.pty.kill(id.as_str()).unwrap();
     h.wait_sessions(&id, 2).await;
-    h.wait_for("de pé de novo", |h| {
-        h.supervisor.state(&id) == AgentState::Idle
-    })
-    .await;
+    h.wait_for("de pé de novo", |h| h.supervisor.state(&id).is_running())
+        .await;
 
     let states = h.recorder.states.lock().unwrap().clone();
     assert!(
@@ -286,7 +299,7 @@ async fn restart_brings_up_a_new_session() {
     let id = h.agent(long_running(), RestartPolicy::Never).await;
     h.supervisor.start(&id).await.unwrap();
     h.supervisor.restart(&id).await.unwrap();
-    assert_eq!(h.supervisor.state(&id), AgentState::Idle);
+    assert!(h.supervisor.state(&id).is_running());
     assert_eq!(h.sessions(&id).await.len(), 2);
 }
 
@@ -362,4 +375,49 @@ async fn a_per_agent_team_starts_each_agent_in_its_own_bench() {
     assert!(std::path::Path::new(&bench.path).exists());
 
     let _ = std::fs::remove_dir_all(&repo);
+}
+
+/// F03-01 de ponta a ponta: processo real, PTY real, detector decidindo.
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread")]
+async fn the_detector_drives_the_state_of_a_real_process() {
+    let h = harness();
+    let script = "printf 'pronto> '; read a; echo trabalhando; sleep 1; \
+                  printf 'Continuar? (s/n) '; read b; printf 'pronto> '; sleep 60";
+    let id = h
+        .agent_with(
+            "prompty",
+            vec!["sh".into(), "-c".into(), script.into()],
+            RestartPolicy::Never,
+        )
+        .await;
+    h.supervisor.start(&id).await.unwrap();
+
+    h.wait_for("ocioso no prompt", |h| {
+        h.supervisor.state(&id) == AgentState::Idle
+    })
+    .await;
+    h.pty.write(id.as_str(), b"vai\r").unwrap();
+    h.wait_for("pergunta ao humano", |h| {
+        h.supervisor.state(&id) == AgentState::AwaitingInput
+    })
+    .await;
+    h.pty.write(id.as_str(), b"s\r").unwrap();
+    h.wait_for("ocioso de novo", |h| {
+        h.supervisor.state(&id) == AgentState::Idle
+    })
+    .await;
+
+    let states = h.recorder.states.lock().unwrap().clone();
+    assert_eq!(
+        states,
+        [
+            AgentState::Starting,
+            AgentState::Idle,
+            AgentState::Busy,
+            AgentState::AwaitingInput,
+            AgentState::Busy,
+            AgentState::Idle,
+        ]
+    );
 }

@@ -16,6 +16,7 @@ ts-rs.workspace = true
 ulid.workspace = true
 toml.workspace = true
 regex.workspace = true
+vt100.workspace = true
 notify.workspace = true
 aisense-pty.workspace = true
 getrandom.workspace = true

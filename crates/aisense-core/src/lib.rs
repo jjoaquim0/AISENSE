@@ -12,6 +12,7 @@ mod ids;
 mod paths;
 pub mod project;
 pub mod repo;
+pub mod state;
 pub mod supervisor;
 pub mod team;
 mod time;

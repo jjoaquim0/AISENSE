@@ -5,7 +5,7 @@
 > Se estiver desatualizado, o próximo agente se perde. Mantenha-o honesto.
 
 **Última atualização:** 2026-09-23
-**Fase atual:** `FASE 02 — Equipes e Agentes` (código completo, falta a demonstração na janela; 00 e 01 com pendências só visuais)
+**Fase atual:** `FASE 03 — Sala da Equipe` (em andamento; demonstração da 02 pendente na janela)
 **Branch de desenvolvimento:** `main` (o usuário pediu commits direto na main)
 
 ---
@@ -23,7 +23,7 @@ runtime e, depois, o supervisor que sobe os agentes.
 | 00 — Fundação | 🟨 Em andamento | 6 feitas, 3 parciais de 9 |
 | 01 — Terminal Core | 🟨 Em andamento | 4 feitas, 4 parciais de 8 |
 | 02 — Equipes e Agentes | 🟨 Código completo | 11 de 11 feitas — falta a demonstração na janela |
-| 03 — Sala da Equipe | ⬜ Não iniciada | 0/9 |
+| 03 — Sala da Equipe | 🟨 Em andamento | 1 feita de 9 |
 | 04 — Sistema de Skills | ⬜ Não iniciada | 0/9 |
 | 05 — Barramento | ⬜ Não iniciada | 0/13 |
 | 06 — Quadro Kanban | ⬜ Não iniciada | 0/11 |
@@ -34,6 +34,23 @@ runtime e, depois, o supervisor que sobe os agentes.
 Legenda: ⬜ não iniciada · 🟨 em andamento · ✅ concluída · 🟥 bloqueada
 
 ## Em andamento agora
+
+**Fase 03 — Sala da Equipe** (iniciada em 2026-09-23 a pedido do usuário). Exceção consciente à R1:
+as 11 tarefas da Fase 02 estão feitas, mas a **demonstração na janela** (criar "Squad Produto",
+fechar, reabrir, subir agente) ainda não foi feita — o usuário estava sem o computador. Continua
+pendente e não bloqueia nada da Fase 03.
+
+| Tarefa | Situação |
+|---|---|
+| F03-01 Detector de estado | ✅ `StateDetector` (tela via `vt100`, regras do `docs/05`), tarefa por sessão no supervisor, `agent:state` com `confidence` |
+
+O agente agora fica em `starting` até o detector ler a primeira tela — antes, processo vivo era
+`idle` na hora. Transcrições dos testes são sintéticas; ver ressalva no documento da fase.
+
+**CI da main estava vermelho desde a F02-08** (job do Windows, teste
+`grava_a_transcricao_completa_em_arquivo`: esperava 200 ms fixos depois do processo sair, e o
+ConPTY ainda entrega saída depois disso). Corrigido no PR #5 esperando o EOF da leitura.
+
 
 **Fase 02 — Equipes e Agentes** (iniciada em 2026-09-22 a pedido do usuário). Exceção consciente à
 regra R1: o que resta das Fases 00 e 01 é **só verificação visual/CI** (F00-02, F00-04, F00-09,
@@ -177,7 +194,7 @@ Bugs encontrados pelos próprios testes, todos corrigidos na origem:
 
 | Risco | Impacto | Mitigação | Dono |
 |---|---|---|---|
-| Detecção de "agente ocioso" por heurística de prompt falhar em algum runtime | Alto — injeção de mensagem no meio de uma resposta | Fila de entrega + modo pull como padrão; regex por adaptador; ver [ADR 0006](adr/0006-entrega-de-mensagens.md) | — |
+| Detecção de "agente ocioso" por heurística de prompt falhar em algum runtime | Alto — injeção de mensagem no meio de uma resposta | Fila de entrega + modo pull como padrão; regex por adaptador; ver [ADR 0006](adr/0006-entrega-de-mensagens.md). O detector (F03-01) só foi testado com transcrições **sintéticas**: gravar sessões reais de cada runtime e ajustar os regex antes da Fase 05, quando o estado passa a decidir injeção | — |
 | WebKitGTK no Linux renderizar diferente do WebView2/WKWebView | Médio | CI com screenshot nos 3 SOs desde a Fase 0; evitar CSS de ponta | — |
 | CLIs de terceiros (claude/codex/opencode) mudarem flags | Médio | Adaptadores em TOML, editáveis pelo usuário sem recompilar | — |
 | ConPTY nativo do Windows 10 rola só ~30 linhas/s (conhost antigo redesenha por linha) | Médio — saída longa (build, testes) aparece com atraso; TUIs que redesenham a tela sofrem menos | Decidir na Fase 09 se o instalador leva `conpty.dll` + `OpenConsole.exe` próprios (MIT, é o que o VS Code faz); o `portable-pty` já carrega um `conpty.dll` ao lado do executável | — |
@@ -207,3 +224,4 @@ Bugs encontrados pelos próprios testes, todos corrigidos na origem:
 | 2026-09-23 | Claude | F02-09: formulário do agente e visão da equipe com terminal; dependências novas no front: react-hook-form, zod, @hookform/resolvers (previstas na fase) |
 | 2026-09-23 | Claude | F02-11: `aisense.toml` (parser, validação, detecção que propõe) e o diálogo "Comandos" |
 | 2026-09-23 | Claude | F02-10: bancadas (git worktree por agente), integradas ao supervisor e às exclusões. Fase 02 com as 11 tarefas feitas |
+| 2026-09-23 | Claude | CI vermelho no Windows desde a F02-08 diagnosticado e corrigido (PR #5). Início da Fase 03 a pedido do usuário; F03-01 (detector de estado) concluída |

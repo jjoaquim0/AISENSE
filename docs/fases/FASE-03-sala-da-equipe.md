@@ -12,12 +12,21 @@ estado de cada um em tempo real.
 
 ## Tarefas
 
-### [ ] F03-01 — Detector de estado do agente
+### [x] F03-01 — Detector de estado do agente
 Máquina de estados de [02 — Arquitetura](../02-arquitetura.md#máquina-de-estados-do-agente) usando
 os regex do adaptador sobre a última tela com ANSI removido, mais o silêncio de `quiet_ms`.
 Emitir `agent:state` com nível de confiança.
 **Aceite:** testes com transcrições gravadas de cada runtime produzindo a sequência de estados
 esperada; `awaiting_input` sempre tem prioridade.
+> Feito: `aisense-core/src/state/`. Tela reconstruída com `vt100` (dependência nova: CLIs de IA
+> redesenham a tela com movimento de cursor, e texto cru não serve). Regras em `docs/05`. O
+> supervisor roda uma tarefa de detector por sessão, alimentada por `OutputSink::raw` (toda a
+> saída, visível ou não); `agent:state` ganhou `confidence`. Duas descobertas dos testes viraram
+> regra: a tela é lida de baixo para cima (pergunta respondida e "trabalhando" antigo ficam
+> visíveis acima do prompt novo) e `busy` vence `idle` na mesma leitura.
+> **Ressalva:** as transcrições são **sintéticas**, modeladas no formato que cada regex espera —
+> não gravações reais. Calibrar com sessões de verdade (claude, codex, opencode, gemini) fica para
+> quem tiver os runtimes instalados; o risco já está em `ESTADO.md`.
 
 ### [ ] F03-02 — Painel de agente
 `AgentPane`: cabeçalho (handle, runtime, estado, badge, menu `⋮`), borda de 3px na cor do agente,

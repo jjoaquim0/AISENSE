@@ -133,6 +133,8 @@ chamadora, é uma chamada de ferramenta síncrona comum — igual a rodar um tes
                                           └────────────────┘
 ```
 
+- `starting` → `busy` e `starting` → `awaiting_input` também valem: a CLI pode aparecer ocupada
+  ou já perguntando algo (confiar na pasta, login) antes do primeiro prompt ocioso.
 - `idle` → seguro injetar mensagem.
 - `busy` → enfileira.
 - `awaiting_input` → **nunca** injeta; destaca na UI para o humano decidir.

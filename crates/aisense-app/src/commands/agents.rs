@@ -6,6 +6,7 @@ use aisense_core::agent::{
     create_agent, update_agent, Agent, AgentDraft, AgentOpError, AgentState, AgentUpdate, Handle,
 };
 use aisense_core::repo::{AgentRepository, RepoError};
+use aisense_core::state::StateConfidence;
 use aisense_core::supervisor::{
     AgentStateChanged, AgentSupervisor, LaunchContext, StartOutcome, SupervisorConfig,
     SupervisorError, SupervisorObserver,
@@ -27,10 +28,11 @@ struct TauriObserver {
 }
 
 impl SupervisorObserver for TauriObserver {
-    fn state_changed(&self, agent_id: &AgentId, state: AgentState) {
+    fn state_changed(&self, agent_id: &AgentId, state: AgentState, confidence: StateConfidence) {
         let payload = AgentStateChanged {
             agent_id: agent_id.clone(),
             state,
+            confidence,
         };
         if let Err(error) = self.app.emit(AGENT_STATE, payload) {
             tracing::warn!(agent = %agent_id, %error, "falha ao emitir o estado do agente");
