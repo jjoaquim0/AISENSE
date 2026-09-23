@@ -156,7 +156,7 @@ Abas Visão, Config e Logs (as abas Skills e Caixa entram nas fases 4 e 5).
 > **Visão:** estado, tempo ativo (relógio só enquanto roda), PID, nº de sessões, runtime, pasta,
 > papel e os últimos 20 eventos de estado desde que a janela abriu. Mensagens e tarefas entram
 > nas Fases 05 e 06. **Config:** os campos do T5 inline — o formulário saiu do diálogo para
-> `features/agents/AgentForm.tsx`, usado pelos dois. Transcrição não é um emulador: TUIs que
+> `features/agents/AgentFormFields.tsx` (não `AgentForm.tsx`: colidiria com `agentForm.ts` no macOS e no Windows), usado pelos dois. Transcrição não é um emulador: TUIs que
 > redesenham a tela inteira ficam repetitivas no texto. **Não conferido na janela.**
 
 ## Critérios de saída

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui';
-import { AgentForm } from '@/features/agents/AgentForm';
+import { AgentFormFields } from '@/features/agents/AgentFormFields';
 import { agentsApi } from '@/features/agents/api';
 import { errorMessage } from '@/features/teams/api';
 import type { Agent } from '@/types/generated/Agent';
@@ -109,7 +109,7 @@ export function AgentInspector({
           />
         </TabsContent>
         <TabsContent value="config">
-          <AgentForm
+          <AgentFormFields
             key={agent.id}
             teamId={teamId}
             agent={agent}

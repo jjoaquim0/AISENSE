@@ -1,13 +1,14 @@
 import { Dialog } from '@/components/ui';
 import type { Agent } from '@/types/generated/Agent';
-import { AgentForm, type AgentFormProps } from './AgentForm';
+import { AgentFormFields, type AgentFormFieldsProps } from './AgentFormFields';
 
-interface AgentFormDialogProps extends Omit<AgentFormProps, 'active' | 'onCancel' | 'compact'> {
+interface AgentFormDialogProps
+  extends Omit<AgentFormFieldsProps, 'active' | 'onCancel' | 'compact'> {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-/** T5 — Criar/editar agente (docs/09) num diálogo. Os campos estão em `AgentForm`. */
+/** T5 — Criar/editar agente (docs/09) num diálogo. Os campos estão em `AgentFormFields`. */
 export function AgentFormDialog({ open, onOpenChange, onSaved, ...form }: AgentFormDialogProps) {
   const editing = form.agent !== undefined;
   return (
@@ -22,7 +23,7 @@ export function AgentFormDialog({ open, onOpenChange, onSaved, ...form }: AgentF
           : 'Um agente é um terminal com um runtime de IA e um papel na equipe.'
       }
     >
-      <AgentForm
+      <AgentFormFields
         {...form}
         active={open}
         onCancel={() => onOpenChange(false)}

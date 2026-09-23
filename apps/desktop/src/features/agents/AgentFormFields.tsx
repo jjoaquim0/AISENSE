@@ -22,7 +22,7 @@ import { agentsApi } from './api';
 
 const COLORS = ['violet', 'cyan', 'emerald', 'amber', 'rose', 'indigo', 'teal', 'fuchsia'] as const;
 
-export interface AgentFormProps {
+export interface AgentFormFieldsProps {
   teamId: TeamId;
   /** Presente = edição. */
   agent?: Agent;
@@ -43,7 +43,7 @@ export interface AgentFormProps {
  * Campos do T5 (docs/09). Mora fora do diálogo porque a aba Config do inspetor (T6)
  * edita os mesmos campos inline — uma regra de validação só, um lugar só para mudar.
  */
-export function AgentForm({
+export function AgentFormFields({
   teamId,
   agent,
   siblings,
@@ -52,7 +52,7 @@ export function AgentForm({
   onSaved,
   onCancel,
   compact = false,
-}: AgentFormProps) {
+}: AgentFormFieldsProps) {
   const editing = agent !== undefined;
   const otherHandles = useMemo(
     () => siblings.filter((s) => s.id !== agent?.id).map((s) => s.handle),
