@@ -2,12 +2,15 @@
 
 use std::sync::Arc;
 
-use aisense_core::agent::AgentState;
+use aisense_core::agent::{
+    create_agent, update_agent, Agent, AgentDraft, AgentOpError, AgentState, AgentUpdate, Handle,
+};
+use aisense_core::repo::{AgentRepository, RepoError};
 use aisense_core::supervisor::{
     AgentStateChanged, AgentSupervisor, LaunchContext, SupervisorConfig, SupervisorError,
     SupervisorObserver,
 };
-use aisense_core::{AgentId, CommandError, DataDir};
+use aisense_core::{now_ms, AgentId, CommandError, DataDir, TeamId};
 use aisense_pty::TerminalSize;
 use aisense_store::Store;
 use tauri::{AppHandle, Emitter, State};
@@ -95,4 +98,63 @@ pub async fn agent_restart(
 #[tauri::command]
 pub fn agent_state(supervisor: State<'_, Supervisor>, agent_id: AgentId) -> AgentState {
     supervisor.state(&agent_id)
+}
+
+fn op_error(error: AgentOpError) -> CommandError {
+    CommandError::new(error.code(), error.to_string(), None)
+}
+
+fn repo_error(error: RepoError) -> CommandError {
+    CommandError::new(error.code(), error.to_string(), None)
+}
+
+#[tauri::command]
+pub async fn agents_list(
+    store: State<'_, Store>,
+    team_id: TeamId,
+) -> Result<Vec<Agent>, CommandError> {
+    store.list_agents(&team_id).await.map_err(repo_error)
+}
+
+#[tauri::command]
+pub async fn agent_create(
+    store: State<'_, Store>,
+    team_id: TeamId,
+    draft: AgentDraft,
+) -> Result<Agent, CommandError> {
+    create_agent(&*store, &team_id, &draft, now_ms())
+        .await
+        .map_err(op_error)
+}
+
+/// Editar um agente vivo grava na hora, mas só vale no próximo início; a resposta diz
+/// se é preciso reiniciar (`docs/09`, F02-09).
+#[tauri::command]
+pub async fn agent_update(
+    store: State<'_, Store>,
+    supervisor: State<'_, Supervisor>,
+    agent_id: AgentId,
+    draft: AgentDraft,
+) -> Result<AgentUpdate, CommandError> {
+    let running = supervisor.state(&agent_id).is_running();
+    update_agent(&*store, &agent_id, &draft, running, now_ms())
+        .await
+        .map_err(op_error)
+}
+
+#[tauri::command]
+pub async fn agent_delete(
+    store: State<'_, Store>,
+    supervisor: State<'_, Supervisor>,
+    agent_id: AgentId,
+) -> Result<(), CommandError> {
+    supervisor.stop(&agent_id).map_err(command_error)?;
+    store.delete_agent(&agent_id).await.map_err(repo_error)
+}
+
+/// Handle sugerido a partir do nome ("Revisão de Código" → `revisao-de-codigo`).
+/// Fica no core para a regra ser uma só; o formulário chama enquanto o nome é digitado.
+#[tauri::command]
+pub fn handle_suggest(name: String) -> Option<String> {
+    Handle::suggest(&name).map(|h| h.as_str().to_owned())
 }

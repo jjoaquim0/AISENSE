@@ -22,7 +22,7 @@ runtime e, depois, o supervisor que sobe os agentes.
 |---|---|---|
 | 00 — Fundação | 🟨 Em andamento | 6 feitas, 3 parciais de 9 |
 | 01 — Terminal Core | 🟨 Em andamento | 4 feitas, 4 parciais de 8 |
-| 02 — Equipes e Agentes | 🟨 Em andamento | 8 feitas de 11 |
+| 02 — Equipes e Agentes | 🟨 Em andamento | 9 feitas de 11 |
 | 03 — Sala da Equipe | ⬜ Não iniciada | 0/9 |
 | 04 — Sistema de Skills | ⬜ Não iniciada | 0/9 |
 | 05 — Barramento | ⬜ Não iniciada | 0/13 |
@@ -50,6 +50,7 @@ abertas e devem ser fechadas por quem tiver uma máquina com tela.
 | F02-07 Adaptadores embutidos | ✅ claude, codex, opencode (flags conferidas nas versões instaladas), gemini (não conferido), shell, custom |
 | F02-06 Supervisor | ✅ start/stop/restart, ambiente `AISENSE_*`, sessões, reinício com backoff; comandos `agent_*` e evento `agent:state` |
 | F02-08 Telas de equipe | ✅ T2 (cards), T3 (assistente com modelos), arquivar e excluir digitando o nome |
+| F02-09 Painel do agente | ✅ formulário T5 (react-hook-form + zod), CRUD de agente, visão da equipe com terminal real do agente |
 
 Verificado aqui: `pnpm lint` e `pnpm test` limpos (62 core + 49 pty + 22 store + 99 front),
 `cargo clippy -p aisense-app -- -D warnings` e `cargo build -p aisense-app` ok.
@@ -59,8 +60,8 @@ de runtimes funciona — conferido pelo usuário. Para isso foi preciso criar
 `crates/aisense-app/capabilities/default.json`: sem ele o Tauri 2 nega `listen`, e nenhum evento do
 core (nem `pty:data`) chegaria ao front. O resto da conferência visual das Fases 00/01 continua aberto.
 
-**Próximas:** F02-09 (painel do agente: criar/editar um agente avulso, ver o terminal dele) — é o
-que falta para operar um agente pela interface; depois F02-10 (bancadas) e F02-11 (`aisense.toml`).
+**Próximas:** F02-10 (bancadas: `git worktree` por agente) e F02-11 (`aisense.toml`), as duas
+últimas da Fase 02. Já dá para criar uma equipe, subir agentes e usar o terminal deles pela interface.
 
 Duas decisões desta fase que valem lembrar:
 1. Os modelos serializam em **camelCase** para o front; o SQL segue snake_case e o store traduz.
@@ -200,3 +201,4 @@ Bugs encontrados pelos próprios testes, todos corrigidos na origem:
 | 2026-09-23 | Claude | PTY no Windows: 49/49 testes. ConPTY não dava EOF ao fim do processo, travava com as flags do `portable-pty` (cópia em `vendor/`) e o `kill` tinha resultado invertido. Testes do PTY no job Windows do CI |
 | 2026-09-23 | Claude | F02-06: supervisor de agentes com sessões e política de reinício; biome passa a ignorar `vendor/` |
 | 2026-09-23 | Claude | F02-08: modelos de equipe, criação atômica, T2 e T3 no front; pnpm 10.33 (o do `packageManager`) para não reescrever o lockfile |
+| 2026-09-23 | Claude | F02-09: formulário do agente e visão da equipe com terminal; dependências novas no front: react-hook-form, zod, @hookform/resolvers (previstas na fase) |

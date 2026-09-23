@@ -29,10 +29,12 @@ import { errorMessage, teamsApi } from './api';
 import { CreateTeamWizard } from './CreateTeamWizard';
 import { DeleteTeamDialog } from './DeleteTeamDialog';
 import { useTeams } from './store';
+import { TeamView } from './TeamView';
 
 /** T2 — Início / Equipes (docs/09). */
 export function TeamsHome() {
-  const { teams, error, showArchived, load, setShowArchived, setWizardOpen } = useTeams();
+  const { teams, error, showArchived, selectedTeamId, load, setShowArchived, setWizardOpen } =
+    useTeams();
 
   useEffect(() => {
     if (!isDesktop()) return;
@@ -43,6 +45,9 @@ export function TeamsHome() {
       void unlisten.then((stop) => stop());
     };
   }, [load]);
+
+  const opened = teams?.find((t) => t.team.id === selectedTeamId);
+  if (opened) return <TeamView summary={opened} />;
 
   if (teams && teams.length === 0 && !showArchived) {
     return (
@@ -118,6 +123,7 @@ function TeamCard({
   onChanged: () => Promise<void>;
 }) {
   const { team, agents } = summary;
+  const selectTeam = useTeams((s) => s.selectTeam);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -163,7 +169,15 @@ function TeamCard({
       />
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <h2 className="truncate text-heading text-primary">{team.name}</h2>
+          <h2 className="truncate text-heading text-primary">
+            <button
+              type="button"
+              onClick={() => selectTeam(team.id)}
+              className="truncate text-left hover:underline"
+            >
+              {team.name}
+            </button>
+          </h2>
           {team.mission && (
             <p className="truncate text-caption text-secondary" title={team.mission}>
               {team.mission}

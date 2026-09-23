@@ -105,11 +105,22 @@ confirmação que exige digitar o nome.
 > com `autostart`. Ícone da equipe e o badge de "tarefas" do card ficam para quando houver
 > seletor de ícone e o Kanban (Fase 06).
 
-### [ ] F02-09 — Painel de agente (T5)
+### [x] F02-09 — Painel de agente (T5)
 Formulário completo de criação/edição com `react-hook-form` + `zod`, geração de handle a partir do
 nome, seletor de runtime mostrando disponibilidade, atribuição de cor e seção "Avançado".
 **Aceite:** validação impede handle duplicado antes de submeter; editar agente rodando avisa que
 exige reinício. Depende de F02-05, F02-03.
+> Feito. Front: `features/agents/agentForm.ts` (esquema zod espelhando o core, conversões
+> formulário ⇄ `AgentDraft`, testado) e `AgentFormDialog.tsx` (T5: nome, endereço sugerido pelo
+> `Handle::suggest` do core até ser editado à mão, papel, runtime com disponibilidade, comando do
+> `custom`, modelo quando o adaptador tem `model_flag`, diretório com seletor nativo, cor e
+> Avançado: entrega, autostart, reinício, autonomia, variáveis e argumentos). Core:
+> `agent/ops.rs` — `update_agent` devolve `restartRequired` só quando o agente está vivo **e**
+> mudou algo lido no início (nome e cor não contam). App: `agents_list`, `agent_create`,
+> `agent_update`, `agent_delete` (para antes), `handle_suggest`. Para o formulário ter onde morar,
+> `features/teams/TeamView.tsx`: a equipe aberta com a lista de agentes (estado, iniciar/parar,
+> editar, excluir) e o terminal real do agente selecionado — o degrau até a Sala da Equipe (F03).
+> Skills do agente e o preview do `BOOT.md` entram com a Fase 04.
 
 ### [ ] F02-10 — Bancadas (`git worktree` por agente)
 Modos `shared` e `per-agent` por equipe, com exceção por agente. Criação, reutilização e validação

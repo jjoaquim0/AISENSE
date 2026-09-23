@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { TeamId } from '@/types/generated/TeamId';
 import type { TeamSummary } from '@/types/generated/TeamSummary';
 import { errorMessage, teamsApi } from './api';
 
@@ -8,7 +9,10 @@ interface TeamsState {
   error: string | null;
   /** Assistente de criação (T3) aberto — o `+` do trilho e o botão da T2 abrem o mesmo. */
   wizardOpen: boolean;
+  /** Equipe aberta; `null` mostra a lista (T2). */
+  selectedTeamId: TeamId | null;
   load: () => Promise<void>;
+  selectTeam: (teamId: TeamId | null) => void;
   setShowArchived: (show: boolean) => void;
   setWizardOpen: (open: boolean) => void;
 }
@@ -18,6 +22,7 @@ export const useTeams = create<TeamsState>((set, get) => ({
   showArchived: false,
   error: null,
   wizardOpen: false,
+  selectedTeamId: null,
   load: async () => {
     try {
       set({ teams: await teamsApi.list(get().showArchived), error: null });
@@ -30,4 +35,5 @@ export const useTeams = create<TeamsState>((set, get) => ({
     void get().load();
   },
   setWizardOpen: (wizardOpen) => set({ wizardOpen }),
+  selectTeam: (selectedTeamId) => set({ selectedTeamId }),
 }));

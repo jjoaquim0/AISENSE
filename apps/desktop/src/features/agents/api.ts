@@ -1,11 +1,24 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import type { Agent } from '@/types/generated/Agent';
+import type { AgentDraft } from '@/types/generated/AgentDraft';
 import type { AgentId } from '@/types/generated/AgentId';
 import type { AgentState } from '@/types/generated/AgentState';
 import type { AgentStateChanged } from '@/types/generated/AgentStateChanged';
+import type { AgentUpdate } from '@/types/generated/AgentUpdate';
+import type { TeamId } from '@/types/generated/TeamId';
 
-/** Único ponto do front que chama os comandos de ciclo de vida do agente (docs/10). */
+/** Único ponto do front que chama os comandos de agente (docs/10). */
 export const agentsApi = {
+  list: (teamId: TeamId): Promise<Agent[]> => invoke('agents_list', { teamId }),
+  create: (teamId: TeamId, draft: AgentDraft): Promise<Agent> =>
+    invoke('agent_create', { teamId, draft }),
+  /** `restartRequired` diz se a mudança só vale depois de reiniciar o agente. */
+  update: (agentId: AgentId, draft: AgentDraft): Promise<AgentUpdate> =>
+    invoke('agent_update', { agentId, draft }),
+  remove: (agentId: AgentId): Promise<void> => invoke('agent_delete', { agentId }),
+  suggestHandle: (name: string): Promise<string | null> => invoke('handle_suggest', { name }),
+
   start: (agentId: AgentId): Promise<void> => invoke('agent_start', { agentId }),
   stop: (agentId: AgentId): Promise<void> => invoke('agent_stop', { agentId }),
   restart: (agentId: AgentId): Promise<void> => invoke('agent_restart', { agentId }),
