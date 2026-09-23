@@ -78,6 +78,9 @@ pub struct InjectRules {
     pub submit: String,
     pub prefix: String,
     pub max_chars: u32,
+    /// Se o `BOOT.md` pode entrar pelo terminal (F04-06). `false` num shell puro: digitar
+    /// "leia o BOOT.md" ali viraria um comando inexistente.
+    pub boot: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]

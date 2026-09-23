@@ -64,6 +64,36 @@ quiet_ms       = 150
 mode = "none"
 "#;
 
+/// Como o `prompty`, mas recebe o `BOOT.md` pelo terminal (F04-06).
+const PROMPTY_STDIN: &str = r#"
+id      = "prompty-stdin"
+name    = "Prompt de teste (terminal)"
+command = "$AGENT_COMMAND"
+
+[state]
+idle_regex     = '(?m)^pronto>\s*$'
+awaiting_regex = '\(s/n\)'
+quiet_ms       = 150
+
+[inject]
+mode   = "stdin"
+submit = "\n"
+"#;
+
+/// Como o `prompty`, mas com flag de system prompt (F04-06).
+const PROMPTY_FLAG: &str = r#"
+id      = "prompty-flag"
+name    = "Prompt de teste (flag)"
+command = "$AGENT_COMMAND"
+
+[capabilities]
+system_prompt_flag = "--sistema"
+
+[state]
+idle_regex = '(?m)^pronto>\s*$'
+quiet_ms   = 150
+"#;
+
 struct Harness {
     supervisor: AgentSupervisor<InMemoryStore>,
     store: Arc<InMemoryStore>,
@@ -88,6 +118,8 @@ fn harness() -> Harness {
     let logs = std::env::temp_dir().join(format!("aisense-sup-{}", ulid::Ulid::new()));
     let mut builtins = BUILTIN_ADAPTERS.to_vec();
     builtins.push(("prompty.toml", PROMPTY));
+    builtins.push(("prompty-stdin.toml", PROMPTY_STDIN));
+    builtins.push(("prompty-flag.toml", PROMPTY_FLAG));
     let runtimes = Arc::new(RuntimeRegistry::new(AdapterCatalog::load_from(
         &builtins, None,
     )));
@@ -108,6 +140,8 @@ fn harness() -> Harness {
             },
             size: TerminalSize::default(),
             skills: Arc::clone(&skills),
+            mcp_boot: false,
+            stdin_boot_timeout: Duration::from_secs(2),
         },
     );
     Harness {
@@ -670,4 +704,135 @@ async fn stop_all_then_restart_all() {
     assert!(h.supervisor.state(&ids[0]).is_running());
     assert!(!h.supervisor.state(&ids[3]).is_running());
     assert!(log.events().iter().all(|(_, p)| p.op == TeamOp::Restart));
+}
+
+#[derive(Default)]
+struct BootRecorder {
+    boots: Mutex<Vec<BootDelivery>>,
+}
+
+impl SupervisorObserver for BootRecorder {
+    fn state_changed(&self, _: &AgentId, _: AgentState, _: StateConfidence) {}
+    fn boot_changed(&self, _agent_id: &AgentId, boot: &BootDelivery) {
+        self.boots.lock().unwrap().push(boot.clone());
+    }
+}
+
+impl Harness {
+    fn file(&self, name: &str) -> String {
+        std::fs::read_to_string(std::path::Path::new(&self.workdir()).join(name))
+            .unwrap_or_default()
+    }
+}
+
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread")]
+async fn boot_pela_flag_vai_nos_argumentos_do_processo() {
+    let h = harness();
+    // Os argumentos do adaptador vêm depois dos do agente: `$1` é a flag, `$2` o BOOT.md.
+    let script = r#"printf '%s' "$1" > flag.txt; printf '%s' "$2" > boot.txt; sleep 60"#;
+    let id = h
+        .agent_with(
+            "prompty-flag",
+            vec!["sh".into(), "-c".into(), script.into(), "sh".into()],
+            RestartPolicy::Never,
+        )
+        .await;
+    let outcome = h.supervisor.start(&id).await.unwrap();
+    assert_eq!(
+        outcome.boot.channel,
+        BootChannel::SystemPromptFlag {
+            flag: "--sistema".into()
+        }
+    );
+    assert_eq!(outcome.boot.status, BootStatus::Delivered);
+    h.wait_for("o processo gravar o que recebeu", |h| {
+        !h.file("boot.txt").is_empty()
+    })
+    .await;
+    assert_eq!(h.file("flag.txt"), "--sistema");
+    let written = h.file(".aisense/agents/backend/BOOT.md");
+    assert_eq!(h.file("boot.txt"), written, "o texto inteiro do BOOT.md");
+    assert!(written.contains("@backend"));
+}
+
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread")]
+async fn boot_pelo_terminal_espera_o_primeiro_prompt() {
+    let mut h = harness();
+    let recorder = Arc::new(BootRecorder::default());
+    h.supervisor = AgentSupervisor::new(
+        Arc::clone(&h.store),
+        Arc::clone(&h.supervisor.shared.runtimes),
+        Arc::clone(&h.pty),
+        Arc::new(Silent),
+        Arc::clone(&recorder) as Arc<dyn SupervisorObserver>,
+        SupervisorConfig {
+            stdin_boot_timeout: PATIENCE,
+            ..h.supervisor.shared.config.clone()
+        },
+    );
+    // Demora a mostrar o prompt: nada pode ser digitado antes dele.
+    let script =
+        "sleep 1; printf 'pronto> '; read linha; printf '%s' \"$linha\" > lido.txt; sleep 60";
+    let id = h
+        .agent_with(
+            "prompty-stdin",
+            vec!["sh".into(), "-c".into(), script.into()],
+            RestartPolicy::Never,
+        )
+        .await;
+    let outcome = h.supervisor.start(&id).await.unwrap();
+    assert_eq!(outcome.boot.channel, BootChannel::Stdin);
+    assert_eq!(outcome.boot.status, BootStatus::Waiting);
+
+    h.wait_for("o agente ler a linha", |h| !h.file("lido.txt").is_empty())
+        .await;
+    assert_eq!(
+        h.file("lido.txt"),
+        "[AISENSE] Leia .aisense/agents/backend/BOOT.md e siga as instruções: é quem você é nesta equipe."
+    );
+    let boot = h.supervisor.boot(&id).unwrap();
+    assert_eq!(boot.status, BootStatus::Delivered);
+    assert_eq!(recorder.boots.lock().unwrap().clone(), [boot]);
+}
+
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread")]
+async fn boot_pelo_terminal_desiste_sem_prompt_e_nunca_digita_aguardando_o_humano() {
+    let h = harness();
+    // Pergunta ao humano e nunca mostra o prompt: o BOOT.md não pode entrar como resposta.
+    let script =
+        "printf 'Confiar nesta pasta? (s/n) '; read r; printf '%s' \"$r\" > resposta.txt; sleep 60";
+    let id = h
+        .agent_with(
+            "prompty-stdin",
+            vec!["sh".into(), "-c".into(), script.into()],
+            RestartPolicy::Never,
+        )
+        .await;
+    h.supervisor.start(&id).await.unwrap();
+    h.wait_for("desistir depois do prazo", |h| {
+        h.supervisor
+            .boot(&id)
+            .is_some_and(|b| b.status == BootStatus::Failed)
+    })
+    .await;
+    assert_eq!(h.supervisor.state(&id), AgentState::AwaitingInput);
+    let boot = h.supervisor.boot(&id).unwrap();
+    assert!(boot.message.contains("Peça ao agente"), "{}", boot.message);
+    assert!(h.file("resposta.txt").is_empty(), "nada foi digitado");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn runtime_sem_quem_leia_nao_recebe_boot() {
+    let h = harness();
+    let id = h.agent(long_running(), RestartPolicy::Never).await;
+    let outcome = h.supervisor.start(&id).await.unwrap();
+    assert_eq!(outcome.boot.channel, BootChannel::None);
+    assert_eq!(outcome.boot.status, BootStatus::Skipped);
+    assert!(outcome
+        .boot
+        .message
+        .contains(".aisense/agents/backend/BOOT.md"));
 }

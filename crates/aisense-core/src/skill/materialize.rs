@@ -68,6 +68,9 @@ fn io_err(path: &Path) -> impl FnOnce(io::Error) -> MaterializeError + '_ {
 pub struct Materialized {
     /// `<workdir>/.aisense/agents/<handle>/`.
     pub agent_dir: PathBuf,
+    /// `<agent_dir>/BOOT.md` e o que foi escrito nele — o que a injeção entrega (F04-06).
+    pub boot_path: PathBuf,
+    pub boot: String,
     /// Ressalvas que não impedem o start (skill nativa que já existia e não é nossa).
     pub warnings: Vec<String>,
 }
@@ -193,6 +196,8 @@ pub fn materialize(req: &MaterializeRequest<'_>) -> Result<Materialized, Materia
     }
     Ok(Materialized {
         agent_dir,
+        boot_path,
+        boot: boot.markdown,
         warnings,
     })
 }

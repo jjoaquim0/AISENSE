@@ -5,6 +5,7 @@
 //! volta, com espera crescente entre quedas seguidas.
 
 mod backoff;
+mod boot;
 mod launch;
 mod team;
 mod token;
@@ -21,6 +22,10 @@ use tokio_util::sync::CancellationToken;
 use ts_rs::TS;
 
 pub use backoff::{Backoff, FIRST_DELAY, MAX_DELAY, STABLE_AFTER};
+pub use boot::{
+    boot_relative_path, choose_boot_channel, stdin_boot_text, BootChannel, BootDelivery,
+    BootStatus, STDIN_BOOT_TIMEOUT,
+};
 pub use launch::{build_launch, LaunchContext, LaunchError, LaunchIdentity, LaunchPlan};
 pub use team::{ProgressFn, TeamOp, TeamProgress, TEAM_START_STAGGER};
 pub use token::{generate_token, TokenError};
@@ -34,7 +39,7 @@ use crate::repo::{
     AgentRepository, RepoError, SessionRecord, SessionRepository, SkillRepository, TeamRepository,
 };
 use crate::skill::{
-    materialize, resolve_agent_skills, MaterializeRequest, SkillLibrary, SkillPlan,
+    materialize, resolve_agent_skills, MaterializeRequest, Materialized, SkillLibrary, SkillPlan,
 };
 use crate::state::{Detection, StateConfidence, StateDetector};
 use crate::time::now_ms;
@@ -54,6 +59,15 @@ pub struct AgentStateChanged {
     pub confidence: StateConfidence,
 }
 
+/// Payload do evento `agent:boot`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../apps/desktop/src/types/generated/")]
+pub struct AgentBootChanged {
+    pub agent_id: AgentId,
+    pub boot: BootDelivery,
+}
+
 /// O que um start decidiu: onde o agente trabalha e alguma ressalva para a UI.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -65,6 +79,8 @@ pub struct StartOutcome {
     /// Outras ressalvas do boot, prontas para a UI (materialização que falhou, skill
     /// nativa que já existia e não é nossa — F04-04).
     pub notes: Vec<String>,
+    /// Por onde o `BOOT.md` vai (ou foi) entregue (F04-06).
+    pub boot: BootDelivery,
 }
 
 /// Uma ressalva sobre um agente que subiu (sem git, setup que falhou...).
@@ -97,6 +113,8 @@ pub struct AgentStartFailure {
 /// Quem precisa saber das mudanças de estado (o app emite `agent:state`).
 pub trait SupervisorObserver: Send + Sync + 'static {
     fn state_changed(&self, agent_id: &AgentId, state: AgentState, confidence: StateConfidence);
+    /// A entrega do `BOOT.md` mudou (o caminho pelo terminal termina depois do start).
+    fn boot_changed(&self, _agent_id: &AgentId, _boot: &BootDelivery) {}
 }
 
 /// Miniatura de um agente: as últimas linhas da tela, sem ANSI.
@@ -138,6 +156,11 @@ pub struct SupervisorConfig {
     pub size: TerminalSize,
     /// Biblioteca de skills atual: o start resolve as do agente contra ela (F04-03).
     pub skills: Arc<SkillLibrary>,
+    /// O `aisense-mcp` entrega o `BOOT.md` (F05-09). Enquanto for `false`, runtimes sem
+    /// flag de system prompt recebem pelo terminal.
+    pub mcp_boot: bool,
+    /// Quanto o caminho pelo terminal espera o primeiro prompt ([`STDIN_BOOT_TIMEOUT`]).
+    pub stdin_boot_timeout: Duration,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -233,6 +256,17 @@ struct Supervised {
     /// A tela da sessão mais recente, compartilhada com a tarefa do detector. Fica
     /// depois que o processo morre: a miniatura de um agente que caiu mostra o erro.
     screen: Option<Arc<Mutex<StateDetector>>>,
+    /// Entrega do `BOOT.md` na sessão atual.
+    boot: Option<BootDelivery>,
+    /// O que digitar no primeiro prompt, enquanto o caminho pelo terminal espera.
+    pending_boot: Option<PendingBoot>,
+}
+
+/// O caminho pelo terminal esperando o primeiro prompt.
+struct PendingBoot {
+    text: String,
+    /// A frase de quando desiste, já com o handle.
+    timeout_message: String,
 }
 
 impl Supervised {
@@ -247,6 +281,8 @@ impl Supervised {
             stop_requested: false,
             detector: None,
             screen: None,
+            boot: None,
+            pending_boot: None,
         }
     }
 }
@@ -359,7 +395,7 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
 
         // Materializa skills, identidade e BOOT.md no diretório de trabalho
         // (F04-04/05). Falha de disco vira ressalva, não impede o start.
-        let notes = self
+        let (materialized, mut notes) = self
             .materialize(
                 &team,
                 &agent,
@@ -379,13 +415,19 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
             &self.shared.config.launch,
             std::path::Path::new(&workdir.path),
         );
-        let plan = match plan {
+        let mut plan = match plan {
             Ok(plan) => plan,
             Err(error) => {
                 self.set_state(agent_id, AgentState::Failed);
                 return Err(error.into());
             }
         };
+        let (boot, pending_boot) =
+            self.prepare_boot(&agent, &adapter, materialized.as_ref(), &mut plan);
+        tracing::info!(agent = %agent_id, channel = ?boot.channel, status = ?boot.status, "boot");
+        if boot.status == BootStatus::Failed {
+            notes.push(boot.message.clone());
+        }
 
         let session_id = SessionId::new();
         let log_path = self
@@ -415,6 +457,8 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
             entry.restart_policy = agent.restart_policy;
             entry.state = AgentState::Starting;
             entry.detector = Some(detector_tx.clone());
+            entry.boot = Some(boot.clone());
+            entry.pending_boot = pending_boot;
         }
         self.notify(agent_id, AgentState::Starting);
 
@@ -440,6 +484,20 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
             return Err(error.into());
         }
         tracing::info!(agent = %agent_id, adapter = %adapter.id, "agente iniciado");
+        if boot.status == BootStatus::Waiting {
+            let (shared, agent_id, session_id) = (
+                Arc::downgrade(&self.shared),
+                agent_id.clone(),
+                session_id.clone(),
+            );
+            let timeout = self.shared.config.stdin_boot_timeout;
+            tokio::spawn(async move {
+                tokio::time::sleep(timeout).await;
+                if let Some(shared) = shared.upgrade() {
+                    AgentSupervisor { shared }.boot_timed_out(&agent_id, &session_id);
+                }
+            });
+        }
         let size = self.shared.config.size;
         let detector = Arc::new(Mutex::new(StateDetector::new(
             &adapter.state,
@@ -479,7 +537,103 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
             workdir,
             skills: skills.plan(),
             notes,
+            boot,
         })
+    }
+
+    /// Escolhe o caminho do `BOOT.md` e prepara o que for preciso: a flag vai nos
+    /// argumentos; o terminal devolve o texto a digitar no primeiro prompt.
+    fn prepare_boot(
+        &self,
+        agent: &crate::agent::Agent,
+        adapter: &crate::adapter::Adapter,
+        materialized: Option<&Materialized>,
+        plan: &mut LaunchPlan,
+    ) -> (BootDelivery, Option<PendingBoot>) {
+        let handle = agent.handle.as_str();
+        let channel = choose_boot_channel(adapter, self.shared.config.mcp_boot);
+        let Some(done) = materialized else {
+            let message =
+                format!("o BOOT.md de @{handle} não foi gerado: o agente sobe sem a identidade");
+            return (
+                BootDelivery::new(channel, BootStatus::Failed, message),
+                None,
+            );
+        };
+        // O servidor MCP (e quem mais precisar) acha o arquivo pelo ambiente.
+        plan.env.push((
+            "AISENSE_BOOT_FILE".into(),
+            done.boot_path.display().to_string(),
+        ));
+        match &channel {
+            BootChannel::SystemPromptFlag { flag } => {
+                plan.args.push(flag.clone());
+                plan.args.push(done.boot.clone());
+                let message = format!("BOOT.md entregue pela flag {flag}");
+                (
+                    BootDelivery::new(channel, BootStatus::Delivered, message),
+                    None,
+                )
+            }
+            BootChannel::Mcp => (
+                BootDelivery::new(
+                    channel,
+                    BootStatus::Delivered,
+                    "BOOT.md entregue pelo servidor MCP ao conectar",
+                ),
+                None,
+            ),
+            BootChannel::Stdin => (
+                BootDelivery::new(
+                    channel,
+                    BootStatus::Waiting,
+                    "esperando o primeiro prompt para enviar o BOOT.md pelo terminal",
+                ),
+                Some(PendingBoot {
+                    text: stdin_boot_text(adapter, handle),
+                    timeout_message: boot::stdin_timeout_message(handle),
+                }),
+            ),
+            BootChannel::None => {
+                let message = format!(
+                    "este runtime não recebe o BOOT.md; ele está em {}",
+                    boot_relative_path(handle)
+                );
+                (
+                    BootDelivery::new(channel, BootStatus::Skipped, message),
+                    None,
+                )
+            }
+        }
+    }
+
+    /// A entrega do `BOOT.md` da sessão atual, se o agente já subiu nesta execução.
+    pub fn boot(&self, agent_id: &AgentId) -> Option<BootDelivery> {
+        self.agents().get(agent_id).and_then(|e| e.boot.clone())
+    }
+
+    /// O caminho pelo terminal não viu prompt a tempo: desiste e avisa.
+    fn boot_timed_out(&self, agent_id: &AgentId, session_id: &SessionId) {
+        let delivery = {
+            let mut agents = self.agents();
+            let Some(entry) = agents.get_mut(agent_id) else {
+                return;
+            };
+            if entry.session.as_ref() != Some(session_id) {
+                return;
+            }
+            let Some(pending) = entry.pending_boot.take() else {
+                return;
+            };
+            let Some(boot) = entry.boot.as_mut() else {
+                return;
+            };
+            boot.status = BootStatus::Failed;
+            boot.message = pending.timeout_message;
+            boot.clone()
+        };
+        tracing::warn!(agent = %agent_id, "BOOT.md não enviado: sem prompt a tempo");
+        self.shared.observer.boot_changed(agent_id, &delivery);
     }
 
     async fn materialize(
@@ -490,7 +644,7 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
         adapter: &crate::adapter::Adapter,
         workdir: &Workdir,
         skills: &[crate::skill::Skill],
-    ) -> Vec<String> {
+    ) -> (Option<Materialized>, Vec<String>) {
         let (team, agent, colleagues, adapter) = (
             team.clone(),
             agent.clone(),
@@ -512,16 +666,25 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
         })
         .await;
         match done {
-            Ok(Ok(done)) => done.warnings,
+            Ok(Ok(done)) => {
+                let warnings = done.warnings.clone();
+                (Some(done), warnings)
+            }
             Ok(Err(error)) => {
                 tracing::warn!(agent = %agent_id, %error, "boot não materializado");
-                vec![format!(
-                    "o boot do agente não foi preparado completamente: {error}"
-                )]
+                (
+                    None,
+                    vec![format!(
+                        "o boot do agente não foi preparado completamente: {error}"
+                    )],
+                )
             }
             Err(error) => {
                 tracing::warn!(agent = %agent_id, %error, "materialização interrompida");
-                vec!["o boot do agente não foi preparado completamente".into()]
+                (
+                    None,
+                    vec!["o boot do agente não foi preparado completamente".into()],
+                )
             }
         }
     }
@@ -676,6 +839,30 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
         self.notify(agent_id, state);
     }
 
+    /// Digita o pedido de leitura do `BOOT.md` e registra o resultado.
+    fn deliver_stdin_boot(&self, agent_id: &AgentId, text: &str) {
+        let written = self.shared.pty.write(agent_id.as_str(), text.as_bytes());
+        let delivery = {
+            let mut agents = self.agents();
+            let Some(boot) = agents.get_mut(agent_id).and_then(|e| e.boot.as_mut()) else {
+                return;
+            };
+            match &written {
+                Ok(()) => {
+                    boot.status = BootStatus::Delivered;
+                    boot.message = "BOOT.md enviado pelo terminal no primeiro prompt".into();
+                }
+                Err(error) => {
+                    boot.status = BootStatus::Failed;
+                    boot.message = format!("o BOOT.md não foi enviado pelo terminal: {error}");
+                }
+            }
+            boot.clone()
+        };
+        tracing::info!(agent = %agent_id, status = ?delivery.status, "BOOT.md pelo terminal");
+        self.shared.observer.boot_changed(agent_id, &delivery);
+    }
+
     fn notify(&self, agent_id: &AgentId, state: AgentState) {
         // Transições do supervisor são fatos (subiu, morreu, parou), não heurística.
         self.shared
@@ -722,6 +909,7 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
         session_id: &SessionId,
         detection: Detection,
     ) -> bool {
+        let mut pending = None;
         {
             let mut agents = self.agents();
             let Some(entry) = agents.get_mut(agent_id) else {
@@ -731,6 +919,15 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
                 return false;
             }
             entry.state = detection.state;
+            // Só um prompt de verdade (regex casou) recebe o BOOT.md; aguardando o humano
+            // ou ocioso só por silêncio, nunca se digita nada (`docs/05`).
+            if detection.state == AgentState::Idle && detection.confidence == StateConfidence::High
+            {
+                pending = entry.pending_boot.take();
+            }
+        }
+        if let Some(pending) = pending {
+            self.deliver_stdin_boot(agent_id, &pending.text);
         }
         tracing::debug!(agent = %agent_id, state = ?detection.state, confidence = ?detection.confidence, "estado do agente");
         self.shared

@@ -16,3 +16,5 @@ quiet_ms   = 400
 [inject]
 mode   = "stdin"
 submit = "\r"
+# Não há IA para ler o BOOT.md: nada é digitado na subida (F04-06).
+boot   = false

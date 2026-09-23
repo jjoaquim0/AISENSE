@@ -11,8 +11,8 @@ use aisense_core::repo::{
 };
 use aisense_core::state::StateConfidence;
 use aisense_core::supervisor::{
-    AgentPreview, AgentStateChanged, AgentSupervisor, LaunchContext, StartOutcome,
-    SupervisorConfig, SupervisorError, SupervisorObserver,
+    AgentBootChanged, AgentPreview, AgentStateChanged, AgentSupervisor, BootDelivery,
+    LaunchContext, StartOutcome, SupervisorConfig, SupervisorError, SupervisorObserver,
 };
 use aisense_core::transcript::{
     export_transcript, read_transcript, summarize_sessions, SessionSummary, Transcript,
@@ -29,6 +29,8 @@ use super::runtimes::Registry;
 pub type Supervisor = AgentSupervisor<Store>;
 
 pub const AGENT_STATE: &str = "agent:state";
+/// A entrega do `BOOT.md` mudou (pelo terminal, termina depois do start — F04-06).
+pub const AGENT_BOOT: &str = "agent:boot";
 
 struct TauriObserver {
     app: AppHandle,
@@ -45,6 +47,23 @@ impl SupervisorObserver for TauriObserver {
             tracing::warn!(agent = %agent_id, %error, "falha ao emitir o estado do agente");
         }
     }
+
+    fn boot_changed(&self, agent_id: &AgentId, boot: &BootDelivery) {
+        let payload = AgentBootChanged {
+            agent_id: agent_id.clone(),
+            boot: boot.clone(),
+        };
+        if let Err(error) = self.app.emit(AGENT_BOOT, payload) {
+            tracing::warn!(agent = %agent_id, %error, "falha ao emitir o boot do agente");
+        }
+    }
+}
+
+/// Por onde o `BOOT.md` da sessão atual foi entregue; `None` se o agente não subiu
+/// nesta execução do app.
+#[tauri::command]
+pub fn agent_boot(supervisor: State<'_, Supervisor>, agent_id: AgentId) -> Option<BootDelivery> {
+    supervisor.boot(&agent_id)
 }
 
 pub fn setup(
@@ -75,6 +94,9 @@ pub fn setup(
             },
             size: TerminalSize::default(),
             skills,
+            // O `aisense-mcp` ainda não entrega o BOOT.md (F05-09).
+            mcp_boot: false,
+            stdin_boot_timeout: aisense_core::supervisor::STDIN_BOOT_TIMEOUT,
         },
     )
 }

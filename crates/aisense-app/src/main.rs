@@ -81,6 +81,7 @@ fn main() {
             commands::agents::agent_stop,
             commands::agents::agent_restart,
             commands::agents::agent_state,
+            commands::agents::agent_boot,
             commands::agents::agents_list,
             commands::agents::agent_create,
             commands::agents::agent_update,

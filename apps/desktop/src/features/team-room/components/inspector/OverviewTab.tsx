@@ -1,8 +1,11 @@
 import { Folder } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { StatusDot } from '@/components/ui';
+import { agentsApi, onAgentBoot } from '@/features/agents/api';
+import { cn } from '@/lib/cn';
 import type { Agent } from '@/types/generated/Agent';
 import type { AgentState } from '@/types/generated/AgentState';
+import type { BootDelivery } from '@/types/generated/BootDelivery';
 import type { SessionSummary } from '@/types/generated/SessionSummary';
 import type { StateConfidence } from '@/types/generated/StateConfidence';
 import type { StateEvent } from '../../hooks/useLiveStates';
@@ -35,6 +38,7 @@ export function OverviewTab({
   const running = isRunning(state);
   const current = running ? sessions?.[0] : undefined;
   const now = useNow(running);
+  const boot = useBoot(agent.id, running);
 
   return (
     <div className="flex flex-col gap-4">
@@ -51,6 +55,16 @@ export function OverviewTab({
         <dd className="font-mono text-secondary">{current?.pid ?? '—'}</dd>
         <dt className="text-muted">Sessões</dt>
         <dd className="text-secondary tabular-nums">{sessions?.length ?? '…'}</dd>
+        <dt className="text-muted">Boot</dt>
+        <dd
+          className={cn(
+            'text-secondary',
+            boot?.status === 'failed' && 'text-failed',
+            boot?.status === 'waiting' && 'text-awaiting',
+          )}
+        >
+          {boot ? describeBoot(boot) : '—'}
+        </dd>
         <dt className="text-muted">Runtime</dt>
         <dd className="text-secondary">
           {agent.adapterId}
@@ -112,4 +126,37 @@ function useNow(ticking: boolean): number {
     return () => clearInterval(timer);
   }, [ticking]);
   return now;
+}
+
+const CHANNEL: Record<BootDelivery['channel']['kind'], string> = {
+  systemPromptFlag: 'flag de system prompt',
+  mcp: 'servidor MCP',
+  stdin: 'terminal',
+  none: 'não recebe',
+};
+
+/** "flag de system prompt — BOOT.md entregue pela flag --append-system-prompt". */
+export function describeBoot(boot: BootDelivery): string {
+  return `${CHANNEL[boot.channel.kind]} — ${boot.message}`;
+}
+
+/** Por onde o `BOOT.md` da sessão atual entrou (F04-06), ao vivo pelo `agent:boot`. */
+function useBoot(agentId: string, running: boolean): BootDelivery | null {
+  const [boot, setBoot] = useState<BootDelivery | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: um novo start troca a entrega; relê quando o agente sobe ou para
+  useEffect(() => {
+    let alive = true;
+    agentsApi
+      .boot(agentId)
+      .then((b) => alive && setBoot(b))
+      .catch(() => alive && setBoot(null));
+    const unlisten = onAgentBoot((event) => {
+      if (event.agentId === agentId) setBoot(event.boot);
+    });
+    return () => {
+      alive = false;
+      void unlisten.then((stop) => stop());
+    };
+  }, [agentId, running]);
+  return boot;
 }

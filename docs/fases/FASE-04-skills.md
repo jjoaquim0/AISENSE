@@ -106,11 +106,26 @@ Depende de F04-04.
 > integração no start. A F04-06 fará a injeção; a F04-07 registrará a skill embutida
 > na biblioteca para materialização automática.
 
-### [ ] F04-06 — Injeção no boot
+### [x] F04-06 — Injeção no boot
 Escolher o melhor caminho conforme as capacidades do adaptador: `system_prompt_flag` → MCP →
 stdin (fallback "leia .aisense/agents/<handle>/BOOT.md e siga"). Registrar qual caminho foi usado.
 **Aceite:** os 3 caminhos testados; o de stdin espera o primeiro `idle` antes de digitar.
 Depende de F04-05, F03-01.
+> Feito: `aisense-core/src/supervisor/boot.rs` (`choose_boot_channel`) e o start do supervisor.
+> Ordem: **flag** (`claude --append-system-prompt`, `opencode --prompt`: o `BOOT.md` inteiro vai
+> como argumento) → **MCP** (o `aisense-mcp` entregaria o arquivo como `instructions` do
+> `initialize`; só é escolhido com `SupervisorConfig::mcp_boot`, `false` até a F05-09) →
+> **terminal** (codex, gemini: digita "[AISENSE] Leia .aisense/agents/<handle>/BOOT.md e siga as
+> instruções..." no primeiro `idle` com confiança **alta**; nunca em `awaiting_input` nem no
+> ocioso só por silêncio; desiste em 30 s e avisa). Adaptador sem quem leia fica em `none`: campo
+> novo `[inject] boot = false` no `shell` (o `custom` já tem `mode = "none"`). Todo agente recebe
+> `AISENSE_BOOT_FILE`. O caminho e o resultado ficam em `BootDelivery` (`StartOutcome.boot`,
+> `AgentSupervisor::boot`, evento `agent:boot`, comando `agent_boot`) e aparecem na linha "Boot" da
+> aba Visão; falha também volta como ressalva do start. Aceite: testes com processo real para a
+> flag (o processo recebe o `BOOT.md` inteiro), o terminal (nada digitado antes do prompt, que
+> demora 1 s) e o terminal diante de uma pergunta "(s/n)" (não digita; desiste no prazo); a
+> escolha dos 3 caminhos testada em `boot.rs` para cada adaptador embutido. Os testes de
+> processo são só Unix (usam `sh`), como o do detector.
 
 ### [x] F04-07 — Skills embutidas
 Escrever `trabalho-em-equipe`, `coordenador`, `revisor-rigoroso`, `implementador`, `pesquisador`,
