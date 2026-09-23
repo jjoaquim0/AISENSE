@@ -10,15 +10,43 @@ que ele já se apresenta com esse papel — sem você digitar nada.
 
 ## Tarefas
 
-### [ ] F04-01 — Parser e validador de skills
+### [x] F04-01 — Parser e validador de skills
 Ler `SKILL.md`, extrair frontmatter (`gray_matter`), validar campos, reportar erro com caminho e
 linha. Carregar skills embutidas e de `~/.aisense/skills/`.
 **Aceite:** frontmatter inválido gera erro legível, não pânico; skills sem `description` são rejeitadas.
+> Feito: `aisense-core/src/skill/` (`parse.rs`, `catalog.rs`, `model.rs`). **Troca de
+> dependência:** `yaml-rust2` em vez de `gray_matter` — o frontmatter é separado à mão (aceita
+> BOM e `\r\n`) e o YAML lido com `yaml-rust2`, que dá a posição do erro de sintaxe; erro de
+> campo aponta a linha da chave. Tudo vira `SkillProblem` com `caminho:linha`, nunca pânico
+> (teste com lixo, números fora de faixa, arquivo de 256 KB+). Campos desconhecidos são
+> **ignorados**, não recusados como nos adaptadores: skills do Claude Code trazem `license`,
+> `allowed-tools`, `metadata` e têm de carregar sem conversão (critério de saída da fase).
+> `version: 1.2` (número em YAML) é recusado com a dica de pôr aspas. `env` segue a regra dos
+> agentes (sem `AISENSE_*`). Corpo vazio é recusado. `SkillCatalog` carrega as embutidas
+> (`BUILTIN_SKILLS`, vazio até a F04-07) e `~/.aisense/skills/<pasta>/SKILL.md`
+> (`DataDir::skills`); a do usuário vence a embutida de mesmo nome, nome repetido na pasta do
+> usuário fica com a primeira em ordem alfabética e o resto vira aviso.
 
-### [ ] F04-02 — Registro e persistência de skills
+### [x] F04-02 — Registro e persistência de skills
 Repositório de `skills` e `agent_skills` com ordem de injeção, hot-reload do diretório com `notify`.
 **Aceite:** editar um `SKILL.md` em disco atualiza a biblioteca na UI sem reiniciar o app.
 Depende de F04-01, F02-02.
+> Feito: porta `SkillRepository` no core (`repo/mod.rs`), em memória e em SQLite
+> (`aisense-store/src/skills.rs`), com o mesmo contrato testado contra os dois. O conteúdo da
+> skill mora no disco; o banco guarda a **identidade estável** (`skills.id`, casada por `slug`)
+> que as atribuições referenciam. `sync_skills` insere e atualiza, mas **não apaga** o que sumiu
+> do disco: um `SKILL.md` com erro de digitação não pode levar as atribuições junto — a skill
+> fica listada como "não está mais no disco". `agent_skills` troca a lista inteira numa
+> transação, na ordem de injeção, e recusa agente ou skill inexistente sem mudar nada.
+> Hot-reload: o observador dos adaptadores virou `fswatch::DirWatcher` (genérico, com o mesmo
+> debounce) e o `SkillWatcher` observa `~/.aisense/skills/` recursivamente. No app,
+> `SkillLibrary` guarda o catálogo, espelha no banco ao subir e a cada recarga, e emite
+> `skills:changed`; comandos `skills_library`, `agent_skills_get`, `agent_skills_set`.
+> UI: aba **Skills** do inspetor (T6) — as do agente em ordem, com liga/desliga, subir/descer
+> e remover; o que dá para adicionar da biblioteca; os `SKILL.md` que não carregaram com
+> `caminho:linha`; aviso de reinício com o agente rodando e de runtime incompatível (o filtro
+> no boot é da F04-03). Aceite como teste: no core, criar/editar/apagar um `SKILL.md` recarrega
+> o catálogo; no front, `skills:changed` refaz a lista sem reiniciar.
 
 ### [ ] F04-03 — Resolução por agente
 Dado um agente, resolver as skills habilitadas, filtrar por `targets` vs `adapter_id`, ordenar por

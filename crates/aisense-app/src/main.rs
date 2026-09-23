@@ -41,6 +41,7 @@ fn main() {
                 .ok_or("could not find the user's home directory; set AISENSE_HOME")?;
             let store = open_store(&data)?;
             let (registry, watcher) = commands::runtimes::setup(app.handle(), &data);
+            let (library, skill_watcher) = commands::skills::setup(app.handle(), &data, &store);
             let supervisor = commands::agents::setup(
                 app.handle(),
                 &data,
@@ -51,6 +52,10 @@ fn main() {
             app.manage(store);
             app.manage(registry);
             app.manage(supervisor);
+            app.manage(library);
+            if let Some(watcher) = skill_watcher {
+                app.manage(watcher);
+            }
             if let Some(watcher) = watcher {
                 // Guardado no estado só para viver enquanto o app viver.
                 app.manage(watcher);
@@ -94,6 +99,9 @@ fn main() {
             commands::teams::team_start,
             commands::teams::team_stop,
             commands::teams::team_restart,
+            commands::skills::skills_library,
+            commands::skills::agent_skills_get,
+            commands::skills::agent_skills_set,
             commands::project::project_lookup,
             commands::project::project_accept,
         ])

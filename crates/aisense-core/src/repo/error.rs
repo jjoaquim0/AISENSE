@@ -1,4 +1,4 @@
-use crate::ids::{AgentId, TeamId};
+use crate::ids::{AgentId, SkillId, TeamId};
 
 #[derive(Debug, thiserror::Error)]
 pub enum RepoError {
@@ -6,6 +6,8 @@ pub enum RepoError {
     TeamNotFound(TeamId),
     #[error("agent {0} not found")]
     AgentNotFound(AgentId),
+    #[error("skill {0} not found")]
+    SkillNotFound(SkillId),
     #[error("handle @{0} is already taken in this team")]
     DuplicateHandle(String),
     #[error("{0} already exists")]
@@ -22,6 +24,7 @@ impl RepoError {
         match self {
             Self::TeamNotFound(_) => "team_not_found",
             Self::AgentNotFound(_) => "agent_not_found",
+            Self::SkillNotFound(_) => "skill_not_found",
             Self::DuplicateHandle(_) => "duplicate_handle",
             Self::AlreadyExists(_) => "already_exists",
             Self::Corrupt(_) => "corrupt_record",

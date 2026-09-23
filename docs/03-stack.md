@@ -48,7 +48,7 @@ Bibliotecas principais:
 | `thiserror` | Erros de domínio tipados |
 | `tracing` + `tracing-subscriber` | Logs estruturados |
 | `toml` | Adaptadores e configuração |
-| `gray_matter` + `pulldown-cmark` | Parse de skills (frontmatter + Markdown) |
+| `yaml-rust2` + `pulldown-cmark` | Parse de skills: frontmatter YAML separado à mão e lido com `yaml-rust2`, que dá a linha do erro (o `gray_matter` previsto antes não repassa a posição); Markdown com `pulldown-cmark` |
 | `keyring` | Segredos no keychain do SO |
 | `notify` | Hot-reload de skills e adaptadores em disco |
 | `interprocess` | Socket Unix + named pipe do Windows sob a mesma API |

@@ -65,10 +65,13 @@ CREATE TABLE agents (
 CREATE INDEX idx_agents_team ON agents(team_id);
 
 -- ─────────────────────────────── SKILLS ────────────────────────────────
+-- Espelho da biblioteca do disco (F04-02): o conteúdo fica no SKILL.md; aqui, a identidade
+-- que agent_skills referencia. Casada por slug a cada recarga; o que some do disco NÃO é
+-- apagado (um SKILL.md quebrado não leva as atribuições junto).
 CREATE TABLE skills (
   id          TEXT PRIMARY KEY,
   slug        TEXT NOT NULL UNIQUE,        -- 'revisor-rigoroso'
-  name        TEXT NOT NULL,
+  name        TEXT NOT NULL,               -- hoje igual ao slug
   description TEXT NOT NULL,
   version     TEXT NOT NULL DEFAULT '1.0.0',
   source      TEXT NOT NULL,               -- builtin | user | imported

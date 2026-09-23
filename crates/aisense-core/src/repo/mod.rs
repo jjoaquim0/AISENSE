@@ -10,7 +10,8 @@ pub use error::RepoError;
 pub use memory::InMemoryStore;
 
 use crate::agent::{Agent, Handle};
-use crate::ids::{AgentId, SessionId, TeamId};
+use crate::ids::{AgentId, SessionId, SkillId, TeamId};
+use crate::skill::{Skill, SkillSource};
 use crate::team::Team;
 use crate::time::Millis;
 
@@ -91,4 +92,91 @@ pub trait SessionRepository: Send + Sync {
         agent_id: &AgentId,
         limit: usize,
     ) -> impl Future<Output = RepoResult<Vec<SessionRecord>>> + Send;
+}
+
+/// Uma skill da biblioteca como o banco a conhece (tabela `skills`). O conteúdo mora no
+/// disco (`SKILL.md`); aqui fica a identidade estável que as atribuições referenciam.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SkillRecord {
+    pub id: SkillId,
+    /// O `name` do frontmatter.
+    pub slug: String,
+    pub description: String,
+    pub version: String,
+    /// `builtin` ou `user`.
+    pub source: String,
+    /// Pasta da skill; `builtin:<nome>` para as embutidas.
+    pub path: String,
+    pub targets: Vec<String>,
+    pub created_at: Millis,
+    pub updated_at: Millis,
+}
+
+impl SkillRecord {
+    /// Colunas que vêm do `SKILL.md`, para comparar com o banco sem olhar datas e id.
+    pub fn matches(&self, skill: &Skill) -> bool {
+        let (source, path) = skill_origin(skill);
+        self.description == skill.description
+            && self.version == skill.version
+            && self.source == source
+            && self.path == path
+            && self.targets == skill.targets
+    }
+}
+
+/// `(source, path)` como vão para a tabela `skills`.
+pub fn skill_origin(skill: &Skill) -> (&'static str, String) {
+    match &skill.source {
+        SkillSource::Builtin => ("builtin", format!("builtin:{}", skill.name)),
+        SkillSource::User { dir } => ("user", dir.clone()),
+    }
+}
+
+/// Uma skill atribuída a um agente (tabela `agent_skills`), na ordem de injeção.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../apps/desktop/src/types/generated/")]
+pub struct AgentSkill {
+    pub skill_id: SkillId,
+    pub enabled: bool,
+}
+
+pub trait SkillRepository: Send + Sync {
+    /// Espelha a biblioteca do disco no banco: insere as novas, atualiza as que mudaram
+    /// (casando por `slug`). **Não apaga** as que sumiram do disco — um `SKILL.md` com erro
+    /// de digitação não pode levar embora as atribuições. Devolve todas, por `slug`.
+    fn sync_skills(
+        &self,
+        skills: &[Skill],
+        now: Millis,
+    ) -> impl Future<Output = RepoResult<Vec<SkillRecord>>> + Send;
+    /// Todas as conhecidas, por `slug`.
+    fn list_skills(&self) -> impl Future<Output = RepoResult<Vec<SkillRecord>>> + Send;
+    /// As skills do agente na ordem de injeção.
+    fn agent_skills(
+        &self,
+        agent_id: &AgentId,
+    ) -> impl Future<Output = RepoResult<Vec<AgentSkill>>> + Send;
+    /// Troca a lista inteira de uma vez; a posição é a ordem de `skills`. Falha com
+    /// `AgentNotFound` ou `SkillNotFound` sem mudar nada. Repetida vale a primeira.
+    fn set_agent_skills(
+        &self,
+        agent_id: &AgentId,
+        skills: &[AgentSkill],
+    ) -> impl Future<Output = RepoResult<()>> + Send;
+    /// Quem usa a skill (habilitada ou não) — o aviso de "N agentes precisam reiniciar".
+    fn skill_users(
+        &self,
+        skill_id: &SkillId,
+    ) -> impl Future<Output = RepoResult<Vec<AgentId>>> + Send;
+}
+
+/// Primeira ocorrência de cada skill, na ordem dada.
+pub fn dedup_agent_skills(skills: &[AgentSkill]) -> Vec<AgentSkill> {
+    let mut seen = std::collections::HashSet::new();
+    skills
+        .iter()
+        .filter(|s| seen.insert(s.skill_id.clone()))
+        .cloned()
+        .collect()
 }

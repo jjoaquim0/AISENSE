@@ -8,15 +8,16 @@ use std::collections::BTreeMap;
 
 use aisense_core::agent::{Agent, AgentDraft, DeliveryMode, Handle, RestartPolicy, Workbench};
 use aisense_core::repo::{
-    AgentRepository, InMemoryStore, RepoError, SessionRecord, SessionRepository, TeamFilter,
-    TeamRepository, SESSIONS_KEPT_PER_AGENT,
+    AgentRepository, AgentSkill, InMemoryStore, RepoError, SessionRecord, SessionRepository,
+    SkillRepository, TeamFilter, TeamRepository, SESSIONS_KEPT_PER_AGENT,
 };
+use aisense_core::skill::{parse_skill, Skill, SkillSource};
 use aisense_core::team::{Team, TeamDraft};
 use aisense_core::{AgentColor, AgentId, SessionId, TeamId};
 use aisense_store::Store;
 
-trait Repo: TeamRepository + AgentRepository + SessionRepository {}
-impl<T: TeamRepository + AgentRepository + SessionRepository> Repo for T {}
+trait Repo: TeamRepository + AgentRepository + SessionRepository + SkillRepository {}
+impl<T: TeamRepository + AgentRepository + SessionRepository + SkillRepository> Repo for T {}
 
 fn team(name: &str, now: i64) -> Team {
     Team::create(
@@ -309,6 +310,180 @@ async fn sessions_are_pruned_per_agent(repo: impl Repo) {
     );
 }
 
+fn skill(name: &str, description: &str, source: SkillSource) -> Skill {
+    let md =
+        format!("---\nname: {name}\ndescription: {description}\ntargets: [claude]\n---\ncorpo\n");
+    parse_skill(&md, "t/SKILL.md", source).unwrap()
+}
+
+async fn skills_sync_by_slug_without_losing_assignments(repo: impl Repo) {
+    let t = team("A", 1);
+    repo.create_team(&t).await.unwrap();
+    let a = add_agent(&repo, &t, "backend").await;
+
+    let first = repo
+        .sync_skills(
+            &[
+                skill("revisor", "Revisa.", SkillSource::Builtin),
+                skill("docs", "Documenta.", SkillSource::Builtin),
+            ],
+            10,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        first.iter().map(|r| r.slug.as_str()).collect::<Vec<_>>(),
+        ["docs", "revisor"]
+    );
+    let revisor = first.iter().find(|r| r.slug == "revisor").unwrap().clone();
+    assert_eq!(
+        (revisor.source.as_str(), revisor.path.as_str()),
+        ("builtin", "builtin:revisor")
+    );
+    assert_eq!(revisor.targets, ["claude"]);
+
+    repo.set_agent_skills(
+        &a.id,
+        &[AgentSkill {
+            skill_id: revisor.id.clone(),
+            enabled: true,
+        }],
+    )
+    .await
+    .unwrap();
+
+    // Editou no disco (agora do usuário, outra descrição) e "docs" sumiu (SKILL.md quebrado).
+    let user = SkillSource::User {
+        dir: "/u/revisor".into(),
+    };
+    let second = repo
+        .sync_skills(&[skill("revisor", "Revisa com rigor.", user)], 20)
+        .await
+        .unwrap();
+    let updated = second.iter().find(|r| r.slug == "revisor").unwrap();
+    assert_eq!(updated.id, revisor.id, "mesma identidade");
+    assert_eq!(updated.description, "Revisa com rigor.");
+    assert_eq!(updated.source, "user");
+    assert_eq!((updated.created_at, updated.updated_at), (10, 20));
+    assert_eq!(second.len(), 2, "docs fica no banco mesmo fora do disco");
+    assert_eq!(
+        repo.agent_skills(&a.id).await.unwrap().len(),
+        1,
+        "atribuição sobrevive"
+    );
+
+    // Sem mudança, `updated_at` não mexe.
+    let third = repo
+        .sync_skills(
+            &[skill(
+                "revisor",
+                "Revisa com rigor.",
+                SkillSource::User {
+                    dir: "/u/revisor".into(),
+                },
+            )],
+            30,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        third
+            .iter()
+            .find(|r| r.slug == "revisor")
+            .unwrap()
+            .updated_at,
+        20
+    );
+    assert_eq!(repo.list_skills().await.unwrap(), third);
+}
+
+async fn agent_skills_keep_order_and_follow_the_agent(repo: impl Repo) {
+    let t = team("A", 1);
+    repo.create_team(&t).await.unwrap();
+    let a = add_agent(&repo, &t, "backend").await;
+    let b = add_agent(&repo, &t, "frontend").await;
+    let records = repo
+        .sync_skills(
+            &[
+                skill("um", "Um.", SkillSource::Builtin),
+                skill("dois", "Dois.", SkillSource::Builtin),
+                skill("tres", "Três.", SkillSource::Builtin),
+            ],
+            1,
+        )
+        .await
+        .unwrap();
+    let id = |slug: &str| records.iter().find(|r| r.slug == slug).unwrap().id.clone();
+    let entry = |slug: &str, enabled| AgentSkill {
+        skill_id: id(slug),
+        enabled,
+    };
+
+    repo.set_agent_skills(
+        &a.id,
+        &[
+            entry("tres", true),
+            entry("um", false),
+            entry("tres", false),
+            entry("dois", true),
+        ],
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        repo.agent_skills(&a.id).await.unwrap(),
+        [entry("tres", true), entry("um", false), entry("dois", true)],
+        "ordem dada, repetida vale a primeira"
+    );
+    repo.set_agent_skills(&b.id, &[entry("um", true)])
+        .await
+        .unwrap();
+    assert_eq!(repo.skill_users(&id("um")).await.unwrap().len(), 2);
+
+    // Trocar a lista substitui tudo.
+    repo.set_agent_skills(&a.id, &[entry("dois", true)])
+        .await
+        .unwrap();
+    assert_eq!(
+        repo.agent_skills(&a.id).await.unwrap(),
+        [entry("dois", true)]
+    );
+
+    // Erros não mudam nada.
+    let ghost = aisense_core::SkillId::new();
+    assert!(matches!(
+        repo.set_agent_skills(
+            &a.id,
+            &[
+                entry("um", true),
+                AgentSkill {
+                    skill_id: ghost,
+                    enabled: true
+                }
+            ]
+        )
+        .await,
+        Err(RepoError::SkillNotFound(_))
+    ));
+    assert_eq!(
+        repo.agent_skills(&a.id).await.unwrap(),
+        [entry("dois", true)]
+    );
+    assert!(matches!(
+        repo.set_agent_skills(&AgentId::new(), &[]).await,
+        Err(RepoError::AgentNotFound(_))
+    ));
+
+    // Excluir o agente leva as atribuições junto.
+    repo.delete_agent(&b.id).await.unwrap();
+    assert_eq!(
+        repo.skill_users(&id("um")).await.unwrap(),
+        Vec::<AgentId>::new()
+    );
+    repo.delete_team(&t.id).await.unwrap();
+    assert!(repo.agent_skills(&a.id).await.unwrap().is_empty());
+}
+
 macro_rules! contract {
     ($($name:ident),+ $(,)?) => {
         mod sqlite {
@@ -343,6 +518,8 @@ contract!(
     sessions_record_start_and_end,
     sessions_need_an_agent_and_follow_it,
     sessions_are_pruned_per_agent,
+    skills_sync_by_slug_without_losing_assignments,
+    agent_skills_keep_order_and_follow_the_agent,
 );
 
 // ───────────────────────── só SQLite ─────────────────────────
