@@ -5,7 +5,7 @@
 > Se estiver desatualizado, o próximo agente se perde. Mantenha-o honesto.
 
 **Última atualização:** 2026-09-23
-**Fase atual:** `FASE 03 — Sala da Equipe` (em andamento; demonstração da 02 pendente na janela)
+**Fase atual:** `FASE 04 — Sistema de Skills` (iniciada a pedido do usuário; a 03 tem código completo e dois critérios de saída abertos)
 **Fluxo de trabalho atual:** um PR por tarefa, a partir de um branch `claude/...`, com o CI verde
 nos 3 SOs antes do merge (o usuário mergeia). Commits com o ID da tarefa no título.
 
@@ -14,16 +14,18 @@ nos 3 SOs antes do merge (o usuário mergeia). Commits com o ID da tarefa no tí
 ## Situação em uma frase
 
 Fundação, terminal, equipes/agentes persistidos e **as 9 tarefas da Sala da Equipe** estão em
-código e testados. A Fase 03 fecha quando alguém com tela conferir a janela e os dois critérios de
-saída pendentes (9 terminais com GPU; calibrar o detector com sessões reais). Depois: **Fase 04 — Skills**.
+código e testados; a Fase 03 ainda tem conferência na janela e dois critérios de saída abertos
+(9 terminais com GPU; calibrar o detector com sessões reais). O trabalho corrente é a
+**Fase 04 — Skills**, iniciada a pedido do usuário.
 
 ## Para quem chega agora (retomada)
 
 1. Leia `AGENTS.md` e este arquivo inteiro; depois `docs/fases/FASE-03-sala-da-equipe.md` — cada
    tarefa feita tem uma nota `> Feito:` dizendo onde está o código e o que ficou de fora.
-2. Próximo passo: a **Fase 04 — Skills** (`docs/fases/FASE-04-skills.md`), depois de o usuário
-   aprovar a exceção à R1 (a Fase 03 tem código completo, mas critérios de saída abertos). Onde
-   a Fase 03 deixou as coisas: sidebar e inspetor entram no shell por `ShellSlot`
+2. Próxima tarefa: **F04-02** (registro/persistência de skills e hot-reload), em
+   `docs/fases/FASE-04-skills.md`. O parser e o catálogo da F04-01 estão em
+   `aisense-core/src/skill/`; o hot-reload dos adaptadores (`adapter/watch.rs`) é o modelo a
+   seguir. Onde a Fase 03 deixou as coisas: sidebar e inspetor entram no shell por `ShellSlot`
    (`features/shell/slots.tsx`); o inspetor tem as abas Visão/Config/Logs e espera Skills
    (Fase 04) e Caixa (Fase 05); a sidebar reordena a **ordem da equipe** (`agents.position`);
    atalhos em `useShortcuts` + ADR 0007; transcrições em `aisense-core/src/transcript.rs`.
@@ -45,7 +47,7 @@ saída pendentes (9 terminais com GPU; calibrar o detector com sessões reais). 
 | 01 — Terminal Core | 🟨 Em andamento | 4 feitas, 4 parciais de 8 |
 | 02 — Equipes e Agentes | 🟨 Código completo | 11 de 11 feitas — falta a demonstração na janela |
 | 03 — Sala da Equipe | 🟨 Código completo | 9 de 9 feitas — faltam conferência na janela e dois critérios de saída |
-| 04 — Sistema de Skills | ⬜ Não iniciada | 0/9 |
+| 04 — Sistema de Skills | 🟨 Em andamento | 1 feita de 9 |
 | 05 — Barramento | ⬜ Não iniciada | 0/13 |
 | 06 — Quadro Kanban | ⬜ Não iniciada | 0/11 |
 | 07 — Coordenação | ⬜ Não iniciada | 0/6 |
@@ -55,6 +57,14 @@ saída pendentes (9 terminais com GPU; calibrar o detector com sessões reais). 
 Legenda: ⬜ não iniciada · 🟨 em andamento · ✅ concluída · 🟥 bloqueada
 
 ## Em andamento agora
+
+**Fase 04 — Sistema de Skills** (iniciada em 2026-09-23 a pedido do usuário). Exceção consciente
+à R1: a Fase 03 tem as 9 tarefas em código, mas faltam a conferência na janela e dois critérios de
+saída que só uma máquina com GPU e os runtimes reais resolvem. Nada da Fase 04 depende deles.
+
+| Tarefa | Situação |
+|---|---|
+| F04-01 Parser e validador | ✅ `SKILL.md` com `caminho:linha` nos erros, campos desconhecidos ignorados (compatível com Claude Code), catálogo embutidas + `~/.aisense/skills/`; `yaml-rust2` no lugar do `gray_matter` |
 
 **Fase 03 — Sala da Equipe** (iniciada em 2026-09-23 a pedido do usuário). Exceção consciente à R1:
 as 11 tarefas da Fase 02 estão feitas, mas a **demonstração na janela** (criar "Squad Produto",
@@ -266,3 +276,4 @@ Bugs encontrados pelos próprios testes, todos corrigidos na origem:
 | 2026-09-23 | Claude | F03-07 (sidebar de agentes no shell, estado ao vivo sem ida ao core, reordenação persistida) |
 | 2026-09-23 | Claude | F03-08 (atalhos de teclado com o terminal focado; ADR 0007) |
 | 2026-09-23 | Claude | F03-09 (inspetor com Visão, Config e Logs; transcrição por sessão). Fase 03 com código completo |
+| 2026-09-23 | Claude | Início da Fase 04 a pedido do usuário; F04-01 (parser e catálogo de skills) |

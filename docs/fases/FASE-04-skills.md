@@ -10,10 +10,22 @@ que ele já se apresenta com esse papel — sem você digitar nada.
 
 ## Tarefas
 
-### [ ] F04-01 — Parser e validador de skills
+### [x] F04-01 — Parser e validador de skills
 Ler `SKILL.md`, extrair frontmatter (`gray_matter`), validar campos, reportar erro com caminho e
 linha. Carregar skills embutidas e de `~/.aisense/skills/`.
 **Aceite:** frontmatter inválido gera erro legível, não pânico; skills sem `description` são rejeitadas.
+> Feito: `aisense-core/src/skill/` (`parse.rs`, `catalog.rs`, `model.rs`). **Troca de
+> dependência:** `yaml-rust2` em vez de `gray_matter` — o frontmatter é separado à mão (aceita
+> BOM e `\r\n`) e o YAML lido com `yaml-rust2`, que dá a posição do erro de sintaxe; erro de
+> campo aponta a linha da chave. Tudo vira `SkillProblem` com `caminho:linha`, nunca pânico
+> (teste com lixo, números fora de faixa, arquivo de 256 KB+). Campos desconhecidos são
+> **ignorados**, não recusados como nos adaptadores: skills do Claude Code trazem `license`,
+> `allowed-tools`, `metadata` e têm de carregar sem conversão (critério de saída da fase).
+> `version: 1.2` (número em YAML) é recusado com a dica de pôr aspas. `env` segue a regra dos
+> agentes (sem `AISENSE_*`). Corpo vazio é recusado. `SkillCatalog` carrega as embutidas
+> (`BUILTIN_SKILLS`, vazio até a F04-07) e `~/.aisense/skills/<pasta>/SKILL.md`
+> (`DataDir::skills`); a do usuário vence a embutida de mesmo nome, nome repetido na pasta do
+> usuário fica com a primeira em ordem alfabética e o resto vira aviso.
 
 ### [ ] F04-02 — Registro e persistência de skills
 Repositório de `skills` e `agent_skills` com ordem de injeção, hot-reload do diretório com `notify`.

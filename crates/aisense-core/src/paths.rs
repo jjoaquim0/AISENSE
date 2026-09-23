@@ -47,6 +47,11 @@ impl DataDir {
         self.0.join("adapters")
     }
 
+    /// Skills do usuário: uma pasta por skill, com o `SKILL.md` dentro (`docs/06`).
+    pub fn skills(&self) -> PathBuf {
+        self.0.join("skills")
+    }
+
     pub fn logs(&self) -> PathBuf {
         self.0.join("logs")
     }
