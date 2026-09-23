@@ -11,9 +11,30 @@ pub const SKILL_FILE: &str = "SKILL.md";
 /// Uma skill que acompanha o binário: pasta e conteúdo do `SKILL.md`.
 pub type BuiltinSkill = (&'static str, &'static str);
 
-/// Skills mantidas pelo projeto (`skills/` na raiz do repositório). As do v1 entram na
-/// F04-07; o mecanismo de carga já as trata como qualquer outra.
-pub const BUILTIN_SKILLS: &[BuiltinSkill] = &[];
+macro_rules! builtin {
+    ($name:literal) => {
+        (
+            $name,
+            include_str!(concat!("../../../../skills/", $name, "/SKILL.md")),
+        )
+    };
+}
+
+/// Skills mantidas pelo projeto (`skills/` na raiz do repositório), a biblioteca do v1
+/// (`docs/06`). Carregam como qualquer outra; a do usuário de mesmo nome vence.
+pub const BUILTIN_SKILLS: &[BuiltinSkill] = &[
+    builtin!("trabalho-em-equipe"),
+    builtin!("coordenador"),
+    builtin!("revisor-rigoroso"),
+    builtin!("implementador"),
+    builtin!("pesquisador"),
+    builtin!("sintetizador"),
+    builtin!("documentador"),
+];
+
+/// A que vai em **todo** agente e não entra na lista de atribuição (`docs/06`): o
+/// `BOOT.md` já a traz na seção "Como falar com a equipe".
+pub const TEAMWORK_SKILL: &str = "trabalho-em-equipe";
 
 /// Resultado de uma carga. Sempre existe: arquivo ruim vira `problem`, nunca erro que
 /// impede o app de subir.
@@ -187,6 +208,21 @@ mod tests {
         let catalog = SkillCatalog::load_from(&[], Some(dir.path()));
         assert_eq!(catalog.get("dup").unwrap().description, "Primeira.");
         assert_eq!(catalog.problems().len(), 1);
+    }
+
+    #[test]
+    fn embutidas_do_v1_carregam_sem_problema() {
+        let catalog = SkillCatalog::load_from(BUILTIN_SKILLS, None);
+        assert!(catalog.problems().is_empty(), "{:?}", catalog.problems());
+        for (dir, _) in BUILTIN_SKILLS {
+            let skill = catalog.get(dir).expect("o nome da pasta é o da skill");
+            assert!(matches!(skill.source, SkillSource::Builtin));
+            assert!(
+                skill.targets.is_empty(),
+                "{dir}: embutida roda em todo runtime"
+            );
+        }
+        assert_eq!(catalog.get(TEAMWORK_SKILL).unwrap().priority, 0);
     }
 
     #[test]

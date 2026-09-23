@@ -112,11 +112,19 @@ stdin (fallback "leia .aisense/agents/<handle>/BOOT.md e siga"). Registrar qual 
 **Aceite:** os 3 caminhos testados; o de stdin espera o primeiro `idle` antes de digitar.
 Depende de F04-05, F03-01.
 
-### [ ] F04-07 — Skills embutidas
+### [x] F04-07 — Skills embutidas
 Escrever `trabalho-em-equipe`, `coordenador`, `revisor-rigoroso`, `implementador`, `pesquisador`,
 `sintetizador` e `documentador` conforme [06](../06-sistema-de-skills.md#biblioteca-de-skills-embutidas-do-v1).
 **Aceite:** `trabalho-em-equipe` entra em todos os agentes automaticamente e não aparece na lista
 de atribuição. Depende de F04-01.
+> Feito: `skills/<nome>/SKILL.md` para as 7, embutidas no binário por `include_str!`
+> (`BUILTIN_SKILLS`, `skill/catalog.rs`); todas sem `targets` (rodam em qualquer runtime) e
+> `trabalho-em-equipe` com `priority: 0`. `TEAMWORK_SKILL` fica fora da lista "Adicionar" da aba
+> Skills e, se já estiver atribuída a alguém, a resolução a pula — o `BOOT.md` já a traz em
+> seção própria (F04-05) e ela entraria duas vezes. Na biblioteca aparece como "sempre ativa".
+> Teste: as 7 carregam sem problema com o nome da pasta. **Limite:** o compositor usa a cópia
+> embutida de `trabalho-em-equipe`, então uma versão do usuário com o mesmo nome não muda o
+> protocolo do `BOOT.md`.
 
 ### [~] F04-08 — Biblioteca e editor de skills (T7)
 Grid da biblioteca, editor Markdown com preview e validação ao vivo, contador de caracteres,
