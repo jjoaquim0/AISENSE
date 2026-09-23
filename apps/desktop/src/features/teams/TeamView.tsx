@@ -2,7 +2,6 @@ import {
   ArrowLeft,
   FileCode,
   Folder,
-  GitBranch,
   Pencil,
   Play,
   Plus,
@@ -16,11 +15,13 @@ import { Button, Dialog, EmptyState, IconButton, StatusDot, Tooltip } from '@/co
 import { AgentFormDialog } from '@/features/agents/AgentFormDialog';
 import { agentsApi, onAgentState } from '@/features/agents/api';
 import { ProjectCommandsDialog } from '@/features/project/ProjectCommandsDialog';
-import { Terminal } from '@/features/terminal/Terminal';
+import { AgentPane } from '@/features/team-room/components/AgentPane';
+import type { PaneAction } from '@/features/team-room/paneMenu';
 import { cn } from '@/lib/cn';
 import type { Agent } from '@/types/generated/Agent';
 import type { AgentState } from '@/types/generated/AgentState';
 import type { StartOutcome } from '@/types/generated/StartOutcome';
+import type { StateConfidence } from '@/types/generated/StateConfidence';
 import type { TeamSummary } from '@/types/generated/TeamSummary';
 import { describeStartReport, errorMessage, teamsApi } from './api';
 import { useTeams } from './store';
@@ -41,6 +42,7 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
   const [notice, setNotice] = useState<{ text: string; restart?: Agent } | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [commandsOpen, setCommandsOpen] = useState(false);
+  const [confidence, setConfidence] = useState<Record<string, StateConfidence>>({});
 
   const stateOf = useCallback(
     (id: string): AgentState => summary.agents.find((a) => a.id === id)?.state ?? 'stopped',
@@ -57,7 +59,10 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
 
   useEffect(() => {
     void reloadAgents().catch((e: unknown) => setProblem(errorMessage(e)));
-    const unlisten = onAgentState(() => void load());
+    const unlisten = onAgentState((event) => {
+      setConfidence((c) => ({ ...c, [event.agentId]: event.confidence }));
+      void load();
+    });
     return () => {
       void unlisten.then((stop) => stop());
     };
@@ -94,6 +99,30 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
       const lines = describeStartReport(await teamsApi.start(team.id), handleOf);
       if (lines.length > 0) setNotice({ text: lines.join(' · ') });
     });
+
+  // "Limpar" do menu: um contador por agente que o terminal observa.
+  const [clears, setClears] = useState<Record<string, number>>({});
+  const paneAction = (agent: Agent, action: PaneAction) => {
+    switch (action) {
+      case 'start':
+        return void startAgent(agent.id);
+      case 'restart':
+        return void restartAgent(agent.id);
+      case 'stop':
+        return void act(() => agentsApi.stop(agent.id));
+      case 'clear':
+        return setClears((c) => ({ ...c, [agent.id]: (c[agent.id] ?? 0) + 1 }));
+      case 'duplicate':
+        return void act(async () => {
+          const copy = await agentsApi.duplicate(agent.id);
+          await reloadAgents();
+          setSelectedId(copy.id);
+          setNotice({ text: `@${agent.handle} duplicado como @${copy.handle}.` });
+        });
+      case 'configure':
+        return setForm({ open: true, agent });
+    }
+  };
 
   const selected = agents.find((a) => a.id === selectedId) ?? null;
 
@@ -185,7 +214,7 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
                   >
                     <span className="truncate text-body text-primary">@{agent.handle}</span>
                     <span className="flex items-center gap-1.5">
-                      <StatusDot state={state} withLabel />
+                      <StatusDot state={state} confidence={confidence[agent.id]} withLabel />
                       <span className="text-caption text-muted">· {agent.adapterId}</span>
                     </span>
                   </button>
@@ -238,14 +267,17 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
           })}
         </ul>
 
-        <section aria-label="Terminal do agente" className="flex min-w-0 flex-1 flex-col">
+        <section aria-label="Terminal do agente" className="flex min-w-0 flex-1 flex-col p-2">
           {selected ? (
             <AgentPane
               agent={selected}
               state={stateOf(selected.id)}
+              confidence={confidence[selected.id]}
               branch={branches[selected.id]}
-              onStart={() => void startAgent(selected.id)}
-              onRestart={() => void restartAgent(selected.id)}
+              focused
+              clearSignal={clears[selected.id]}
+              onAction={(action) => paneAction(selected, action)}
+              className="flex-1"
             />
           ) : (
             <EmptyState
@@ -314,68 +346,5 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
         />
       )}
     </div>
-  );
-}
-
-function AgentPane({
-  agent,
-  state,
-  branch,
-  onStart,
-  onRestart,
-}: {
-  agent: Agent;
-  state: AgentState;
-  /** Branch da bancada, quando o agente está numa. */
-  branch?: string;
-  onStart: () => void;
-  onRestart: () => void;
-}) {
-  const running = RUNNING.includes(state);
-  // Uma sessão que já existiu (inclusive a que acabou de cair) tem histórico no core.
-  const hasSession = running || state === 'failed';
-
-  return (
-    <>
-      <div className="flex items-center gap-2 border-b border-subtle px-3 py-1.5">
-        <span
-          aria-hidden
-          className="size-2.5 rounded-full"
-          style={{ background: `var(--agent-${agent.color})` }}
-        />
-        <span className="text-label text-primary">@{agent.handle}</span>
-        <span className="text-caption text-muted">— {agent.name}</span>
-        <span className="ml-auto flex items-center gap-2">
-          {branch && (
-            <span
-              className="flex items-center gap-1 font-mono text-caption text-muted"
-              title="Bancada"
-            >
-              <GitBranch size={11} /> {branch}
-            </span>
-          )}
-          <StatusDot state={state} withLabel />
-          {running && (
-            <IconButton label={`Reiniciar @${agent.handle}`} size="sm" onClick={onRestart}>
-              <RotateCw size={12} />
-            </IconButton>
-          )}
-        </span>
-      </div>
-      {hasSession ? (
-        <Terminal key={agent.id} agentId={agent.id} className="min-h-0 flex-1" />
-      ) : (
-        <EmptyState
-          icon={<SquareTerminal size={22} />}
-          title="Agente parado"
-          description={agent.role || 'Inicie o agente para abrir o terminal dele.'}
-          action={
-            <Button variant="primary" onClick={onStart}>
-              <Play size={13} /> Iniciar
-            </Button>
-          }
-        />
-      )}
-    </>
   );
 }

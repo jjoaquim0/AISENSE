@@ -21,6 +21,8 @@ import {
   TabsTrigger,
   Tooltip,
 } from '@/components/ui';
+import { AgentPane } from '@/features/team-room/components/AgentPane';
+import type { Agent } from '@/types/generated/Agent';
 
 /**
  * Amostra do design system (F00-03 e F00-06). Só existe em desenvolvimento:
@@ -82,6 +84,21 @@ export function KitchenSink() {
           {AGENT_STATES.map((state) => (
             <StatusDot key={state} state={state} withLabel />
           ))}
+          <StatusDot state="idle" confidence="low" withLabel />
+        </div>
+      </Section>
+
+      <Section title="Painel de agente (parado)">
+        <div className="grid grid-cols-2 gap-3">
+          <AgentPane agent={SAMPLE_AGENT} state="stopped" onAction={() => {}} className="h-56" />
+          <AgentPane
+            agent={{ ...SAMPLE_AGENT, handle: 'revisor', color: 'amber', adapterId: 'codex' }}
+            state="stopped"
+            pending={2}
+            focused
+            onAction={() => {}}
+            className="h-56"
+          />
         </div>
       </Section>
 
@@ -237,3 +254,25 @@ const AGENT_STATES: AgentState[] = [
   'stopped',
   'starting',
 ];
+
+const SAMPLE_AGENT: Agent = {
+  id: 'agt_exemplo',
+  teamId: 'tem_exemplo',
+  handle: 'backend',
+  name: 'Backend',
+  role: 'Cuida da API e do banco de dados.',
+  adapterId: 'claude',
+  model: null,
+  workdir: null,
+  env: {},
+  args: [],
+  color: 'violet',
+  autostart: false,
+  restartPolicy: 'on-crash',
+  deliveryMode: 'pull',
+  autonomy: 'ask',
+  workbench: 'inherit',
+  position: 0,
+  createdAt: 0,
+  updatedAt: 0,
+};

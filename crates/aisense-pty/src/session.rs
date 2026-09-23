@@ -299,6 +299,14 @@ impl PtySession {
             .unwrap_or_default()
     }
 
+    /// Esquece o histórico retido ("Limpar" do painel). O log em arquivo fica: ele é a
+    /// transcrição completa, não a tela.
+    pub fn clear(&self) {
+        if let Ok(mut ring) = self.ring.lock() {
+            ring.clear();
+        }
+    }
+
     pub fn dropped_entries(&self) -> u64 {
         self.ring
             .lock()

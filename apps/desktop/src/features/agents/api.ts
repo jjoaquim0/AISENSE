@@ -17,6 +17,8 @@ export const agentsApi = {
   /** `restartRequired` diz se a mudança só vale depois de reiniciar o agente. */
   update: (agentId: AgentId, draft: AgentDraft): Promise<AgentUpdate> =>
     invoke('agent_update', { agentId, draft }),
+  /** Mesma configuração, handle e cor livres (menu ⋮ do painel). */
+  duplicate: (agentId: AgentId): Promise<Agent> => invoke('agent_duplicate', { agentId }),
   remove: (agentId: AgentId): Promise<void> => invoke('agent_delete', { agentId }),
   suggestHandle: (name: string): Promise<string | null> => invoke('handle_suggest', { name }),
 

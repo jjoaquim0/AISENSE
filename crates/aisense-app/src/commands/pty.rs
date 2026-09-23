@@ -92,6 +92,12 @@ pub fn pty_snapshot(manager: State<'_, Manager>, agent_id: String) -> Result<Str
     Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
 }
 
+/// "Limpar" do menu do painel: esquece o histórico retido (o log em disco fica).
+#[tauri::command]
+pub fn pty_clear(manager: State<'_, Manager>, agent_id: String) -> Result<(), CommandError> {
+    manager.clear(&agent_id).map_err(pty_error)
+}
+
 #[tauri::command]
 pub fn pty_set_visible(
     manager: State<'_, Manager>,

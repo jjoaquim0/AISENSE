@@ -23,7 +23,7 @@ runtime e, depois, o supervisor que sobe os agentes.
 | 00 — Fundação | 🟨 Em andamento | 6 feitas, 3 parciais de 9 |
 | 01 — Terminal Core | 🟨 Em andamento | 4 feitas, 4 parciais de 8 |
 | 02 — Equipes e Agentes | 🟨 Código completo | 11 de 11 feitas — falta a demonstração na janela |
-| 03 — Sala da Equipe | 🟨 Em andamento | 1 feita de 9 |
+| 03 — Sala da Equipe | 🟨 Em andamento | 2 feitas de 9 |
 | 04 — Sistema de Skills | ⬜ Não iniciada | 0/9 |
 | 05 — Barramento | ⬜ Não iniciada | 0/13 |
 | 06 — Quadro Kanban | ⬜ Não iniciada | 0/11 |
@@ -43,13 +43,16 @@ pendente e não bloqueia nada da Fase 03.
 | Tarefa | Situação |
 |---|---|
 | F03-01 Detector de estado | ✅ `StateDetector` (tela via `vt100`, regras do `docs/05`), tarefa por sessão no supervisor, `agent:state` com `confidence` |
+| F03-02 Painel de agente | ✅ `AgentPane` com borda na cor do agente, estado com forma + texto, menu `⋮` (reiniciar, parar/iniciar, limpar, duplicar, configurar) |
 
 O agente agora fica em `starting` até o detector ler a primeira tela — antes, processo vivo era
 `idle` na hora. Transcrições dos testes são sintéticas; ver ressalva no documento da fase.
 
 **CI da main estava vermelho desde a F02-08** (job do Windows, teste
 `grava_a_transcricao_completa_em_arquivo`: esperava 200 ms fixos depois do processo sair, e o
-ConPTY ainda entrega saída depois disso). Corrigido no PR #5 esperando o EOF da leitura.
+ConPTY ainda entrega saída depois disso). A causa real era de produto: o console era fechado no
+instante em que o processo morria, descartando as últimas linhas (em geral a mensagem de erro).
+Agora espera a leitura silenciar antes de fechar. PR #5, mergeado.
 
 
 **Fase 02 — Equipes e Agentes** (iniciada em 2026-09-22 a pedido do usuário). Exceção consciente à
@@ -225,3 +228,4 @@ Bugs encontrados pelos próprios testes, todos corrigidos na origem:
 | 2026-09-23 | Claude | F02-11: `aisense.toml` (parser, validação, detecção que propõe) e o diálogo "Comandos" |
 | 2026-09-23 | Claude | F02-10: bancadas (git worktree por agente), integradas ao supervisor e às exclusões. Fase 02 com as 11 tarefas feitas |
 | 2026-09-23 | Claude | CI vermelho no Windows desde a F02-08 diagnosticado e corrigido (PR #5). Início da Fase 03 a pedido do usuário; F03-01 (detector de estado) concluída |
+| 2026-09-23 | Claude | Causa real do CI vermelho no Windows: ConPTY fechado cedo demais perdia as últimas linhas; corrigido. F03-02 (painel de agente com menu ⋮, duplicar e limpar) |
