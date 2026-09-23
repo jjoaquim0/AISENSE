@@ -58,10 +58,19 @@ equipe em `teams.layout`.
 > A bancada pegou dois defeitos do modo livre, corrigidos: painel solto sobre outro ficava
 > escondido atrás, e o painel perdia a largura ao soltar (estilo apagado em vez de restaurado).
 
-### [ ] F03-04 — Vista Foco
+### [x] F03-04 — Vista Foco
 Um terminal grande + tira de miniaturas com as últimas 4 linhas renderizadas fora do xterm
 (componente leve atualizado a 2 fps).
 **Aceite:** a miniatura não cria instância de xterm; CPU permanece baixa. Depende de F03-02.
+> Feito: `features/team-room/components/{FocusView,MiniPreview,ViewPicker}.tsx`. As miniaturas
+> são texto puro vindo do core: `agent_previews` lê as últimas linhas da **mesma tela** que o
+> detector de estado (F03-01) já mantém em `vt100` — nenhum custo novo de emulação. Uma chamada
+> para todos os agentes a cada 500 ms, pausada com a janela em segundo plano e sem re-render
+> quando nada mudou. A tela fica após o processo morrer, então a miniatura de quem caiu mostra o
+> erro. Vista escolhida salva em `teams.layout.view`. Teste monta a vista no jsdom e confere que
+> não há `.xterm`/`canvas` nas miniaturas e que a busca é uma só a 2 fps.
+> Corrigido de carona um defeito da F03-03: equipe sem layout salvo abria com a lista de agentes
+> ainda vazia, ganhava o preset "1" e ficava presa nele.
 
 ### [ ] F03-05 — Gestão de visibilidade
 Integrar com `pty_set_visible`: painel fora da tela ou em vista que não o mostra é marcado invisível;

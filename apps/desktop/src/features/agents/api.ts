@@ -3,6 +3,7 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type { Agent } from '@/types/generated/Agent';
 import type { AgentDraft } from '@/types/generated/AgentDraft';
 import type { AgentId } from '@/types/generated/AgentId';
+import type { AgentPreview } from '@/types/generated/AgentPreview';
 import type { AgentState } from '@/types/generated/AgentState';
 import type { AgentStateChanged } from '@/types/generated/AgentStateChanged';
 import type { AgentUpdate } from '@/types/generated/AgentUpdate';
@@ -17,6 +18,9 @@ export const agentsApi = {
   /** `restartRequired` diz se a mudança só vale depois de reiniciar o agente. */
   update: (agentId: AgentId, draft: AgentDraft): Promise<AgentUpdate> =>
     invoke('agent_update', { agentId, draft }),
+  /** Últimas linhas da tela de cada agente (miniaturas da vista Foco). */
+  previews: (agentIds: AgentId[], lines: number): Promise<AgentPreview[]> =>
+    invoke('agent_previews', { agentIds, lines }),
   /** Mesma configuração, handle e cor livres (menu ⋮ do painel). */
   duplicate: (agentId: AgentId): Promise<Agent> => invoke('agent_duplicate', { agentId }),
   remove: (agentId: AgentId): Promise<void> => invoke('agent_delete', { agentId }),

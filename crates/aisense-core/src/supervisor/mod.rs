@@ -87,6 +87,18 @@ pub trait SupervisorObserver: Send + Sync + 'static {
     fn state_changed(&self, agent_id: &AgentId, state: AgentState, confidence: StateConfidence);
 }
 
+/// Miniatura de um agente: as últimas linhas da tela, sem ANSI.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../apps/desktop/src/types/generated/")]
+pub struct AgentPreview {
+    pub agent_id: AgentId,
+    pub lines: Vec<String>,
+}
+
+/// Teto de linhas por miniatura: é uma prévia, não um segundo terminal.
+pub const MAX_PREVIEW_LINES: usize = 20;
+
 /// O que chega à tarefa do detector de estado de uma sessão.
 enum DetectorInput {
     Output(Vec<u8>),
@@ -198,6 +210,9 @@ struct Supervised {
     /// Canal para o detector da sessão atual (redimensionamento). `None` quando não
     /// há processo.
     detector: Option<mpsc::UnboundedSender<DetectorInput>>,
+    /// A tela da sessão mais recente, compartilhada com a tarefa do detector. Fica
+    /// depois que o processo morre: a miniatura de um agente que caiu mostra o erro.
+    screen: Option<Arc<Mutex<StateDetector>>>,
 }
 
 impl Supervised {
@@ -211,6 +226,7 @@ impl Supervised {
             cancel: CancellationToken::new(),
             stop_requested: false,
             detector: None,
+            screen: None,
         }
     }
 }
@@ -375,7 +391,15 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
         }
         tracing::info!(agent = %agent_id, adapter = %adapter.id, "agente iniciado");
         let size = self.shared.config.size;
-        let detector = StateDetector::new(&adapter.state, size.rows, size.cols, Instant::now());
+        let detector = Arc::new(Mutex::new(StateDetector::new(
+            &adapter.state,
+            size.rows,
+            size.cols,
+            Instant::now(),
+        )));
+        if let Some(entry) = self.agents().get_mut(agent_id) {
+            entry.screen = Some(Arc::clone(&detector));
+        }
         tokio::spawn(run_detector(
             Arc::downgrade(&self.shared),
             agent_id.clone(),
@@ -560,6 +584,29 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
             .state_changed(agent_id, state, StateConfidence::High);
     }
 
+    /// Últimas linhas da tela de cada agente pedido (vista Foco, F03-04). Agente que
+    /// nunca subiu nesta execução do app não aparece na resposta.
+    pub fn previews(&self, agent_ids: &[AgentId], lines: usize) -> Vec<AgentPreview> {
+        let lines = lines.clamp(1, MAX_PREVIEW_LINES);
+        let screens: Vec<(AgentId, Arc<Mutex<StateDetector>>)> = {
+            let agents = self.agents();
+            agent_ids
+                .iter()
+                .filter_map(|id| Some((id.clone(), agents.get(id)?.screen.clone()?)))
+                .collect()
+        };
+        screens
+            .into_iter()
+            .map(|(agent_id, screen)| AgentPreview {
+                agent_id,
+                lines: screen
+                    .lock()
+                    .map(|d| d.last_lines(lines))
+                    .unwrap_or_default(),
+            })
+            .collect()
+    }
+
     /// O painel do agente mudou de tamanho: a tela do detector precisa acompanhar,
     /// senão uma TUI desenhada para outra largura vira texto quebrado.
     pub fn resized(&self, agent_id: &AgentId, size: TerminalSize) {
@@ -638,21 +685,25 @@ async fn run_detector<S: SupervisorStore>(
     shared: Weak<Shared<S>>,
     agent_id: AgentId,
     session_id: SessionId,
-    mut detector: StateDetector,
+    detector: Arc<Mutex<StateDetector>>,
     mut input: mpsc::UnboundedReceiver<DetectorInput>,
 ) {
+    // O lock é curto e nunca atravessa um `await`: a miniatura lê a mesma tela.
+    let with = |f: &mut dyn FnMut(&mut StateDetector) -> Option<Detection>| {
+        detector.lock().ok().and_then(|mut d| f(&mut d))
+    };
     loop {
-        let deadline = detector.next_deadline();
+        let deadline = detector.lock().ok().and_then(|d| d.next_deadline());
         let detection = tokio::select! {
             received = input.recv() => match received {
-                Some(DetectorInput::Output(chunk)) => detector.feed(&chunk, Instant::now()),
-                Some(DetectorInput::Resize(size)) => {
-                    detector.resize(size.rows, size.cols);
+                Some(DetectorInput::Output(chunk)) => with(&mut |d| d.feed(&chunk, Instant::now())),
+                Some(DetectorInput::Resize(size)) => with(&mut |d| {
+                    d.resize(size.rows, size.cols);
                     None
-                }
+                }),
                 None => return,
             },
-            () = sleep_until(deadline) => detector.tick(Instant::now()),
+            () = sleep_until(deadline) => with(&mut |d| d.tick(Instant::now())),
         };
         if let Some(detection) = detection {
             let Some(shared) = shared.upgrade() else {

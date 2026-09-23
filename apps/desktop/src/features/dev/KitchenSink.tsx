@@ -22,6 +22,7 @@ import {
   Tooltip,
 } from '@/components/ui';
 import { AgentPane } from '@/features/team-room/components/AgentPane';
+import { MiniPreview } from '@/features/team-room/components/MiniPreview';
 import type { Agent } from '@/types/generated/Agent';
 
 /**
@@ -85,6 +86,37 @@ export function KitchenSink() {
             <StatusDot key={state} state={state} withLabel />
           ))}
           <StatusDot state="idle" confidence="low" withLabel />
+        </div>
+      </Section>
+
+      <Section title="Miniaturas da vista Foco">
+        <div className="flex h-24 gap-2">
+          <MiniPreview
+            agent={SAMPLE_AGENT}
+            state="busy"
+            lines={[
+              'Implementando o middleware de',
+              'refresh token...',
+              '⠋ editando src/auth/refresh.rs',
+            ]}
+            index={0}
+            onSelect={() => {}}
+          />
+          <MiniPreview
+            agent={{ ...SAMPLE_AGENT, handle: 'frontend', color: 'cyan' }}
+            state="idle"
+            confidence="low"
+            lines={['[AISENSE] Mensagem de @backend:', 'contrato do /users v2 subiu', '❯']}
+            index={1}
+            onSelect={() => {}}
+          />
+          <MiniPreview
+            agent={{ ...SAMPLE_AGENT, handle: 'revisor', color: 'amber' }}
+            state="stopped"
+            lines={[]}
+            index={2}
+            onSelect={() => {}}
+          />
         </div>
       </Section>
 
