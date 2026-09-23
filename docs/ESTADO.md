@@ -13,18 +13,20 @@ nos 3 SOs antes do merge (o usuário mergeia). Commits com o ID da tarefa no tí
 
 ## Situação em uma frase
 
-Fundação, terminal, equipes/agentes persistidos e **8 das 9 tarefas da Sala da Equipe** estão em
-código e testados. Próximo: **F03-09 (inspetor)**, que fecha a Fase 03.
+Fundação, terminal, equipes/agentes persistidos e **as 9 tarefas da Sala da Equipe** estão em
+código e testados. A Fase 03 fecha quando alguém com tela conferir a janela e os dois critérios de
+saída pendentes (9 terminais com GPU; calibrar o detector com sessões reais). Depois: **Fase 04 — Skills**.
 
 ## Para quem chega agora (retomada)
 
 1. Leia `AGENTS.md` e este arquivo inteiro; depois `docs/fases/FASE-03-sala-da-equipe.md` — cada
    tarefa feita tem uma nota `> Feito:` dizendo onde está o código e o que ficou de fora.
-2. Próxima tarefa: **F03-09** (inspetor, abas Visão/Config/Logs). Ponto de partida:
-   `features/team-room/components/AgentInspector.tsx` (hoje só o cabeçalho), colocado no inspetor
-   do shell por `ShellSlot` em `features/teams/TeamView.tsx`; o formulário do T5 está em
-   `features/agents/AgentFormDialog.tsx`. A sidebar (F03-07) reordena a **ordem da equipe**
-   (`agents.position`), não `grid.order`. Atalhos: `useShortcuts` + ADR 0007.
+2. Próximo passo: a **Fase 04 — Skills** (`docs/fases/FASE-04-skills.md`), depois de o usuário
+   aprovar a exceção à R1 (a Fase 03 tem código completo, mas critérios de saída abertos). Onde
+   a Fase 03 deixou as coisas: sidebar e inspetor entram no shell por `ShellSlot`
+   (`features/shell/slots.tsx`); o inspetor tem as abas Visão/Config/Logs e espera Skills
+   (Fase 04) e Caixa (Fase 05); a sidebar reordena a **ordem da equipe** (`agents.position`);
+   atalhos em `useShortcuts` + ADR 0007; transcrições em `aisense-core/src/transcript.rs`.
 3. Onde as coisas moram na Fase 03: `aisense-core/src/state/` (detector), `supervisor/team.rs`
    (▶ ⏸ ⟳), `apps/desktop/src/features/team-room/` (painel, grid, foco, controles, layout).
 4. Verificação que se espera antes de cada PR: `pnpm lint`, `pnpm typecheck`, `pnpm test`,
@@ -42,7 +44,7 @@ código e testados. Próximo: **F03-09 (inspetor)**, que fecha a Fase 03.
 | 00 — Fundação | 🟨 Em andamento | 6 feitas, 3 parciais de 9 |
 | 01 — Terminal Core | 🟨 Em andamento | 4 feitas, 4 parciais de 8 |
 | 02 — Equipes e Agentes | 🟨 Código completo | 11 de 11 feitas — falta a demonstração na janela |
-| 03 — Sala da Equipe | 🟨 Em andamento | 8 feitas de 9 |
+| 03 — Sala da Equipe | 🟨 Código completo | 9 de 9 feitas — faltam conferência na janela e dois critérios de saída |
 | 04 — Sistema de Skills | ⬜ Não iniciada | 0/9 |
 | 05 — Barramento | ⬜ Não iniciada | 0/13 |
 | 06 — Quadro Kanban | ⬜ Não iniciada | 0/11 |
@@ -69,7 +71,7 @@ pendente e não bloqueia nada da Fase 03.
 | F03-06 Controles da equipe | ✅ ▶ escalonado (300 ms), ⏸ e ⟳ com confirmação e progresso ao vivo (`team:progress`) |
 | F03-07 Sidebar de agentes | ✅ lista na sidebar do shell (portal), estado direto do evento, reordenar grava `position` (`agents_reorder`), duplo clique abre o inspetor (cabeçalho do agente; abas na F03-09), badge de mensagens pronto para a Fase 05 |
 | F03-08 Navegação por teclado | ✅ camada única na captura da janela; ⌘1..9 valem com o terminal focado sem vazar para o shell; ⌘G, ⌘T, ⌘W (fecha o painel, não o agente), ⌘\\, Esc Esc; fora do macOS o resto fica com o shell ([ADR 0007](adr/0007-atalhos-com-o-terminal-focado.md)) |
-| F03-09 Inspetor do agente | ⬜ **próxima** |
+| F03-09 Inspetor do agente | ✅ abas Visão (estado, tempo ativo, PID, últimos eventos), Config (campos do T5 inline) e Logs (transcrição por sessão com busca e exportação; `sessions.log_offset`, migração 0003) |
 
 O agente agora fica em `starting` até o detector ler a primeira tela — antes, processo vivo era
 `idle` na hora. Transcrições dos testes são sintéticas; ver ressalva no documento da fase.
@@ -263,3 +265,4 @@ Bugs encontrados pelos próprios testes, todos corrigidos na origem:
 | 2026-09-23 | Claude | Retomada documentada no topo deste arquivo para continuar em outra sessão; próxima tarefa F03-07 |
 | 2026-09-23 | Claude | F03-07 (sidebar de agentes no shell, estado ao vivo sem ida ao core, reordenação persistida) |
 | 2026-09-23 | Claude | F03-08 (atalhos de teclado com o terminal focado; ADR 0007) |
+| 2026-09-23 | Claude | F03-09 (inspetor com Visão, Config e Logs; transcrição por sessão). Fase 03 com código completo |

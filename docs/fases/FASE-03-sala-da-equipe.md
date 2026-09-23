@@ -138,16 +138,33 @@ Camada de atalhos global respeitando o foco do xterm.
 > Aceite como teste: um "xterm" com textarea ouvindo teclas; `Ctrl+1` roda o atalho, fica com
 > `defaultPrevented` e o textarea não vê a tecla. **Não conferido na janela.**
 
-### [ ] F03-09 — Inspetor do agente (T6)
+### [x] F03-09 — Inspetor do agente (T6)
 Abas Visão, Config e Logs (as abas Skills e Caixa entram nas fases 4 e 5).
 **Aceite:** a aba Logs mostra a transcrição com busca e exportação. Depende de F03-02.
+> Feito: `features/team-room/components/{AgentInspector.tsx, inspector/{OverviewTab,LogsTab}.tsx}`
+> no inspetor do shell. **Logs:** o log é um arquivo por agente com as sessões em sequência;
+> cada sessão agora grava onde começa (`sessions.log_offset`, migração 0003) e vai até onde a
+> seguinte começa — é o que separa "sessões anteriores". O core (`aisense-core/src/transcript.rs`)
+> transforma a saída crua em texto aos pedaços (escapes somem, `\r` sobrescreve a linha — barra de
+> progresso fica no estado final —, `\b` recua, UTF-8 e escapes partidos entre leituras). A tela
+> recebe o final da sessão (até 1 MB de log, começando numa linha inteira); **exportar** grava a
+> sessão inteira no arquivo escolhido no diálogo de salvar (`dialog:allow-save`), em streaming.
+> Busca no front: sem diferenciar maiúsculas, marca as ocorrências (até 1000), Enter/⇧Enter e
+> setas andam entre elas. Comandos `agent_sessions`, `session_transcript` e `session_export`,
+> com a leitura de disco fora da thread dos comandos. Sessão cujo trecho saiu do log (rotação
+> aos 200 MB, ou gravada antes da 0003) aparece como indisponível, sem inventar conteúdo.
+> **Visão:** estado, tempo ativo (relógio só enquanto roda), PID, nº de sessões, runtime, pasta,
+> papel e os últimos 20 eventos de estado desde que a janela abriu. Mensagens e tarefas entram
+> nas Fases 05 e 06. **Config:** os campos do T5 inline — o formulário saiu do diálogo para
+> `features/agents/AgentForm.tsx`, usado pelos dois. Transcrição não é um emulador: TUIs que
+> redesenham a tela inteira ficam repetitivas no texto. **Não conferido na janela.**
 
 ## Critérios de saída
-- [ ] 9 terminais simultâneos com performance dentro do orçamento de [03 — Stack](../03-stack.md#orçamento-de-performance-metas-verificáveis-na-fase-8)
-- [ ] Estado de cada agente visível e correto
-- [ ] Layout persistido por equipe
-- [ ] Navegação inteiramente por teclado
-- [ ] Trocar de vista não recria processos
+- [ ] 9 terminais simultâneos com performance dentro do orçamento — **pendente de máquina com GPU** (`#/dev/grid`) de [03 — Stack](../03-stack.md#orçamento-de-performance-metas-verificáveis-na-fase-8)
+- [ ] Estado de cada agente visível e correto — visível sim; "correto" pede calibrar os regex com sessões reais de cada runtime
+- [x] Layout persistido por equipe (`teams.layout`, F03-03/F03-04)
+- [x] Navegação inteiramente por teclado (F03-08; conferido em teste, não na janela)
+- [x] Trocar de vista não recria processos (os processos vivem no core; a vista só monta terminais)
 
 ## Riscos
 | Risco | Mitigação |

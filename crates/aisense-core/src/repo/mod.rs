@@ -68,6 +68,9 @@ pub struct SessionRecord {
     pub ended_at: Option<Millis>,
     pub exit_code: Option<i32>,
     pub log_path: String,
+    /// Tamanho do log no início da sessão: a transcrição dela começa aqui (F03-09).
+    /// `None` nas sessões gravadas antes de existir este campo.
+    pub log_offset: Option<u64>,
 }
 
 pub trait SessionRepository: Send + Sync {

@@ -47,7 +47,7 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
     setProblem,
   );
 
-  const { stateOf, confidenceOf } = useLiveStates(summary.agents);
+  const { stateOf, confidenceOf, eventsOf } = useLiveStates(summary.agents);
   const showInspector = usePanels((s) => s.showInspector);
 
   const reloadAgents = useCallback(async () => {
@@ -149,6 +149,21 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
 
   const selected = agents.find((a) => a.id === selectedId) ?? null;
 
+  // Diálogo T5 e aba Config do inspetor salvam pelo mesmo caminho.
+  const agentSaved = (agent: Agent, restartRequired: boolean) => {
+    void reloadAgents();
+    void load();
+    setSelectedId(agent.id);
+    setNotice(
+      restartRequired
+        ? {
+            text: `@${agent.handle} foi salvo. As mudanças valem no próximo início.`,
+            restart: agent,
+          }
+        : { text: `@${agent.handle} foi salvo.` },
+    );
+  };
+
   // F03-08: ⌘1..9, ⌘G, ⌘T, ⌘W, ⌘\ — a regra de cada um mora em `roomShortcuts`.
   const shortcuts = useMemo(
     () =>
@@ -195,7 +210,11 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
           agent={selected}
           state={selected ? stateOf(selected.id) : 'stopped'}
           confidence={selected ? confidenceOf(selected.id) : undefined}
+          events={selected ? eventsOf(selected.id) : []}
           teamWorkdir={team.workdir}
+          teamId={team.id}
+          siblings={agents}
+          onSaved={agentSaved}
         />
       </ShellSlot>
       <header className="flex items-center gap-3 border-b border-subtle px-4 py-2.5">
@@ -300,19 +319,7 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
         running={form.agent ? isRunning(stateOf(form.agent.id)) : false}
         open={form.open}
         onOpenChange={(open) => setForm((f) => ({ ...f, open }))}
-        onSaved={(agent, restartRequired) => {
-          void reloadAgents();
-          void load();
-          setSelectedId(agent.id);
-          setNotice(
-            restartRequired
-              ? {
-                  text: `@${agent.handle} foi salvo. As mudanças valem no próximo início.`,
-                  restart: agent,
-                }
-              : { text: `@${agent.handle} foi salvo.` },
-          );
-        }}
+        onSaved={agentSaved}
       />
 
       <ProjectCommandsDialog

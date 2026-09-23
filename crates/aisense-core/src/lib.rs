@@ -17,6 +17,7 @@ pub mod supervisor;
 pub mod team;
 mod time;
 mod toml_pos;
+pub mod transcript;
 mod validation;
 
 pub use app_info::AppInfo;

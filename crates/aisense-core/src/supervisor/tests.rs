@@ -303,6 +303,37 @@ async fn restart_brings_up_a_new_session() {
     assert_eq!(h.sessions(&id).await.len(), 2);
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn each_session_knows_where_it_starts_in_the_log() {
+    let h = harness();
+    let echo = if cfg!(windows) {
+        vec!["cmd".into(), "/C".into(), "echo sessao".into()]
+    } else {
+        vec!["sh".into(), "-c".into(), "echo sessao".into()]
+    };
+    let id = h.agent(echo, RestartPolicy::Never).await;
+    for round in 1..=2 {
+        h.supervisor.start(&id).await.unwrap();
+        h.wait_sessions(&id, round).await;
+        h.wait_for("parado", |h| !h.supervisor.state(&id).is_running())
+            .await;
+    }
+    let sessions = h.sessions(&id).await;
+    assert_eq!(sessions[1].log_offset, Some(0), "a primeira começa no zero");
+    let second = sessions[0].log_offset.unwrap();
+    assert!(second > 0, "a segunda começa depois da primeira");
+
+    for session in &sessions {
+        let t = crate::transcript::read_transcript(&sessions, &session.id).unwrap();
+        assert_eq!(
+            t.text.matches("sessao").count(),
+            1,
+            "cada sessão só com a própria saída: {:?}",
+            t.text
+        );
+    }
+}
+
 /// Repositório git com um commit, para os testes de bancada.
 fn git_repo() -> PathBuf {
     let dir = std::env::temp_dir().join(format!("aisense-sup-repo-{}", ulid::Ulid::new()));

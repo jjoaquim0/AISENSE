@@ -6,13 +6,19 @@ use aisense_core::agent::{
     create_agent, duplicate_agent, reorder_agents, update_agent, Agent, AgentDraft, AgentOpError,
     AgentState, AgentUpdate, Handle,
 };
-use aisense_core::repo::{AgentRepository, RepoError};
+use aisense_core::repo::{
+    AgentRepository, RepoError, SessionRecord, SessionRepository, SESSIONS_KEPT_PER_AGENT,
+};
 use aisense_core::state::StateConfidence;
 use aisense_core::supervisor::{
     AgentPreview, AgentStateChanged, AgentSupervisor, LaunchContext, StartOutcome,
     SupervisorConfig, SupervisorError, SupervisorObserver,
 };
-use aisense_core::{now_ms, AgentId, CommandError, DataDir, TeamId};
+use aisense_core::transcript::{
+    export_transcript, read_transcript, summarize_sessions, SessionSummary, Transcript,
+    TranscriptError,
+};
+use aisense_core::{now_ms, AgentId, CommandError, DataDir, SessionId, TeamId};
 use aisense_pty::TerminalSize;
 use aisense_store::Store;
 use tauri::{AppHandle, Emitter, State};
@@ -197,4 +203,63 @@ pub async fn agents_reorder(
 #[tauri::command]
 pub fn handle_suggest(name: String) -> Option<String> {
     Handle::suggest(&name).map(|h| h.as_str().to_owned())
+}
+
+// ───────────── aba Logs do inspetor (F03-09) ─────────────
+
+async fn sessions_of(
+    store: &Store,
+    agent_id: &AgentId,
+) -> Result<Vec<SessionRecord>, CommandError> {
+    store
+        .list_sessions(agent_id, SESSIONS_KEPT_PER_AGENT)
+        .await
+        .map_err(repo_error)
+}
+
+fn transcript_error(error: TranscriptError) -> CommandError {
+    CommandError::new(error.code(), error.to_string(), None)
+}
+
+/// Ler o log é disco: fora da thread dos comandos (R6).
+async fn blocking<T: Send + 'static>(
+    work: impl FnOnce() -> Result<T, TranscriptError> + Send + 'static,
+) -> Result<T, CommandError> {
+    tauri::async_runtime::spawn_blocking(work)
+        .await
+        .map_err(|e| CommandError::new("internal", e.to_string(), None))?
+        .map_err(transcript_error)
+}
+
+/// Sessões do agente, mais recente primeiro, com o que ainda tem transcrição.
+#[tauri::command]
+pub async fn agent_sessions(
+    store: State<'_, Store>,
+    agent_id: AgentId,
+) -> Result<Vec<SessionSummary>, CommandError> {
+    let sessions = sessions_of(&store, &agent_id).await?;
+    blocking(move || Ok(summarize_sessions(&sessions))).await
+}
+
+/// O final da transcrição de uma sessão, já sem os códigos de terminal.
+#[tauri::command]
+pub async fn session_transcript(
+    store: State<'_, Store>,
+    agent_id: AgentId,
+    session_id: SessionId,
+) -> Result<Transcript, CommandError> {
+    let sessions = sessions_of(&store, &agent_id).await?;
+    blocking(move || read_transcript(&sessions, &session_id)).await
+}
+
+/// Grava a transcrição inteira em `path` (escolhido no diálogo de salvar).
+#[tauri::command]
+pub async fn session_export(
+    store: State<'_, Store>,
+    agent_id: AgentId,
+    session_id: SessionId,
+    path: String,
+) -> Result<u64, CommandError> {
+    let sessions = sessions_of(&store, &agent_id).await?;
+    blocking(move || export_transcript(&sessions, &session_id, std::path::Path::new(&path))).await
 }
