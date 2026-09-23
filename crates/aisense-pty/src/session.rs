@@ -2,8 +2,9 @@
 
 use std::io::{Read, Write};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use bytes::Bytes;
 use portable_pty::{ChildKiller, CommandBuilder, MasterPty, PtySize};
@@ -17,6 +18,11 @@ use crate::ring::RingBuffer;
 /// Perder aqui não perde histórico: o ring buffer continua completo.
 const BROADCAST_CAPACITY: usize = 512;
 const READ_CHUNK: usize = 8 * 1024;
+
+/// No Windows, quanto silêncio da leitura esperar antes de fechar o console depois
+/// que o processo morreu, e o teto dessa espera. Ver `close_console_on_exit`.
+const CONSOLE_FLUSH_QUIET: Duration = Duration::from_millis(150);
+const CONSOLE_FLUSH_MAX: Duration = Duration::from_secs(3);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TerminalSize {
@@ -194,7 +200,15 @@ impl PtySession {
                 }
             });
 
-        spawn_reader(reader, output.clone(), Arc::clone(&ring), log, reader_tx);
+        let activity = ReadActivity::new();
+        spawn_reader(
+            reader,
+            output.clone(),
+            Arc::clone(&ring),
+            log,
+            reader_tx,
+            activity.clone(),
+        );
 
         // A espera pelo processo é bloqueante e mora na própria thread; o `killer` foi
         // clonado antes, então parar o agente não depende desta thread.
@@ -212,7 +226,7 @@ impl PtySession {
                     }
                 };
                 running_for_waiter.store(false, Ordering::SeqCst);
-                close_console_on_exit(&master_for_waiter);
+                close_console_on_exit(&master_for_waiter, &activity);
                 let _ = exit_tx.send(Some(code));
             })
             .map_err(|error| PtyError::Spawn {
@@ -324,16 +338,59 @@ impl PtySession {
     }
 }
 
+/// Quando a thread de leitura recebeu bytes pela última vez.
+#[derive(Clone)]
+struct ReadActivity {
+    base: Instant,
+    /// Milissegundos desde `base` na última leitura com dados.
+    last: Arc<AtomicU64>,
+}
+
+impl ReadActivity {
+    fn new() -> Self {
+        Self {
+            base: Instant::now(),
+            last: Arc::new(AtomicU64::new(0)),
+        }
+    }
+
+    fn touch(&self) {
+        let ms = u64::try_from(self.base.elapsed().as_millis()).unwrap_or(u64::MAX);
+        self.last.store(ms, Ordering::Relaxed);
+    }
+
+    fn quiet_for(&self) -> Duration {
+        let last = Duration::from_millis(self.last.load(Ordering::Relaxed));
+        self.base.elapsed().saturating_sub(last)
+    }
+
+    /// Bloqueia até a leitura ficar em silêncio por `quiet`, no máximo `max`.
+    fn wait_quiet(&self, quiet: Duration, max: Duration) {
+        let deadline = Instant::now() + max;
+        while self.quiet_for() < quiet && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    }
+}
+
 /// No Windows, a leitura de um ConPTY **não** vê EOF quando o processo termina: o
 /// pseudo-console continua aberto e a thread de leitura ficaria parada para sempre —
 /// e com ela o evento de término, do qual o supervisor depende para reiniciar
 /// agentes. Soltar o master (o escravo já foi solto no spawn) chama
-/// `ClosePseudoConsole`, que entrega o que falta da saída e fecha o pipe.
+/// `ClosePseudoConsole` e fecha o pipe.
+///
+/// Mas **não na hora**: o conhost renderiza a saída em intervalos, e quando o
+/// processo morre ainda pode haver texto que não chegou ao pipe. Fechar o console
+/// nesse instante descarta esse texto — justamente as últimas linhas, que costumam
+/// ser a mensagem de erro. Por isso esperamos a leitura ficar em silêncio antes de
+/// fechar, como o node-pty do VS Code faz. O CI do Windows pegou isso: o fim de uma
+/// saída de 300 linhas sumia do log.
 ///
 /// Em Unix o EOF já vem com a morte do processo; o master fica para quem ainda
 /// quiser consultá-lo.
-fn close_console_on_exit(master: &Master) {
+fn close_console_on_exit(master: &Master, activity: &ReadActivity) {
     if cfg!(windows) {
+        activity.wait_quiet(CONSOLE_FLUSH_QUIET, CONSOLE_FLUSH_MAX);
         if let Ok(mut master) = master.lock() {
             drop(master.take());
         }
@@ -346,6 +403,7 @@ fn spawn_reader(
     ring: Arc<Mutex<RingBuffer>>,
     mut log: Option<SessionLog>,
     done: watch::Sender<bool>,
+    activity: ReadActivity,
 ) {
     let done_on_failure = done.clone();
     // Leitura de PTY é bloqueante, então mora numa thread própria e não numa task
@@ -358,6 +416,7 @@ fn spawn_reader(
                 match reader.read(&mut buffer) {
                     Ok(0) => break,
                     Ok(count) => {
+                        activity.touch();
                         let chunk = &buffer[..count];
                         if let Ok(mut ring) = ring.lock() {
                             ring.push(chunk);
@@ -398,6 +457,57 @@ mod tests {
 
     use super::*;
     use crate::ring::DEFAULT_MAX_BYTES;
+
+    #[test]
+    fn wait_quiet_holds_while_output_keeps_arriving() {
+        let activity = ReadActivity::new();
+        let feeder = activity.clone();
+        let writer = std::thread::spawn(move || {
+            for _ in 0..10 {
+                feeder.touch();
+                std::thread::sleep(Duration::from_millis(30));
+            }
+        });
+        let started = Instant::now();
+        activity.wait_quiet(Duration::from_millis(100), Duration::from_secs(5));
+        writer.join().unwrap();
+        // 10 toques a cada 30 ms: não pode ter liberado antes de ~300 ms.
+        assert!(
+            started.elapsed() >= Duration::from_millis(250),
+            "{:?}",
+            started.elapsed()
+        );
+    }
+
+    #[test]
+    fn wait_quiet_gives_up_at_the_cap() {
+        let activity = ReadActivity::new();
+        let feeder = activity.clone();
+        let stop = Arc::new(AtomicBool::new(false));
+        let stop_flag = Arc::clone(&stop);
+        let writer = std::thread::spawn(move || {
+            while !stop_flag.load(Ordering::Relaxed) {
+                feeder.touch();
+                std::thread::sleep(Duration::from_millis(5));
+            }
+        });
+        let started = Instant::now();
+        activity.wait_quiet(Duration::from_millis(100), Duration::from_millis(300));
+        stop.store(true, Ordering::Relaxed);
+        writer.join().unwrap();
+        assert!(started.elapsed() < Duration::from_secs(2));
+    }
+
+    /// Espera a leitura do PTY chegar ao EOF: só aí toda a saída está no ring e no
+    /// log. A morte do processo não basta — no Windows o ConPTY ainda entrega saída
+    /// depois dela, e um `sleep` fixo perdia a última linha no runner do CI.
+    async fn wait_reader_done(session: &PtySession) {
+        let mut done = session.reader_done();
+        tokio::time::timeout(Duration::from_secs(10), done.wait_for(|d| *d))
+            .await
+            .expect("a leitura do PTY não terminou em 10 s")
+            .expect("o sinal de fim de leitura foi descartado");
+    }
 
     use crate::test_support::*;
 
@@ -581,7 +691,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(session.wait().await, 0);
-        tokio::time::sleep(Duration::from_millis(200)).await;
+        wait_reader_done(&session).await;
 
         let transcript = std::fs::read_to_string(&path).unwrap();
         assert!(
@@ -607,8 +717,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(session.wait().await, 0);
-        // Dá um instante para a thread de leitura drenar o que sobrou no buffer do PTY.
-        tokio::time::sleep(Duration::from_millis(200)).await;
+        wait_reader_done(&session).await;
 
         let snapshot = session.snapshot();
         assert!(

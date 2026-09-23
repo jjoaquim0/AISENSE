@@ -37,7 +37,9 @@ impl AgentState {
         use AgentState::*;
         match (self, next) {
             (Stopped | Failed, Starting) => true,
-            (Starting, Idle) => true,
+            // O detector pode ver a CLI ocupada ou já perguntando algo (confiar na
+            // pasta, login) antes do primeiro prompt ocioso.
+            (Starting, Idle | Busy | AwaitingInput) => true,
             (Idle, Busy) | (Busy, Idle) | (Busy, AwaitingInput) => true,
             (AwaitingInput, Busy | Idle) => true,
             (from, Stopped | Failed) => from.is_running(),
@@ -70,6 +72,10 @@ mod tests {
         assert!(!Stopped.can_transition_to(Busy));
         assert!(!Stopped.can_transition_to(Failed));
         assert!(!Idle.can_transition_to(Starting));
+        assert!(
+            Starting.can_transition_to(AwaitingInput),
+            "trust/login dialogs at boot"
+        );
     }
 
     #[test]

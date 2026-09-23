@@ -132,14 +132,28 @@ Isso é o que faz a comunicação entre agentes funcionar **em qualquer terminal
 A heurística de "o agente está ocioso" é a parte mais frágil do sistema. Regras de implementação:
 
 1. O estado só muda para `idle` se **as duas** condições valerem: silêncio por `quiet_ms`
-   **e** o fim do buffer casar com `idle_regex`.
-2. `awaiting_regex` tem **prioridade máxima**: se casar, o estado é `awaiting_input` e o AISENSE
-   **nunca** injeta nada — a decisão é do humano.
-3. Se nenhum regex casar por mais de 60 s com silêncio total, o estado vira `idle` com flag
-   `low_confidence`, e a política de entrega cai para `pull` automaticamente naquela rodada.
-4. A saída avaliada é a **última tela** (linhas visíveis), com códigos ANSI removidos, não o log inteiro.
+   **e** a tela casar com `idle_regex`. Saída chegando é `busy` na hora.
+2. A tela é lida **de baixo para cima**: decide a linha mais baixa que casar com algum regex.
+   Na mesma linha, `awaiting_regex` tem **prioridade máxima**, depois `busy_regex`, depois
+   `idle_regex`. Com `awaiting_input` o AISENSE **nunca** injeta nada — a decisão é do humano.
+   Por que a posição: a tela guarda o passado. Num programa de linha, o "(s/n)" já respondido
+   e o "compilando…" já terminado continuam visíveis acima do prompt novo; o que está por
+   último é o que o programa disse por último.
+3. Se nenhum regex casar por mais de 60 s com silêncio total, o estado vira `idle` com
+   confiança `low`, e a política de entrega cai para `pull` automaticamente naquela rodada.
+4. A saída avaliada é a **última tela**, reconstruída por um emulador de terminal (`vt100`) e
+   sem códigos ANSI — não o log. Só as **últimas 12 linhas não vazias** contam: diálogos e
+   prompts ficam no rodapé, e uma palavra como "permission" numa resposta antiga lá no alto
+   não pode marcar o agente como aguardando. A tela acompanha o tamanho do painel.
 5. Cada troca de estado é registrada em `tracing` no nível `debug` — a tela Configurações → Runtimes
    tem um "modo calibração" que mostra estado em tempo real para o usuário ajustar os regex.
+6. Enquanto o agente está em `starting`, saída não o marca como `busy`: é o próprio boot. Ele sai
+   de `starting` quando a tela casa com algum regex (inclusive `awaiting`, para diálogos de
+   confiança/login na subida) ou pelo silêncio longo da regra 3.
+
+Implementação: `aisense-core/src/state/detector.rs` (puro, testado com transcrições de cada
+runtime) e uma tarefa por sessão no supervisor, que alimenta o detector com **toda** a saída —
+inclusive a de painéis fechados, que não geram evento para a UI.
 
 **Nunca** trate detecção de estado como certeza. Toda injeção passa pela fila e é cancelável.
 

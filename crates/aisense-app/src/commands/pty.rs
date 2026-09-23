@@ -68,13 +68,16 @@ pub fn pty_write(
 #[tauri::command]
 pub fn pty_resize(
     manager: State<'_, Manager>,
+    supervisor: State<'_, super::agents::Supervisor>,
     agent_id: String,
     rows: u16,
     cols: u16,
 ) -> Result<(), CommandError> {
-    manager
-        .resize(&agent_id, TerminalSize { rows, cols })
-        .map_err(pty_error)
+    let size = TerminalSize { rows, cols };
+    manager.resize(&agent_id, size).map_err(pty_error)?;
+    // O detector de estado lê a mesma tela que o painel mostra.
+    supervisor.resized(&aisense_core::AgentId::from_raw(agent_id), size);
+    Ok(())
 }
 
 #[tauri::command]

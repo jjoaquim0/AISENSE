@@ -24,6 +24,11 @@ const IDLE_POLL: Duration = Duration::from_millis(250);
 pub trait OutputSink: Send + Sync + 'static {
     fn data(&self, agent_id: &str, chunk: Vec<u8>);
     fn exit(&self, agent_id: &str, code: i32);
+
+    /// Cada chunk como chegou do PTY, **visível ou não** e antes da coalescência.
+    /// É por aqui que o detector de estado enxerga um agente cujo painel está
+    /// fechado — `data` não emite nada nesse caso. Chamado antes de `exit`.
+    fn raw(&self, _agent_id: &str, _chunk: &[u8]) {}
 }
 
 struct Managed {
@@ -232,7 +237,10 @@ async fn pump(
 
         tokio::select! {
             received = stream.recv() => match received {
-                Ok(chunk) => push(&batcher, &chunk),
+                Ok(chunk) => {
+                    sink.raw(&agent_id, &chunk);
+                    push(&batcher, &chunk);
+                }
                 Err(RecvError::Lagged(skipped)) => {
                     // A interface ficou para trás. O histórico segue íntegro no ring
                     // buffer, e o próximo snapshot corrige a tela.
@@ -252,7 +260,10 @@ async fn pump(
     // A leitura acabou, mas ainda pode haver chunks no canal. Drena sem bloquear.
     loop {
         match stream.try_recv() {
-            Ok(chunk) => push(&batcher, &chunk),
+            Ok(chunk) => {
+                sink.raw(&agent_id, &chunk);
+                push(&batcher, &chunk);
+            }
             Err(TryRecvError::Lagged(skipped)) => {
                 tracing::debug!(%agent_id, skipped, "saída do PTY descartada por atraso");
             }
