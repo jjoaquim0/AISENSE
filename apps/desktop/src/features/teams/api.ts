@@ -1,10 +1,10 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { AgentDraft } from '@/types/generated/AgentDraft';
-import type { AgentStartFailure } from '@/types/generated/AgentStartFailure';
 import type { PlannedAgent } from '@/types/generated/PlannedAgent';
 import type { Team } from '@/types/generated/Team';
 import type { TeamDraft } from '@/types/generated/TeamDraft';
 import type { TeamId } from '@/types/generated/TeamId';
+import type { TeamStartReport } from '@/types/generated/TeamStartReport';
 import type { TeamSummary } from '@/types/generated/TeamSummary';
 import type { TeamTemplate } from '@/types/generated/TeamTemplate';
 
@@ -21,7 +21,8 @@ export const teamsApi = {
   /** O core confere `confirmName` de novo: a interface não é a única barreira. */
   remove: (teamId: TeamId, confirmName: string): Promise<void> =>
     invoke('team_delete', { teamId, confirmName }),
-  start: (teamId: TeamId): Promise<AgentStartFailure[]> => invoke('team_start', { teamId }),
+  /** Quem não subiu (com o motivo) e quem subiu com ressalva. */
+  start: (teamId: TeamId): Promise<TeamStartReport> => invoke('team_start', { teamId }),
 };
 
 /** Mensagem legível de um `CommandError` (ou de qualquer coisa que o `invoke` rejeite). */
@@ -31,4 +32,15 @@ export function errorMessage(error: unknown): string {
     return `${String(error.message)}${hint}`;
   }
   return String(error);
+}
+
+/** Uma linha por agente com problema ou ressalva, para mostrar depois de "Iniciar equipe". */
+export function describeStartReport(
+  report: TeamStartReport,
+  handleOf: (agentId: string) => string,
+): string[] {
+  return [
+    ...report.failures.map((f) => `@${handleOf(f.agentId)}: ${errorMessage(f.error)}`),
+    ...report.notices.map((n) => `@${handleOf(n.agentId)}: ${n.message}`),
+  ];
 }

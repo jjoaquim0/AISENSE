@@ -7,8 +7,8 @@ use aisense_core::agent::{
 };
 use aisense_core::repo::{AgentRepository, RepoError};
 use aisense_core::supervisor::{
-    AgentStateChanged, AgentSupervisor, LaunchContext, SupervisorConfig, SupervisorError,
-    SupervisorObserver,
+    AgentStateChanged, AgentSupervisor, LaunchContext, StartOutcome, SupervisorConfig,
+    SupervisorError, SupervisorObserver,
 };
 use aisense_core::{now_ms, AgentId, CommandError, DataDir, TeamId};
 use aisense_pty::TerminalSize;
@@ -57,6 +57,7 @@ pub fn setup(
         Arc::new(TauriObserver { app: app.clone() }),
         SupervisorConfig {
             logs_dir: data.logs(),
+            benches_dir: data.benches(),
             launch: LaunchContext {
                 socket: data.socket(),
                 sidecar_dir,
@@ -71,11 +72,12 @@ fn command_error(error: SupervisorError) -> CommandError {
     error.to_command_error()
 }
 
+/// Devolve onde o agente foi trabalhar (bancada ou diretório da equipe) e alguma ressalva.
 #[tauri::command]
 pub async fn agent_start(
     supervisor: State<'_, Supervisor>,
     agent_id: AgentId,
-) -> Result<(), CommandError> {
+) -> Result<StartOutcome, CommandError> {
     supervisor.start(&agent_id).await.map_err(command_error)
 }
 
@@ -91,7 +93,7 @@ pub fn agent_stop(
 pub async fn agent_restart(
     supervisor: State<'_, Supervisor>,
     agent_id: AgentId,
-) -> Result<(), CommandError> {
+) -> Result<StartOutcome, CommandError> {
     supervisor.restart(&agent_id).await.map_err(command_error)
 }
 
@@ -148,7 +150,8 @@ pub async fn agent_delete(
     supervisor: State<'_, Supervisor>,
     agent_id: AgentId,
 ) -> Result<(), CommandError> {
-    supervisor.stop(&agent_id).map_err(command_error)?;
+    // Para e remove a bancada; com trabalho não commitado nela, recusa (`docs/16`).
+    supervisor.retire(&agent_id).await.map_err(command_error)?;
     store.delete_agent(&agent_id).await.map_err(repo_error)
 }
 

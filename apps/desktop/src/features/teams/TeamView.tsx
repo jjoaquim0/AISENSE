@@ -2,6 +2,7 @@ import {
   ArrowLeft,
   FileCode,
   Folder,
+  GitBranch,
   Pencil,
   Play,
   Plus,
@@ -19,8 +20,9 @@ import { Terminal } from '@/features/terminal/Terminal';
 import { cn } from '@/lib/cn';
 import type { Agent } from '@/types/generated/Agent';
 import type { AgentState } from '@/types/generated/AgentState';
+import type { StartOutcome } from '@/types/generated/StartOutcome';
 import type { TeamSummary } from '@/types/generated/TeamSummary';
-import { errorMessage, teamsApi } from './api';
+import { describeStartReport, errorMessage, teamsApi } from './api';
 import { useTeams } from './store';
 
 const RUNNING: AgentState[] = ['starting', 'idle', 'busy', 'awaiting_input'];
@@ -72,6 +74,27 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
     }
   };
 
+  const handleOf = (id: string) => agents.find((a) => a.id === id)?.handle ?? id;
+
+  // Onde cada agente foi trabalhar no último start (bancada), para o cabeçalho do painel.
+  const [branches, setBranches] = useState<Record<string, string>>({});
+  const launched = (agentId: string, outcome: StartOutcome) => {
+    const branch = outcome.workdir.bench?.branch;
+    setBranches((b) => ({ ...b, [agentId]: branch ?? '' }));
+    if (outcome.workdir.warning) {
+      setNotice({ text: `@${handleOf(agentId)}: ${outcome.workdir.warning}` });
+    }
+  };
+  const startAgent = (agentId: string) =>
+    act(async () => launched(agentId, await agentsApi.start(agentId)));
+  const restartAgent = (agentId: string) =>
+    act(async () => launched(agentId, await agentsApi.restart(agentId)));
+  const startTeam = () =>
+    act(async () => {
+      const lines = describeStartReport(await teamsApi.start(team.id), handleOf);
+      if (lines.length > 0) setNotice({ text: lines.join(' · ') });
+    });
+
   const selected = agents.find((a) => a.id === selectedId) ?? null;
 
   return (
@@ -94,7 +117,7 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
         <Button onClick={() => setCommandsOpen(true)}>
           <FileCode size={13} /> Comandos
         </Button>
-        <Button onClick={() => void act(() => teamsApi.start(team.id))}>
+        <Button onClick={() => void startTeam()}>
           <Play size={13} /> Iniciar equipe
         </Button>
         <Button variant="primary" onClick={() => setForm({ open: true })}>
@@ -118,7 +141,7 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
                   onClick={() => {
                     const agent = notice.restart;
                     setNotice(null);
-                    if (agent) void act(() => agentsApi.restart(agent.id));
+                    if (agent) void restartAgent(agent.id);
                   }}
                 >
                   <RotateCw size={12} /> Reiniciar agora
@@ -183,7 +206,7 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
                         size="sm"
                         onClick={() => {
                           setSelectedId(agent.id);
-                          void act(() => agentsApi.start(agent.id));
+                          void startAgent(agent.id);
                         }}
                       >
                         <Play size={12} />
@@ -220,8 +243,9 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
             <AgentPane
               agent={selected}
               state={stateOf(selected.id)}
-              onStart={() => void act(() => agentsApi.start(selected.id))}
-              onRestart={() => void act(() => agentsApi.restart(selected.id))}
+              branch={branches[selected.id]}
+              onStart={() => void startAgent(selected.id)}
+              onRestart={() => void restartAgent(selected.id)}
             />
           ) : (
             <EmptyState
@@ -296,11 +320,14 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
 function AgentPane({
   agent,
   state,
+  branch,
   onStart,
   onRestart,
 }: {
   agent: Agent;
   state: AgentState;
+  /** Branch da bancada, quando o agente está numa. */
+  branch?: string;
   onStart: () => void;
   onRestart: () => void;
 }) {
@@ -319,6 +346,14 @@ function AgentPane({
         <span className="text-label text-primary">@{agent.handle}</span>
         <span className="text-caption text-muted">— {agent.name}</span>
         <span className="ml-auto flex items-center gap-2">
+          {branch && (
+            <span
+              className="flex items-center gap-1 font-mono text-caption text-muted"
+              title="Bancada"
+            >
+              <GitBranch size={11} /> {branch}
+            </span>
+          )}
           <StatusDot state={state} withLabel />
           {running && (
             <IconButton label={`Reiniciar @${agent.handle}`} size="sm" onClick={onRestart}>

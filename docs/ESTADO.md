@@ -5,7 +5,7 @@
 > Se estiver desatualizado, o próximo agente se perde. Mantenha-o honesto.
 
 **Última atualização:** 2026-09-23
-**Fase atual:** `FASE 02 — Equipes e Agentes` (em andamento; 00 e 01 com pendências só visuais)
+**Fase atual:** `FASE 02 — Equipes e Agentes` (código completo, falta a demonstração na janela; 00 e 01 com pendências só visuais)
 **Branch de desenvolvimento:** `main` (o usuário pediu commits direto na main)
 
 ---
@@ -22,7 +22,7 @@ runtime e, depois, o supervisor que sobe os agentes.
 |---|---|---|
 | 00 — Fundação | 🟨 Em andamento | 6 feitas, 3 parciais de 9 |
 | 01 — Terminal Core | 🟨 Em andamento | 4 feitas, 4 parciais de 8 |
-| 02 — Equipes e Agentes | 🟨 Em andamento | 10 feitas de 11 |
+| 02 — Equipes e Agentes | 🟨 Código completo | 11 de 11 feitas — falta a demonstração na janela |
 | 03 — Sala da Equipe | ⬜ Não iniciada | 0/9 |
 | 04 — Sistema de Skills | ⬜ Não iniciada | 0/9 |
 | 05 — Barramento | ⬜ Não iniciada | 0/13 |
@@ -52,6 +52,7 @@ abertas e devem ser fechadas por quem tiver uma máquina com tela.
 | F02-08 Telas de equipe | ✅ T2 (cards), T3 (assistente com modelos), arquivar e excluir digitando o nome |
 | F02-09 Painel do agente | ✅ formulário T5 (react-hook-form + zod), CRUD de agente, visão da equipe com terminal real do agente |
 | F02-11 `aisense.toml` | ✅ parser com linha do erro, detecção que só propõe, botão "Comandos" com aceite que nunca sobrescreve |
+| F02-10 Bancadas | ✅ `git worktree` por agente com fallback para `shared`, cópia do `bench.copy`, `bench.setup`, remoção recusada com pendências |
 
 Verificado aqui: `pnpm lint` e `pnpm test` limpos (62 core + 49 pty + 22 store + 99 front),
 `cargo clippy -p aisense-app -- -D warnings` e `cargo build -p aisense-app` ok.
@@ -61,7 +62,9 @@ de runtimes funciona — conferido pelo usuário. Para isso foi preciso criar
 `crates/aisense-app/capabilities/default.json`: sem ele o Tauri 2 nega `listen`, e nenhum evento do
 core (nem `pty:data`) chegaria ao front. O resto da conferência visual das Fases 00/01 continua aberto.
 
-**Próximas:** F02-10 (bancadas: `git worktree` por agente), a última da Fase 02. Já dá para criar uma equipe, subir agentes e usar o terminal deles pela interface.
+**Próximas:** a demonstração da Fase 02 na janela (criar equipe, fechar, reabrir, subir agente) e
+então a **Fase 03 — Sala da Equipe**. Já dá para criar uma equipe, subir agentes, usar o
+terminal deles e isolá-los em bancadas pela interface.
 
 Duas decisões desta fase que valem lembrar:
 1. Os modelos serializam em **camelCase** para o front; o SQL segue snake_case e o store traduz.
@@ -203,3 +206,4 @@ Bugs encontrados pelos próprios testes, todos corrigidos na origem:
 | 2026-09-23 | Claude | F02-08: modelos de equipe, criação atômica, T2 e T3 no front; pnpm 10.33 (o do `packageManager`) para não reescrever o lockfile |
 | 2026-09-23 | Claude | F02-09: formulário do agente e visão da equipe com terminal; dependências novas no front: react-hook-form, zod, @hookform/resolvers (previstas na fase) |
 | 2026-09-23 | Claude | F02-11: `aisense.toml` (parser, validação, detecção que propõe) e o diálogo "Comandos" |
+| 2026-09-23 | Claude | F02-10: bancadas (git worktree por agente), integradas ao supervisor e às exclusões. Fase 02 com as 11 tarefas feitas |

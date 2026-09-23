@@ -56,10 +56,12 @@ describe('conversões', () => {
   });
 
   it('no custom, o comando vira o primeiro argumento e volta para o campo ao editar', () => {
-    const draft = draftFromForm(
-      { ...valid, adapterId: 'custom', command: 'htop', argsText: '-d\n10' },
-      'inherit',
-    );
+    const draft = draftFromForm({
+      ...valid,
+      adapterId: 'custom',
+      command: 'htop',
+      argsText: '-d\n10',
+    });
     expect(draft.args).toEqual(['htop', '-d', '10']);
     expect(draft.model).toBeUndefined();
 
@@ -76,6 +78,6 @@ describe('conversões', () => {
   });
 
   it('diretório vazio herda o da equipe', () => {
-    expect(draftFromForm(valid, 'inherit').workdir).toBeUndefined();
+    expect(draftFromForm(valid).workdir).toBeUndefined();
   });
 });

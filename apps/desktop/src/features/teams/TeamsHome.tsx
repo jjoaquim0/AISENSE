@@ -25,7 +25,7 @@ import { RuntimeList } from '@/features/runtimes/RuntimeList';
 import { isDesktop } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import type { TeamSummary } from '@/types/generated/TeamSummary';
-import { errorMessage, teamsApi } from './api';
+import { describeStartReport, errorMessage, teamsApi } from './api';
 import { CreateTeamWizard } from './CreateTeamWizard';
 import { DeleteTeamDialog } from './DeleteTeamDialog';
 import { useTeams } from './store';
@@ -145,14 +145,12 @@ function TeamCard({
 
   const start = () =>
     run(async () => {
-      const failures = await teamsApi.start(team.id);
-      if (failures.length > 0) {
-        const names = failures.map((f) => {
-          const agent = agents.find((a) => a.id === f.agentId);
-          return `@${agent?.handle ?? f.agentId}: ${errorMessage(f.error)}`;
-        });
-        setProblem(names.join('\n'));
-      }
+      const report = await teamsApi.start(team.id);
+      const lines = describeStartReport(
+        report,
+        (id) => agents.find((a) => a.id === id)?.handle ?? id,
+      );
+      if (lines.length > 0) setProblem(lines.join('\n'));
     });
 
   return (

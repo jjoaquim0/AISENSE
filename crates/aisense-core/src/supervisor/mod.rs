@@ -25,7 +25,9 @@ pub use token::{generate_token, TokenError};
 
 use crate::adapter::RuntimeRegistry;
 use crate::agent::{AgentState, RestartPolicy};
+use crate::bench::{prepare_workdir, remove_bench, BenchError, Workdir};
 use crate::ids::{AgentId, SessionId, TeamId};
+use crate::project::{load_project, ProjectLookup};
 use crate::repo::{AgentRepository, RepoError, SessionRecord, SessionRepository, TeamRepository};
 use crate::time::now_ms;
 
@@ -40,6 +42,32 @@ const SESSION_RECORD_WAIT: Duration = Duration::from_secs(5);
 pub struct AgentStateChanged {
     pub agent_id: AgentId,
     pub state: AgentState,
+}
+
+/// O que um start decidiu: onde o agente trabalha e alguma ressalva para a UI.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../apps/desktop/src/types/generated/")]
+pub struct StartOutcome {
+    pub workdir: Workdir,
+}
+
+/// Uma ressalva sobre um agente que subiu (sem git, setup que falhou...).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../apps/desktop/src/types/generated/")]
+pub struct AgentNotice {
+    pub agent_id: AgentId,
+    pub message: String,
+}
+
+/// Resultado de "▶ Iniciar equipe": quem não subiu e quem subiu com ressalva.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../apps/desktop/src/types/generated/")]
+pub struct TeamStartReport {
+    pub failures: Vec<AgentStartFailure>,
+    pub notices: Vec<AgentNotice>,
 }
 
 /// Um agente que não subiu ao iniciar a equipe inteira (T2, "▶ Iniciar equipe").
@@ -64,6 +92,8 @@ impl<T: TeamRepository + AgentRepository + SessionRepository + 'static> Supervis
 pub struct SupervisorConfig {
     /// `logs/<agent_id>.log` (`docs/02`, "Persistência e layout em disco").
     pub logs_dir: PathBuf,
+    /// `benches/` (`docs/16`): onde nascem os worktrees das bancadas.
+    pub benches_dir: PathBuf,
     pub launch: LaunchContext,
     /// Tamanho inicial do terminal; a UI redimensiona quando o painel abre.
     pub size: TerminalSize,
@@ -87,6 +117,8 @@ pub enum SupervisorError {
     Repo(#[from] RepoError),
     #[error(transparent)]
     Token(#[from] TokenError),
+    #[error(transparent)]
+    Bench(#[from] BenchError),
 }
 
 impl SupervisorError {
@@ -107,6 +139,7 @@ impl SupervisorError {
             Self::Pty(_) => "pty_failed",
             Self::Repo(e) => e.code(),
             Self::Token(_) => "token_failed",
+            Self::Bench(e) => e.code(),
         }
     }
 
@@ -128,6 +161,13 @@ impl SupervisorError {
             }
             Self::AlreadyRunning(_) => Some("Pare o agente antes de iniciá-lo de novo.".to_owned()),
             Self::Pty(e) => e.hint().map(str::to_owned),
+            Self::Bench(BenchError::Dirty { .. }) => Some(
+                "Commite ou descarte as mudanças na bancada do agente antes de continuar."
+                    .to_owned(),
+            ),
+            Self::Bench(BenchError::Occupied(_)) => {
+                Some("Mova ou apague essa pasta; ela não é uma bancada do AISENSE.".to_owned())
+            }
             _ => None,
         }
     }
@@ -222,7 +262,7 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
 
     /// Sobe o agente. Um reinício agendado pela política é cancelado: quem pede
     /// explicitamente manda.
-    pub async fn start(&self, agent_id: &AgentId) -> SupervisorResult<()> {
+    pub async fn start(&self, agent_id: &AgentId) -> SupervisorResult<StartOutcome> {
         if self.state(agent_id).is_running() {
             return Err(SupervisorError::AlreadyRunning(agent_id.clone()));
         }
@@ -241,6 +281,19 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
             .adapter(&agent.adapter_id)
             .ok_or_else(|| SupervisorError::UnknownAdapter(agent.adapter_id.clone()))?;
 
+        // Bancada: pode criar worktree, copiar arquivos e rodar o setup — tudo
+        // bloqueante, então fora das threads do runtime assíncrono.
+        let workdir = match self.prepare_workdir(&team, &agent).await {
+            Ok(workdir) => workdir,
+            Err(error) => {
+                self.set_state(agent_id, AgentState::Failed);
+                return Err(error);
+            }
+        };
+        if let Some(warning) = &workdir.warning {
+            tracing::warn!(agent = %agent_id, %warning, "diretório de trabalho com ressalva");
+        }
+
         let token = generate_token()?;
         let plan = build_launch(
             &agent,
@@ -248,6 +301,7 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
             &adapter,
             &LaunchIdentity { token: &token },
             &self.shared.config.launch,
+            std::path::Path::new(&workdir.path),
         );
         let plan = match plan {
             Ok(plan) => plan,
@@ -335,7 +389,50 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
         if became_idle {
             self.notify(agent_id, AgentState::Idle);
         }
+        Ok(StartOutcome { workdir })
+    }
+
+    async fn prepare_workdir(
+        &self,
+        team: &crate::team::Team,
+        agent: &crate::agent::Agent,
+    ) -> SupervisorResult<Workdir> {
+        let benches = self.shared.config.benches_dir.clone();
+        let (team, agent) = (team.clone(), agent.clone());
+        tokio::task::spawn_blocking(move || {
+            let project = match load_project(std::path::Path::new(&team.workdir)) {
+                ProjectLookup::Found { config, .. } => Some(config),
+                _ => None,
+            };
+            prepare_workdir(&team, &agent, &benches, project.as_ref())
+        })
+        .await
+        .map_err(|e| SupervisorError::Bench(BenchError::Io(e.to_string())))?
+        .map_err(SupervisorError::from)
+    }
+
+    /// Para o agente e remove a bancada dele, se houver. **Recusa** com mudanças não
+    /// commitadas na bancada — usado antes de excluir o agente (`docs/16`).
+    pub async fn retire(&self, agent_id: &AgentId) -> SupervisorResult<()> {
+        let store = &self.shared.store;
+        let agent = store
+            .get_agent(agent_id)
+            .await?
+            .ok_or_else(|| SupervisorError::AgentNotFound(agent_id.clone()))?;
+        let team = store
+            .get_team(&agent.team_id)
+            .await?
+            .ok_or_else(|| SupervisorError::TeamNotFound(agent.team_id.clone()))?;
+        self.stop(agent_id)?;
+        let benches = self.shared.config.benches_dir.clone();
+        tokio::task::spawn_blocking(move || remove_bench(&benches, &team, &agent))
+            .await
+            .map_err(|e| SupervisorError::Bench(BenchError::Io(e.to_string())))??;
         Ok(())
+    }
+
+    pub fn benches_dir(&self) -> &std::path::Path {
+        &self.shared.config.benches_dir
     }
 
     /// Para o agente e cancela qualquer reinício agendado. Parar quem já está parado
@@ -365,7 +462,7 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
     }
 
     /// Para, espera o processo sair e sobe de novo.
-    pub async fn restart(&self, agent_id: &AgentId) -> SupervisorResult<()> {
+    pub async fn restart(&self, agent_id: &AgentId) -> SupervisorResult<StartOutcome> {
         self.stop(agent_id)?;
         let deadline = Instant::now() + Duration::from_secs(10);
         while self.state(agent_id).is_running() && Instant::now() < deadline {

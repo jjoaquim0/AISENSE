@@ -6,6 +6,7 @@ import type { AgentId } from '@/types/generated/AgentId';
 import type { AgentState } from '@/types/generated/AgentState';
 import type { AgentStateChanged } from '@/types/generated/AgentStateChanged';
 import type { AgentUpdate } from '@/types/generated/AgentUpdate';
+import type { StartOutcome } from '@/types/generated/StartOutcome';
 import type { TeamId } from '@/types/generated/TeamId';
 
 /** Único ponto do front que chama os comandos de agente (docs/10). */
@@ -19,9 +20,10 @@ export const agentsApi = {
   remove: (agentId: AgentId): Promise<void> => invoke('agent_delete', { agentId }),
   suggestHandle: (name: string): Promise<string | null> => invoke('handle_suggest', { name }),
 
-  start: (agentId: AgentId): Promise<void> => invoke('agent_start', { agentId }),
+  /** Devolve onde o agente foi trabalhar e alguma ressalva (sem bancada, setup que falhou). */
+  start: (agentId: AgentId): Promise<StartOutcome> => invoke('agent_start', { agentId }),
   stop: (agentId: AgentId): Promise<void> => invoke('agent_stop', { agentId }),
-  restart: (agentId: AgentId): Promise<void> => invoke('agent_restart', { agentId }),
+  restart: (agentId: AgentId): Promise<StartOutcome> => invoke('agent_restart', { agentId }),
   state: (agentId: AgentId): Promise<AgentState> => invoke('agent_state', { agentId }),
 };
 

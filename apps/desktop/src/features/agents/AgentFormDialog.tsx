@@ -96,7 +96,7 @@ export function AgentFormDialog({
 
   const submit = handleSubmit(async (values) => {
     setError(null);
-    const draft = draftFromForm(values, agent?.workbench ?? 'inherit');
+    const draft = draftFromForm(values);
     try {
       if (agent) {
         const update = await agentsApi.update(agent.id, draft);
@@ -289,6 +289,17 @@ export function AgentFormDialog({
               ]}
               inputProps={register('autonomy')}
             />
+            <label className="flex items-center gap-2 text-body text-primary">
+              Bancada
+              <select
+                {...register('workbench')}
+                className="h-7 rounded-md border border-strong bg-surface px-2 text-label text-primary"
+              >
+                <option value="inherit">seguir a equipe</option>
+                <option value="own">própria (git worktree)</option>
+                <option value="shared">diretório compartilhado</option>
+              </select>
+            </label>
             <TextBlock
               id="agent-env"
               label="Variáveis de ambiente"

@@ -51,6 +51,11 @@ impl DataDir {
         self.0.join("logs")
     }
 
+    /// Worktrees das bancadas, fora dos repositórios (`docs/16`).
+    pub fn benches(&self) -> PathBuf {
+        self.0.join("benches")
+    }
+
     /// Endereço do barramento (`docs/02`): socket Unix em `run/`, named pipe no Windows.
     pub fn socket(&self) -> String {
         if cfg!(windows) {

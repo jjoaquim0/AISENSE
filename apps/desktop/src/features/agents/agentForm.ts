@@ -72,6 +72,7 @@ export function agentSchema(siblingHandles: string[]) {
       restartPolicy: z.enum(['never', 'on-crash', 'always']),
       deliveryMode: z.enum(['pull', 'push', 'hook']),
       autonomy: z.enum(['ask', 'trusted']),
+      workbench: z.enum(['inherit', 'own', 'shared']),
       envText: z.string().refine((t) => !parseEnv(t).error, {
         error: (issue) => parseEnv(String(issue.input)).error ?? 'Variáveis inválidas',
       }),
@@ -98,6 +99,7 @@ export const EMPTY_FORM: AgentFormValues = {
   restartPolicy: 'on-crash',
   deliveryMode: 'pull',
   autonomy: 'ask',
+  workbench: 'inherit',
   envText: '',
   argsText: '',
 };
@@ -119,6 +121,7 @@ export function formFromAgent(agent: Agent): AgentFormValues {
     restartPolicy: agent.restartPolicy,
     deliveryMode: agent.deliveryMode,
     autonomy: agent.autonomy,
+    workbench: agent.workbench,
     envText: Object.entries(agent.env)
       .map(([k, v]) => `${k}=${v ?? ''}`)
       .join('\n'),
@@ -127,7 +130,7 @@ export function formFromAgent(agent: Agent): AgentFormValues {
 }
 
 /** No `custom`, o comando vira o primeiro argumento (é assim que o supervisor o lê). */
-export function draftFromForm(values: AgentFormValues, workbench: Agent['workbench']): AgentDraft {
+export function draftFromForm(values: AgentFormValues): AgentDraft {
   const args = parseArgs(values.argsText);
   const custom = values.adapterId === CUSTOM_ADAPTER;
   return {
@@ -144,6 +147,6 @@ export function draftFromForm(values: AgentFormValues, workbench: Agent['workben
     restartPolicy: values.restartPolicy,
     deliveryMode: values.deliveryMode,
     autonomy: values.autonomy,
-    workbench,
+    workbench: values.workbench,
   };
 }

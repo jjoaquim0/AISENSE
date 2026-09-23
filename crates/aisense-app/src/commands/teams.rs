@@ -4,8 +4,9 @@ use std::sync::Arc;
 
 use aisense_core::adapter::RuntimeStatus;
 use aisense_core::agent::AgentDraft;
+use aisense_core::bench;
 use aisense_core::repo::{AgentRepository, RepoError, TeamFilter, TeamRepository};
-use aisense_core::supervisor::AgentStartFailure;
+use aisense_core::supervisor::{AgentNotice, AgentStartFailure, TeamStartReport};
 use aisense_core::team::{
     confirm_deletion, create_team_with_agents, AgentSummary, PlannedAgent, Team, TeamDraft,
     TeamSetupError, TeamSummary, TeamTemplate,
@@ -123,7 +124,8 @@ pub async fn team_set_archived(
 }
 
 /// Excluir apaga tudo o que é da equipe; o nome digitado é conferido aqui também,
-/// não só na interface.
+/// não só na interface. Bancadas com trabalho não commitado impedem a exclusão, com a
+/// lista de quem tem pendência (`docs/16`, "Ciclo de vida e limpeza").
 #[tauri::command]
 pub async fn team_delete(
     store: State<'_, Store>,
@@ -133,31 +135,71 @@ pub async fn team_delete(
 ) -> Result<(), CommandError> {
     let team = load_team(&store, &team_id).await?;
     confirm_deletion(&team, &confirm_name).map_err(setup_error)?;
-    stop_team(&store, &supervisor, &team_id).await?;
+    let agents = store.list_agents(&team_id).await.map_err(repo_error)?;
+
+    let benches = supervisor.benches_dir().to_path_buf();
+    let (t, list) = (team.clone(), agents.clone());
+    let pending = tauri::async_runtime::spawn_blocking(move || {
+        list.iter()
+            .filter_map(|agent| match bench::pending_changes(&benches, &t, agent) {
+                Ok(changes) if !changes.is_empty() => {
+                    Some(format!("@{} ({})", agent.handle.as_str(), changes.len()))
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    })
+    .await
+    .map_err(|e| CommandError::new("bench_io", e.to_string(), None))?;
+    if !pending.is_empty() {
+        return Err(CommandError::new(
+            "bench_dirty",
+            format!("benches with uncommitted changes: {}", pending.join(", ")),
+            Some(format!(
+                "Commite ou descarte as mudanças nas bancadas de {} antes de excluir a equipe.",
+                pending.join(", ")
+            )),
+        ));
+    }
+
+    for agent in &agents {
+        supervisor
+            .retire(&agent.id)
+            .await
+            .map_err(|e| e.to_command_error())?;
+    }
     store.delete_team(&team_id).await.map_err(repo_error)?;
     tracing::info!(team = %team_id, "equipe excluída");
     Ok(())
 }
 
 /// "▶ Iniciar equipe": sobe todos os agentes com `autostart` que estão parados.
-/// Devolve os que não subiram, cada um com o motivo.
+/// Devolve quem não subiu (com o motivo) e quem subiu com ressalva (sem bancada...).
 #[tauri::command]
 pub async fn team_start(
     store: State<'_, Store>,
     supervisor: State<'_, Supervisor>,
     team_id: TeamId,
-) -> Result<Vec<AgentStartFailure>, CommandError> {
-    let mut failures = Vec::new();
+) -> Result<TeamStartReport, CommandError> {
+    let mut report = TeamStartReport::default();
     for agent in store.list_agents(&team_id).await.map_err(repo_error)? {
         if !agent.autostart || supervisor.state(&agent.id).is_running() {
             continue;
         }
-        if let Err(error) = supervisor.start(&agent.id).await {
-            failures.push(AgentStartFailure {
+        match supervisor.start(&agent.id).await {
+            Ok(outcome) => {
+                if let Some(message) = outcome.workdir.warning {
+                    report.notices.push(AgentNotice {
+                        agent_id: agent.id.clone(),
+                        message,
+                    });
+                }
+            }
+            Err(error) => report.failures.push(AgentStartFailure {
                 agent_id: agent.id.clone(),
                 error: error.to_command_error(),
-            });
+            }),
         }
     }
-    Ok(failures)
+    Ok(report)
 }

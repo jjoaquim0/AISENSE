@@ -56,6 +56,8 @@ pub fn build_launch(
     adapter: &Adapter,
     identity: &LaunchIdentity<'_>,
     context: &LaunchContext,
+    // Já decidido pelas bancadas (`bench::prepare_workdir`): a do agente ou a da equipe.
+    cwd: &Path,
 ) -> Result<LaunchPlan, LaunchError> {
     let (command, mut args) = if adapter.command == AGENT_COMMAND_PLACEHOLDER {
         let (command, rest) = agent
@@ -81,13 +83,11 @@ pub fn build_launch(
         }
     })?;
 
-    let cwd = PathBuf::from(agent.workdir.as_deref().unwrap_or(&team.workdir));
-
     Ok(LaunchPlan {
         program,
         args,
-        env: environment(agent, team, adapter, identity, context, &cwd),
-        cwd,
+        env: environment(agent, team, adapter, identity, context, cwd),
+        cwd: cwd.to_path_buf(),
     })
 }
 
@@ -225,6 +225,7 @@ mod tests {
             adapter,
             &LaunchIdentity { token: "tok" },
             &context(),
+            Path::new(agent.workdir.as_deref().unwrap_or(&team.workdir)),
         )
     }
 
@@ -292,17 +293,22 @@ mod tests {
     }
 
     #[test]
-    fn workdir_falls_back_to_the_team() {
+    fn the_given_workdir_is_the_cwd_and_aisense_workdir() {
         let (agent, team, adapter) = fixture(&adapter_running(real_program()), draft());
-        let plan = launch(&agent, &team, &adapter).unwrap();
-        assert_eq!(plan.cwd, PathBuf::from(&team.workdir));
-
-        let mut d = draft();
-        d.workdir = Some("/srv/api".into());
-        let (agent, team, adapter) = fixture(&adapter_running(real_program()), d);
+        let bench = std::env::temp_dir().join("bancada");
+        let plan = build_launch(
+            &agent,
+            &team,
+            &adapter,
+            &LaunchIdentity { token: "tok" },
+            &context(),
+            &bench,
+        )
+        .unwrap();
+        assert_eq!(plan.cwd, bench);
         assert_eq!(
-            launch(&agent, &team, &adapter).unwrap().cwd,
-            PathBuf::from("/srv/api")
+            env_of(&plan, "AISENSE_WORKDIR"),
+            Some(bench.display().to_string())
         );
     }
 

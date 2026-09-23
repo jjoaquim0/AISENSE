@@ -81,6 +81,7 @@ fn harness() -> Harness {
         Arc::clone(&recorder) as Arc<dyn SupervisorObserver>,
         SupervisorConfig {
             logs_dir: logs.clone(),
+            benches_dir: logs.join("benches"),
             launch: LaunchContext {
                 socket: "test.sock".into(),
                 sidecar_dir: None,
@@ -287,4 +288,78 @@ async fn restart_brings_up_a_new_session() {
     h.supervisor.restart(&id).await.unwrap();
     assert_eq!(h.supervisor.state(&id), AgentState::Idle);
     assert_eq!(h.sessions(&id).await.len(), 2);
+}
+
+/// Repositório git com um commit, para os testes de bancada.
+fn git_repo() -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("aisense-sup-repo-{}", ulid::Ulid::new()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let git = |args: &[&str]| {
+        let ok = std::process::Command::new("git")
+            .arg("-C")
+            .arg(&dir)
+            .args([
+                "-c",
+                "user.name=AISENSE",
+                "-c",
+                "user.email=t@aisense.local",
+            ])
+            .args(args)
+            .output()
+            .unwrap()
+            .status
+            .success();
+        assert!(ok, "git {args:?}");
+    };
+    git(&["init", "-q", "-b", "main"]);
+    std::fs::write(dir.join("app.txt"), "v1\n").unwrap();
+    git(&["add", "app.txt"]);
+    git(&["commit", "-q", "-m", "inicial"]);
+    dir
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_per_agent_team_starts_each_agent_in_its_own_bench() {
+    let h = harness();
+    let repo = git_repo();
+    let team = Team::create(
+        &TeamDraft {
+            name: "Paralela".into(),
+            workdir: repo.display().to_string(),
+            workspace_mode: crate::agent::WorkspaceMode::PerAgent,
+            ..TeamDraft::default()
+        },
+        1,
+    )
+    .unwrap();
+    h.store.create_team(&team).await.unwrap();
+    let agent = Agent::create(
+        team.id.clone(),
+        &AgentDraft {
+            handle: "dev".into(),
+            name: "Dev".into(),
+            adapter_id: "custom".into(),
+            args: long_running(),
+            restart_policy: RestartPolicy::Never,
+            ..AgentDraft::default()
+        },
+        &[],
+        1,
+    )
+    .unwrap();
+    h.store.create_agent(&agent).await.unwrap();
+
+    let outcome = h.supervisor.start(&agent.id).await.unwrap();
+    let bench = outcome.workdir.bench.expect("deveria ter bancada própria");
+    assert_eq!(bench.branch, "aisense/dev");
+    assert!(std::path::Path::new(&bench.path).join("app.txt").exists());
+
+    // Trabalho pendente na bancada: excluir o agente é recusado com motivo claro.
+    std::fs::write(std::path::Path::new(&bench.path).join("app.txt"), "wip\n").unwrap();
+    let error = h.supervisor.retire(&agent.id).await.unwrap_err();
+    assert_eq!(error.code(), "bench_dirty");
+    assert!(error.hint().is_some());
+    assert!(std::path::Path::new(&bench.path).exists());
+
+    let _ = std::fs::remove_dir_all(&repo);
 }

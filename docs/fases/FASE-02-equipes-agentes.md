@@ -122,7 +122,7 @@ exige reinício. Depende de F02-05, F02-03.
 > editar, excluir) e o terminal real do agente selecionado — o degrau até a Sala da Equipe (F03).
 > Skills do agente e o preview do `BOOT.md` entram com a Fase 04.
 
-### [ ] F02-10 — Bancadas (`git worktree` por agente)
+### [x] F02-10 — Bancadas (`git worktree` por agente)
 Modos `shared` e `per-agent` por equipe, com exceção por agente. Criação, reutilização e validação
 do worktree; fallback para `shared` com aviso quando o diretório não é git ou o Git é antigo.
 Cópia dos arquivos ignorados declarados em `aisense.toml` e execução do `bench.setup`.
@@ -130,6 +130,23 @@ Remoção sempre por `git worktree remove`, recusando quando há mudanças não 
 Ver [16 — Bancadas](../16-bancadas.md).
 **Aceite:** dois agentes de uma equipe `per-agent` editam o mesmo arquivo sem se atropelar; excluir
 um agente com trabalho pendente é recusado com mensagem clara. Depende de F02-06.
+> Feito: `aisense-core/src/bench/` (`git.rs` usa o binário do usuário, sem prompt; `mod.rs`
+> decide e prepara o diretório). Modo efetivo = exceção do agente (`own`/`shared`) sobre o da
+> equipe. Bancada em `<dados>/benches/<team_id>/<handle>`, branch `aisense/<handle>` a partir da
+> branch atual (reaproveita branch e worktree existentes; recusa pasta estranha no lugar).
+> Na criação: submódulos, cópia do `bench.copy` e `bench.setup` (até 10 min; falha vira
+> ressalva, não impede o start). Sem git, git < 2.5 ou diretório que não é repositório: cai para
+> `shared` com aviso. Remoção só por `git worktree remove`, e **recusada** com mudanças não
+> commitadas — o branch com o trabalho fica. O aceite são testes com repositórios git reais
+> (dois agentes, mesmo arquivo, checkout da equipe intacto; exclusão recusada).
+> Supervisor: `start` prepara o diretório fora do runtime assíncrono e devolve `StartOutcome`
+> (onde foi trabalhar + ressalva); `retire` para e remove a bancada. App: `agent_delete` usa
+> `retire`; `team_delete` lista as bancadas com pendência e recusa; `team_start` devolve
+> falhas e ressalvas. Front: modo no passo 1 do assistente, "Bancada" no Avançado do agente,
+> branch no cabeçalho do terminal e ressalvas na visão da equipe.
+> Ficaram de fora, documentado: `base_branch` configurável por equipe (hoje é a branch atual),
+> a tabela `workbenches` (o caminho é determinístico, então não foi preciso gravar), "Limpar
+> bancadas" na UI e os comandos `aisense bench …`, que dependem do barramento (Fase 05).
 
 ### [x] F02-11 — `aisense.toml` (comandos do projeto)
 Parser, validação e detecção automática que **propõe** um arquivo (nunca cria sozinho) a partir de
@@ -149,13 +166,16 @@ UI com o conteúdo gerado para revisão.
 > editável. O `aisense run` em si é da Fase 05 (barramento) e a lista no `BOOT.md`, da Fase 04.
 
 ## Critérios de saída
-- [ ] CRUD completo de equipes e agentes, persistido
-- [ ] Runtimes detectados e adaptadores carregando de disco
-- [ ] Agente sobe com o comando e o ambiente corretos
-- [ ] Política de reinício funcionando
-- [ ] Modelos de equipe criando squads prontos
-- [ ] Bancadas isolando agentes em `per-agent`, com fallback seguro quando não há git
-- [ ] `aisense.toml` lido e proposto automaticamente
+
+Todos cumpridos em código e testes (2026-09-23). Falta a **demonstração** do topo desta página
+feita na janela por uma pessoa: criar a "Squad Produto", fechar, reabrir e subir um agente.
+- [x] CRUD completo de equipes e agentes, persistido
+- [x] Runtimes detectados e adaptadores carregando de disco
+- [x] Agente sobe com o comando e o ambiente corretos
+- [x] Política de reinício funcionando
+- [x] Modelos de equipe criando squads prontos
+- [x] Bancadas isolando agentes em `per-agent`, com fallback seguro quando não há git
+- [x] `aisense.toml` lido e proposto automaticamente
 
 ## Riscos
 | Risco | Mitigação |

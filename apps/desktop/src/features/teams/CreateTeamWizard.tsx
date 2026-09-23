@@ -220,6 +220,37 @@ function IdentityStep({
         </Button>
       </div>
       <fieldset className="flex flex-col gap-1">
+        <legend className="text-label text-secondary">Onde os agentes trabalham</legend>
+        {(
+          [
+            [
+              'shared',
+              'Diretório compartilhado',
+              'Todos no mesmo checkout. Simples; bom para um agente escrevendo por vez.',
+            ],
+            [
+              'per-agent',
+              'Bancada por agente',
+              'Cada agente num git worktree com branch próprio, para trabalharem em paralelo sem se atropelar.',
+            ],
+          ] as const
+        ).map(([mode, title, hint]) => (
+          <label key={mode} className="flex cursor-pointer items-start gap-2 py-0.5">
+            <input
+              type="radio"
+              name="workspace-mode"
+              checked={draft.workspaceMode === mode}
+              onChange={() => onChange({ ...draft, workspaceMode: mode })}
+              className="mt-1"
+            />
+            <span className="flex flex-col">
+              <span className="text-body text-primary">{title}</span>
+              <span className="text-caption text-muted">{hint}</span>
+            </span>
+          </label>
+        ))}
+      </fieldset>
+      <fieldset className="flex flex-col gap-1">
         <legend className="text-label text-secondary">Cor</legend>
         <div className="flex gap-1.5 pt-1">
           {COLORS.map((color) => (

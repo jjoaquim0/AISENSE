@@ -5,6 +5,7 @@
 pub mod adapter;
 pub mod agent;
 mod app_info;
+pub mod bench;
 mod color;
 mod command_error;
 mod ids;
