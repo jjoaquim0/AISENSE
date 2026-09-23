@@ -6,14 +6,16 @@ use aisense_core::adapter::RuntimeStatus;
 use aisense_core::agent::AgentDraft;
 use aisense_core::bench;
 use aisense_core::repo::{AgentRepository, RepoError, TeamFilter, TeamRepository};
-use aisense_core::supervisor::{AgentNotice, AgentStartFailure, TeamStartReport};
+use aisense_core::supervisor::{
+    SupervisorError, TeamProgress, TeamStartReport, TEAM_START_STAGGER,
+};
 use aisense_core::team::{
     confirm_deletion, create_team_with_agents, AgentSummary, PlannedAgent, Team, TeamDraft,
     TeamSetupError, TeamSummary, TeamTemplate,
 };
 use aisense_core::{now_ms, CommandError, TeamId};
 use aisense_store::Store;
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
 
 use super::agents::Supervisor;
 use super::runtimes::Registry;
@@ -34,19 +36,17 @@ async fn load_team(store: &Store, team_id: &TeamId) -> Result<Team, CommandError
         .ok_or_else(|| repo_error(RepoError::TeamNotFound(team_id.clone())))
 }
 
-/// Para todos os agentes da equipe. Usado antes de arquivar e de excluir: um processo
-/// vivo de uma equipe que sumiu da tela ficaria órfão.
-async fn stop_team(
-    store: &Store,
-    supervisor: &Supervisor,
-    team_id: &TeamId,
-) -> Result<(), CommandError> {
-    for agent in store.list_agents(team_id).await.map_err(repo_error)? {
-        if let Err(error) = supervisor.stop(&agent.id) {
-            tracing::warn!(agent = %agent.id, %error, "agente não parou");
-        }
-    }
-    Ok(())
+/// Para todos os agentes da equipe e espera saírem. Usado antes de arquivar e de
+/// excluir: um processo vivo de uma equipe que sumiu da tela ficaria órfão.
+async fn stop_team(supervisor: &Supervisor, team_id: &TeamId) -> Result<(), CommandError> {
+    supervisor
+        .stop_team(team_id, &|_| {})
+        .await
+        .map_err(|e| e.to_command_error())
+}
+
+fn command_error(error: SupervisorError) -> CommandError {
+    error.to_command_error()
 }
 
 #[tauri::command]
@@ -127,7 +127,7 @@ pub async fn team_set_archived(
     archived: bool,
 ) -> Result<(), CommandError> {
     if archived {
-        stop_team(&store, &supervisor, &team_id).await?;
+        stop_team(&supervisor, &team_id).await?;
     }
     store
         .set_team_archived(&team_id, archived.then(now_ms))
@@ -187,31 +187,52 @@ pub async fn team_delete(
 
 /// "▶ Iniciar equipe": sobe todos os agentes com `autostart` que estão parados.
 /// Devolve quem não subiu (com o motivo) e quem subiu com ressalva (sem bancada...).
+pub const TEAM_PROGRESS: &str = "team:progress";
+
+/// Emite o avanço de uma operação da equipe para a interface (`team:progress`).
+fn emitter(app: &AppHandle) -> impl Fn(TeamProgress) + Send + Sync + '_ {
+    move |progress| {
+        if let Err(error) = app.emit(TEAM_PROGRESS, progress) {
+            tracing::warn!(%error, "falha ao emitir o progresso da equipe");
+        }
+    }
+}
+
+/// ▶ Iniciar equipe: os `autostart`, na ordem, com 300 ms entre um e outro (F03-06).
 #[tauri::command]
 pub async fn team_start(
-    store: State<'_, Store>,
+    app: AppHandle,
     supervisor: State<'_, Supervisor>,
     team_id: TeamId,
 ) -> Result<TeamStartReport, CommandError> {
-    let mut report = TeamStartReport::default();
-    for agent in store.list_agents(&team_id).await.map_err(repo_error)? {
-        if !agent.autostart || supervisor.state(&agent.id).is_running() {
-            continue;
-        }
-        match supervisor.start(&agent.id).await {
-            Ok(outcome) => {
-                if let Some(message) = outcome.workdir.warning {
-                    report.notices.push(AgentNotice {
-                        agent_id: agent.id.clone(),
-                        message,
-                    });
-                }
-            }
-            Err(error) => report.failures.push(AgentStartFailure {
-                agent_id: agent.id.clone(),
-                error: error.to_command_error(),
-            }),
-        }
-    }
-    Ok(report)
+    supervisor
+        .start_team(&team_id, TEAM_START_STAGGER, &emitter(&app))
+        .await
+        .map_err(command_error)
+}
+
+/// ⏸ Parar tudo.
+#[tauri::command]
+pub async fn team_stop(
+    app: AppHandle,
+    supervisor: State<'_, Supervisor>,
+    team_id: TeamId,
+) -> Result<(), CommandError> {
+    supervisor
+        .stop_team(&team_id, &emitter(&app))
+        .await
+        .map_err(command_error)
+}
+
+/// ⟳ Reiniciar tudo: quem estava rodando volta, escalonado.
+#[tauri::command]
+pub async fn team_restart(
+    app: AppHandle,
+    supervisor: State<'_, Supervisor>,
+    team_id: TeamId,
+) -> Result<TeamStartReport, CommandError> {
+    supervisor
+        .restart_team(&team_id, TEAM_START_STAGGER, &emitter(&app))
+        .await
+        .map_err(command_error)
 }

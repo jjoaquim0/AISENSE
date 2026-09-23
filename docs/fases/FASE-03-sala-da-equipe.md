@@ -89,10 +89,18 @@ Depende de F03-03, F03-04, F01-07.
 > instante do `show` pode aparecer duas vezes — janela de milissegundos, a mesma que o painel
 > já tinha ao montar. Eliminá-la pede numerar a saída; fica anotado se aparecer na prática.
 
-### [ ] F03-06 — Controles da equipe
+### [x] F03-06 — Controles da equipe
 ▶ Iniciar equipe (sobe os `autostart` em ordem, com escalonamento de 300 ms entre spawns),
 ⏸ Parar tudo, ⟳ Reiniciar tudo, com confirmação e feedback de progresso.
 **Aceite:** iniciar uma equipe de 6 agentes não congela a UI em momento algum. Depende de F02-06.
+> Feito: `aisense-core/src/supervisor/team.rs` (`start_team`, `stop_team`, `restart_team`, evento
+> `team:progress`) e `features/team-room/components/TeamControls.tsx`. ▶ sobe os `autostart` na
+> ordem da equipe com 300 ms entre spawns; ⏸ para todos e espera saírem; ⟳ reinicia quem estava
+> de pé (sem ninguém de pé, é o mesmo que ▶). ⏸ e ⟳ pedem confirmação só quando há agente
+> rodando. Barra de progresso "Iniciando 3/6 · @backend" alimentada pelos eventos — a interface
+> nunca espera um spawn. Arquivar e excluir a equipe agora esperam os processos saírem.
+> Aceite como teste: 6 agentes num runtime de **uma thread só**, com uma tarefa-relógio ao lado;
+> a equipe sobe em ordem, com o intervalo, e o relógio continua batendo durante todo o start.
 
 ### [ ] F03-07 — Sidebar de agentes
 Lista com estado ao vivo, badge de mensagens pendentes (preparado para a Fase 5), reordenação por

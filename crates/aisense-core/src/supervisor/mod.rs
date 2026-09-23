@@ -6,6 +6,7 @@
 
 mod backoff;
 mod launch;
+mod team;
 mod token;
 
 use std::collections::HashMap;
@@ -21,6 +22,7 @@ use ts_rs::TS;
 
 pub use backoff::{Backoff, FIRST_DELAY, MAX_DELAY, STABLE_AFTER};
 pub use launch::{build_launch, LaunchContext, LaunchError, LaunchIdentity, LaunchPlan};
+pub use team::{ProgressFn, TeamOp, TeamProgress, TEAM_START_STAGGER};
 pub use token::{generate_token, TokenError};
 
 use crate::adapter::RuntimeRegistry;

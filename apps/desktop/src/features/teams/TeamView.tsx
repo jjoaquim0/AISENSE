@@ -19,6 +19,7 @@ import { AgentPane } from '@/features/team-room/components/AgentPane';
 import { FocusView } from '@/features/team-room/components/FocusView';
 import { type DragHandle, GridView } from '@/features/team-room/components/GridView';
 import { PresetPicker } from '@/features/team-room/components/PresetPicker';
+import { TeamControls } from '@/features/team-room/components/TeamControls';
 import { ViewPicker } from '@/features/team-room/components/ViewPicker';
 import { useTeamLayout } from '@/features/team-room/hooks/useTeamLayout';
 import type { PaneAction } from '@/features/team-room/paneMenu';
@@ -28,7 +29,7 @@ import type { AgentState } from '@/types/generated/AgentState';
 import type { StartOutcome } from '@/types/generated/StartOutcome';
 import type { StateConfidence } from '@/types/generated/StateConfidence';
 import type { TeamSummary } from '@/types/generated/TeamSummary';
-import { describeStartReport, errorMessage, teamsApi } from './api';
+import { describeStartReport, errorMessage } from './api';
 import { useTeams } from './store';
 
 const RUNNING: AgentState[] = ['starting', 'idle', 'busy', 'awaiting_input'];
@@ -104,11 +105,6 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
     act(async () => launched(agentId, await agentsApi.start(agentId)));
   const restartAgent = (agentId: string) =>
     act(async () => launched(agentId, await agentsApi.restart(agentId)));
-  const startTeam = () =>
-    act(async () => {
-      const lines = describeStartReport(await teamsApi.start(team.id), handleOf);
-      if (lines.length > 0) setNotice({ text: lines.join(' · ') });
-    });
 
   // "Limpar" do menu: um contador por agente que o terminal observa.
   const [clears, setClears] = useState<Record<string, number>>({});
@@ -177,9 +173,17 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
         <Button onClick={() => setCommandsOpen(true)}>
           <FileCode size={13} /> Comandos
         </Button>
-        <Button onClick={() => void startTeam()}>
-          <Play size={13} /> Iniciar equipe
-        </Button>
+        <TeamControls
+          teamId={team.id}
+          running={agents.filter((a) => RUNNING.includes(stateOf(a.id))).length}
+          handleOf={handleOf}
+          onReport={(report) => {
+            const lines = describeStartReport(report, handleOf);
+            if (lines.length > 0) setNotice({ text: lines.join(' · ') });
+            void load();
+          }}
+          onError={setProblem}
+        />
         <Button variant="primary" onClick={() => setForm({ open: true })}>
           <Plus size={14} /> Novo agente
         </Button>
