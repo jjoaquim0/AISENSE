@@ -63,6 +63,16 @@ settings_file = ".claude/settings.json"   # usado para instalar o hook de inbox
 CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = "1"
 ```
 
+### Regras de validação
+
+- Campo desconhecido é **erro**, não é ignorado: `idle_regx` aponta a linha em vez de desligar o
+  detector em silêncio.
+- `id` segue `^[a-z][a-z0-9-]*$` (até 64); `name` e `command` obrigatórios.
+- Os três regex de `[state]` precisam compilar; `quiet_ms` entre 50 e 10 000.
+- `[env]` recusa chaves `AISENSE_*`, pelo mesmo motivo do agente (invariante I7 em `docs/04`).
+- `command = "$SHELL"` significa "o shell padrão do sistema" e é resolvido pelo supervisor.
+- Dois arquivos do usuário com o mesmo `id`: vale o primeiro em ordem alfabética; o outro vira aviso.
+
 ## Adaptadores embutidos no v1
 
 | `id` | Runtime | MCP | Flag de system prompt | Notas |

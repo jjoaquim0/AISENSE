@@ -1,0 +1,18 @@
+# Shell puro: o humano chama a IA que quiser. `aisense` já está no PATH (docs/05).
+id          = "shell"
+name        = "Shell"
+description = "Terminal comum, sem integração de IA"
+icon        = "terminal"
+
+# `$SHELL` é resolvido pelo supervisor para o shell padrão do sistema
+# (no Windows, o PowerShell).
+command = "$SHELL"
+args    = []
+
+[state]
+idle_regex = '(?m)[$#%>]\s*$'
+quiet_ms   = 400
+
+[inject]
+mode   = "stdin"
+submit = "\r"

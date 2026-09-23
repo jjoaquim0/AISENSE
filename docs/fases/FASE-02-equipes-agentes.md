@@ -36,10 +36,16 @@ Depende de F02-02.
 > contra o SQLite e o `InMemoryStore` do core, para os dois nunca divergirem. Dado inválido no banco
 > (enum desconhecido, handle reservado editado à mão) vira `RepoError::Corrupt`, nunca entidade.
 
-### [ ] F02-04 — Carregador de adaptadores
+### [x] F02-04 — Carregador de adaptadores
 Parse dos TOMLs (embutidos + `~/.aisense/adapters/`), precedência do usuário, validação de schema,
 hot-reload com `notify`.
 **Aceite:** TOML inválido não derruba o app — é reportado com o caminho e a linha do erro.
+> Feito: `aisense-core/src/adapter/`. `AdapterCatalog` sempre carrega: arquivo ruim vira
+> `AdapterProblem` (`caminho:linha:coluna: mensagem`) e os outros seguem. `deny_unknown_fields`
+> em todo o formato — erro de digitação num campo vira aviso, não campo ignorado. Regex de estado
+> são compilados na carga. Embutidos vêm de `adapters/*.toml` na raiz via `include_str!`; por ora
+> só `shell` (os demais são F02-07). `AdapterWatcher` recarrega com debounce de 200 ms.
+> A ligação com o app (estado Tauri + evento para a UI) fica para F02-05, que é quem expõe a lista.
 
 ### [ ] F02-05 — Detecção de runtimes instalados
 Executar o `detect` de cada adaptador (com timeout de 3 s, em paralelo), cachear o resultado,

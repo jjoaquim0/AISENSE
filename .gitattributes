@@ -1,0 +1,6 @@
+# LF em todo lugar: ts-rs, rustfmt e biome escrevem LF, e o CI compara os tipos
+# gerados com `git diff`. Sem isto, um checkout no Windows vira CRLF e tudo aparece modificado.
+* text=auto eol=lf
+*.ico binary
+*.icns binary
+*.png binary
