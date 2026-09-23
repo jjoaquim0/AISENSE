@@ -169,6 +169,7 @@ Bugs encontrados pelos próprios testes, todos corrigidos na origem:
 | Detecção de "agente ocioso" por heurística de prompt falhar em algum runtime | Alto — injeção de mensagem no meio de uma resposta | Fila de entrega + modo pull como padrão; regex por adaptador; ver [ADR 0006](adr/0006-entrega-de-mensagens.md) | — |
 | WebKitGTK no Linux renderizar diferente do WebView2/WKWebView | Médio | CI com screenshot nos 3 SOs desde a Fase 0; evitar CSS de ponta | — |
 | CLIs de terceiros (claude/codex/opencode) mudarem flags | Médio | Adaptadores em TOML, editáveis pelo usuário sem recompilar | — |
+| Testes de `aisense-pty` falham e travam no Windows (escrita no PTY dá `ERROR_INVALID_HANDLE`; helpers de teste supõem shell POSIX). O CI só roda testes no Linux | Alto — o PTY é o coração do app e o Windows é plataforma alvo | Corrigir e incluir os testes do PTY no job Windows do CI. Até lá, rode `--exclude aisense-pty` no Windows | — |
 | Performance com 9+ terminais simultâneos | Médio | Ring buffer no Rust, render só do visível, coalescência a 60fps | — |
 
 ## Log de sessões
