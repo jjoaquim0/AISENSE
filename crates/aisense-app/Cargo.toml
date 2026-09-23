@@ -22,6 +22,8 @@ base64.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tauri = { version = "2", features = [] }
+# Seletor nativo de pasta para o diretório da equipe (docs/09, T3 passo 1).
+tauri-plugin-dialog = "2"
 thiserror.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true

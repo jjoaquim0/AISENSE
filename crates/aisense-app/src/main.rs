@@ -35,6 +35,7 @@ fn main() {
     let setup_manager = std::sync::Arc::clone(&manager);
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .setup(move |app| {
             let data = aisense_core::DataDir::resolve()
                 .ok_or("could not find the user's home directory; set AISENSE_HOME")?;
@@ -71,6 +72,12 @@ fn main() {
             commands::agents::agent_stop,
             commands::agents::agent_restart,
             commands::agents::agent_state,
+            commands::teams::teams_list,
+            commands::teams::team_template_plan,
+            commands::teams::team_create,
+            commands::teams::team_set_archived,
+            commands::teams::team_delete,
+            commands::teams::team_start,
         ])
         .on_window_event(move |window, event| {
             // Fechar a janela precisa matar os processos dos agentes; senão eles

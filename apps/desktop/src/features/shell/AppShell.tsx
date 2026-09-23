@@ -2,6 +2,7 @@ import { Moon, PanelRight, Plus, Sun } from 'lucide-react';
 import { type ReactNode, useMemo } from 'react';
 import { IconButton, ScrollArea, StatusDot, Tooltip } from '@/components/ui';
 import { formatShortcut } from '@/components/ui/Kbd';
+import { useTeams } from '@/features/teams/store';
 import { isDark, useTheme } from '@/lib/theme';
 import { useShortcuts } from '@/lib/useShortcuts';
 import { ResizeHandle } from './ResizeHandle';
@@ -106,6 +107,7 @@ function TitleBar({
 }
 
 function TeamRail() {
+  const openWizard = useTeams((s) => s.setWizardOpen);
   return (
     <nav
       aria-label="Equipes"
@@ -115,6 +117,7 @@ function TeamRail() {
         <button
           type="button"
           aria-label="Nova equipe"
+          onClick={() => openWizard(true)}
           className="flex size-8 items-center justify-center rounded-lg border border-dashed border-strong text-muted transition-colors duration-100 hover:border-accent hover:text-accent"
         >
           <Plus size={16} />

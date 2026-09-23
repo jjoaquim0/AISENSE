@@ -14,8 +14,10 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError, Weak};
 use std::time::{Duration, Instant};
 
 use aisense_pty::{OutputSink, PtyError, PtyManager, PtySpawn, TerminalSize};
+use serde::{Deserialize, Serialize};
 use tokio::sync::watch;
 use tokio_util::sync::CancellationToken;
+use ts_rs::TS;
 
 pub use backoff::{Backoff, FIRST_DELAY, MAX_DELAY, STABLE_AFTER};
 pub use launch::{build_launch, LaunchContext, LaunchError, LaunchIdentity, LaunchPlan};
@@ -32,12 +34,21 @@ use crate::time::now_ms;
 const SESSION_RECORD_WAIT: Duration = Duration::from_secs(5);
 
 /// Payload do evento `agent:state` que o app emite a cada mudança.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "../../../apps/desktop/src/types/generated/")]
 pub struct AgentStateChanged {
     pub agent_id: AgentId,
     pub state: AgentState,
+}
+
+/// Um agente que não subiu ao iniciar a equipe inteira (T2, "▶ Iniciar equipe").
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../apps/desktop/src/types/generated/")]
+pub struct AgentStartFailure {
+    pub agent_id: AgentId,
+    pub error: crate::CommandError,
 }
 
 /// Quem precisa saber das mudanças de estado (o app emite `agent:state`).
@@ -79,6 +90,11 @@ pub enum SupervisorError {
 }
 
 impl SupervisorError {
+    /// Forma que a interface recebe.
+    pub fn to_command_error(&self) -> crate::CommandError {
+        crate::CommandError::new(self.code(), self.to_string(), self.hint())
+    }
+
     pub fn code(&self) -> &'static str {
         match self {
             Self::AgentNotFound(_) => "agent_not_found",

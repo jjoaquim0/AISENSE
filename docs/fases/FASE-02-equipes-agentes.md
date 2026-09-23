@@ -90,10 +90,20 @@ Depende de F02-04.
 > **dentro de um PTY** é exercitado pelo supervisor (F02-06). Os regex de estado são iniciais; a
 > calibração é da Fase 03.
 
-### [ ] F02-08 — Telas de equipe
+### [x] F02-08 — Telas de equipe
 T2 (lista de equipes), T3 (assistente de criação com modelos de equipe), arquivar e excluir com
 confirmação que exige digitar o nome.
 **Aceite:** criar equipe pelo modelo "Dupla Dev" gera os 2 agentes configurados. Depende de F02-03.
+> Feito. Core: `team/templates.rs` (5 modelos; cada agente tem runtimes em ordem de preferência e
+> cai para o próximo instalado) e `team/setup.rs` (`create_team_with_agents` valida tudo antes de
+> gravar e desfaz a equipe se um agente falhar; `confirm_deletion`). O aceite é teste do core.
+> App: `teams_list`, `team_template_plan`, `team_create`, `team_set_archived`, `team_delete`
+> (confere o nome de novo no core), `team_start`. Arquivar e excluir param os agentes antes.
+> Front: `features/teams/` — T2 com cards (cor, missão, pontos de estado, contagem, diretório,
+> última atividade, ▶ Iniciar equipe, menu arquivar/excluir), T3 em 3 passos com seletor nativo de
+> pasta (`tauri-plugin-dialog`) e troca de runtime por agente no passo 3. Agentes de modelo nascem
+> com `autostart`. Ícone da equipe e o badge de "tarefas" do card ficam para quando houver
+> seletor de ícone e o Kanban (Fase 06).
 
 ### [ ] F02-09 — Painel de agente (T5)
 Formulário completo de criação/edição com `react-hook-form` + `zod`, geração de handle a partir do

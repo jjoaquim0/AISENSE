@@ -1,6 +1,7 @@
 import * as RadixDialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { cn } from '@/lib/cn';
 import { IconButton } from './IconButton';
 
 interface DialogProps {
@@ -11,14 +12,30 @@ interface DialogProps {
   description: string;
   children?: ReactNode;
   footer?: ReactNode;
+  /** `lg` para assistentes e listas; o padrão serve a confirmações. */
+  size?: 'md' | 'lg';
 }
 
-export function Dialog({ open, onOpenChange, title, description, children, footer }: DialogProps) {
+export function Dialog({
+  open,
+  onOpenChange,
+  title,
+  description,
+  children,
+  footer,
+  size = 'md',
+}: DialogProps) {
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
       <RadixDialog.Portal>
         <RadixDialog.Overlay className="fixed inset-0 z-40 bg-black/40" />
-        <RadixDialog.Content className="fixed top-1/2 left-1/2 z-50 w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-subtle bg-raised p-4 shadow-lg">
+        <RadixDialog.Content
+          className={cn(
+            'fixed top-1/2 left-1/2 z-50 max-h-[calc(100vh-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto',
+            'rounded-xl border border-subtle bg-raised p-4 shadow-lg',
+            size === 'lg' ? 'w-[min(42rem,calc(100vw-2rem))]' : 'w-[min(28rem,calc(100vw-2rem))]',
+          )}
+        >
           <div className="mb-3 flex items-start justify-between gap-4">
             <div>
               <RadixDialog.Title className="text-heading text-primary">{title}</RadixDialog.Title>

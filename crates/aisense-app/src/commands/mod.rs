@@ -8,6 +8,7 @@
 pub mod agents;
 pub mod pty;
 pub mod runtimes;
+pub mod teams;
 
 use aisense_core::{AppInfo, CommandError};
 use aisense_pty::PtyError;

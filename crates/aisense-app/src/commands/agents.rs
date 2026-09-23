@@ -65,7 +65,7 @@ pub fn setup(
 }
 
 fn command_error(error: SupervisorError) -> CommandError {
-    CommandError::new(error.code(), error.to_string(), error.hint())
+    error.to_command_error()
 }
 
 #[tauri::command]
