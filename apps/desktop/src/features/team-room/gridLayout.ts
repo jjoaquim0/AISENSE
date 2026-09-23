@@ -146,3 +146,27 @@ export function setFreeRect(layout: GridLayout, id: string, rect: FreeRect): Gri
   const top = Math.max(0, ...Object.values(layout.free).map((r) => r.z ?? 0));
   return { ...layout, free: { ...layout.free, [id]: clampRect({ ...rect, z: top + 1 }) } };
 }
+
+const FIXED_PRESETS = ['1', '2', '3', '4', '6', '9'] as const;
+
+/**
+ * `⌘W` — fechar o painel (docs/08): sai da grade, **o agente continua rodando**. O
+ * painel vai para "Fora da grade" e o preset encolhe para o menor que ainda mostra os
+ * outros visíveis. Último painel na tela, ou modo livre (onde todos aparecem), não fecha.
+ */
+export function closePane(layout: GridLayout, id: string): GridLayout {
+  if (layout.preset === 'free') return layout;
+  const visible = visibleIds(layout);
+  if (!visible.includes(id) || visible.length <= 1) return layout;
+  const order = [...layout.order.filter((x) => x !== id), id];
+  const remaining = visible.length - 1;
+  const preset = FIXED_PRESETS.find((p) => Number(p) >= remaining) ?? '9';
+  return { ...layout, preset, order };
+}
+
+/** `⌘\` — dividir: o próximo preset maior, que abre lugar para mais um painel. */
+export function splitLayout(layout: GridLayout): GridLayout {
+  if (layout.preset === 'free') return layout;
+  const next = FIXED_PRESETS[FIXED_PRESETS.indexOf(layout.preset) + 1];
+  return next ? { ...layout, preset: next } : layout;
+}

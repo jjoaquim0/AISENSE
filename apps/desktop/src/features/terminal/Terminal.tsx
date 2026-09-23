@@ -10,6 +10,7 @@ import { onPtyData, onPtyExit } from '@/lib/events';
 import { useTheme } from '@/lib/theme';
 import { terminalApi } from './api';
 import { decodeChunk } from './decode';
+import { registerTerminalFocus } from './focus';
 import { HydrationGate } from './hydration';
 import { TerminalSearch } from './TerminalSearch';
 import { readTerminalTheme } from './theme';
@@ -28,6 +29,8 @@ interface TerminalProps {
   onExit?: (code: number) => void;
   /** Cada mudança limpa a tela e o histórico retido no core ("Limpar" do painel). */
   clearSignal?: number;
+  /** Nome acessível, ex.: "Terminal de @backend". */
+  label?: string;
   className?: string;
 }
 
@@ -36,6 +39,7 @@ export function Terminal({
   visible = true,
   onExit,
   clearSignal,
+  label = 'Terminal',
   className,
 }: TerminalProps) {
   const host = useRef<HTMLDivElement>(null);
@@ -95,6 +99,7 @@ export function Terminal({
     }
 
     term.current = xterm;
+    const unregisterFocus = registerTerminalFocus(agentId, () => xterm.focus());
     fit.current = fitAddon;
     search.current = searchAddon;
 
@@ -118,6 +123,7 @@ export function Terminal({
     });
 
     return () => {
+      unregisterFocus();
       stopData();
       stopExit();
       typed.dispose();
@@ -196,7 +202,12 @@ export function Terminal({
       {searchOpen && search.current && (
         <TerminalSearch addon={search.current} onClose={() => setSearchOpen(false)} />
       )}
-      <div ref={host} className="size-full" />
+      <div
+        ref={host}
+        role="application"
+        aria-label={`${label}. Esc duas vezes volta para a interface.`}
+        className="size-full"
+      />
     </div>
   );
 }

@@ -60,12 +60,17 @@ export function AgentPane({
   const hasSession = running || state === 'failed';
 
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: foco do painel por clique; o teclado usa ⌘1..9 (F03-08)
-    <div
+    <section
+      data-agent-pane={agent.id}
       data-focused={focused || undefined}
+      // Alvo do `Esc Esc` e do ⌘N com o agente parado: focável por código, fora do Tab.
+      tabIndex={-1}
+      aria-label={`Painel de @${agent.handle}`}
       onMouseDown={onFocus}
+      onFocus={onFocus}
       className={cn(
         'flex min-h-0 flex-col overflow-hidden rounded-lg border border-l-[3px] bg-surface',
+        'outline-none focus-visible:ring-2 focus-visible:ring-ring',
         focused ? 'border-ring' : 'border-subtle',
         className,
       )}
@@ -116,6 +121,7 @@ export function AgentPane({
           key={agent.id}
           agentId={agent.id}
           clearSignal={clearSignal}
+          label={`Terminal de @${agent.handle}`}
           className="min-h-0 flex-1"
         />
       ) : (
@@ -130,7 +136,7 @@ export function AgentPane({
           }
         />
       )}
-    </div>
+    </section>
   );
 }
 

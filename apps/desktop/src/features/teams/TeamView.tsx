@@ -1,5 +1,5 @@
 import { ArrowLeft, FileCode, Folder, Plus, RotateCw, SquareTerminal } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, Dialog, EmptyState, IconButton } from '@/components/ui';
 import { AgentFormDialog } from '@/features/agents/AgentFormDialog';
 import { agentsApi } from '@/features/agents/api';
@@ -17,7 +17,10 @@ import { ViewPicker } from '@/features/team-room/components/ViewPicker';
 import { useLiveStates } from '@/features/team-room/hooks/useLiveStates';
 import { useTeamLayout } from '@/features/team-room/hooks/useTeamLayout';
 import type { PaneAction } from '@/features/team-room/paneMenu';
+import { roomShortcuts } from '@/features/team-room/shortcuts';
 import { isRunning } from '@/features/team-room/sidebar';
+import { focusAgentPane } from '@/features/terminal/focus';
+import { useShortcuts } from '@/lib/useShortcuts';
 import type { Agent } from '@/types/generated/Agent';
 import type { StartOutcome } from '@/types/generated/StartOutcome';
 import type { TeamSummary } from '@/types/generated/TeamSummary';
@@ -145,6 +148,23 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
   };
 
   const selected = agents.find((a) => a.id === selectedId) ?? null;
+
+  // F03-08: ⌘1..9, ⌘G, ⌘T, ⌘W, ⌘\ — a regra de cada um mora em `roomShortcuts`.
+  const shortcuts = useMemo(
+    () =>
+      roomShortcuts({
+        grid,
+        view,
+        selectedId,
+        setGrid,
+        setView,
+        select: setSelectedId,
+        focusPane: focusAgentPane,
+        newAgent: () => setForm({ open: true }),
+      }),
+    [grid, view, selectedId, setGrid, setView],
+  );
+  useShortcuts(shortcuts);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
