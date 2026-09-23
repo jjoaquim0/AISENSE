@@ -6,6 +6,7 @@
 //! ├── .gitignore                  gerado uma vez: ignora tudo menos notes/
 //! ├── agents/<handle>/
 //! │   ├── agent.json              identidade do agente
+//! │   ├── BOOT.md                 instruções de início (F04-05)
 //! │   └── skills/<nome>/SKILL.md  skills resolvidas (com os arquivos de apoio)
 //! └── native-skills.json          quem é dono de cada pasta em `skills.dir` do runtime
 //! ```
@@ -28,6 +29,7 @@ use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 
+use super::boot::{compose_boot, BOOT_FILE};
 use super::catalog::SKILL_FILE;
 use super::model::{Skill, SkillSource};
 use crate::adapter::Adapter;
@@ -61,7 +63,7 @@ fn io_err(path: &Path) -> impl FnOnce(io::Error) -> MaterializeError + '_ {
     }
 }
 
-/// O que foi escrito, para o compositor do `BOOT.md` (F04-05) e para a UI.
+/// O que foi escrito, para a injeção no boot (F04-06) e para a UI.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Materialized {
     /// `<workdir>/.aisense/agents/<handle>/`.
@@ -113,6 +115,8 @@ pub struct MaterializeRequest<'a> {
     pub workdir: &'a Path,
     pub agent: &'a Agent,
     pub team: &'a Team,
+    /// All agents of the team, including this agent, for the colleague table.
+    pub colleagues: &'a [Agent],
     pub adapter: &'a Adapter,
     /// Já resolvidas (F04-03), na ordem de injeção.
     pub skills: &'a [Skill],
@@ -176,6 +180,14 @@ pub fn materialize(req: &MaterializeRequest<'_>) -> Result<Materialized, Materia
     fs::write(&card_path, json + "\n").map_err(io_err(&card_path))?;
 
     let mut warnings = Vec::new();
+    let boot = compose_boot(req.agent, req.team, req.colleagues, req.workdir, req.skills);
+    let boot_path = agent_dir.join(BOOT_FILE);
+    fs::write(&boot_path, &boot.markdown).map_err(io_err(&boot_path))?;
+    if boot.truncated {
+        warnings.push(format!(
+            "o BOOT.md de @{handle} foi resumido para caber no limite de 12.000 caracteres"
+        ));
+    }
     if let Some(target) = &req.adapter.skills {
         sync_native(req, &root, &target.dir, handle, &old_handles, &mut warnings)?;
     }
@@ -392,6 +404,7 @@ mod tests {
             workdir: f.dir.path(),
             agent,
             team: &f.team,
+            colleagues: std::slice::from_ref(agent),
             adapter: &f.claude,
             skills,
             now: 42,
@@ -431,6 +444,7 @@ mod tests {
             files(&f.dir.path().join(".aisense")),
             [
                 ".gitignore",
+                "agents/revisor/BOOT.md",
                 "agents/revisor/agent.json",
                 "agents/revisor/skills/beta/SKILL.md",
                 "agents/revisor/skills/gama/SKILL.md",
@@ -540,7 +554,7 @@ mod tests {
         run(&f, &revisor, &[]);
         assert_eq!(
             files(&f.dir.path().join(".aisense/agents")),
-            ["critico/agent.json"]
+            ["critico/BOOT.md", "critico/agent.json"]
         );
         // O dono antigo da skill nativa era o mesmo agente: ela sai também.
         assert!(!f.dir.path().join(".claude/skills/alfa").exists());

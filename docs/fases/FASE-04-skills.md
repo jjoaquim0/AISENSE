@@ -90,11 +90,21 @@ Depende de F04-03.
 > nativa é uma só — um agente claude enxerga lá as skills dos outros agentes claude da equipe
 > (o `BOOT.md` de cada um, F04-05, só cita as dele). Com bancada própria (docs/16), fica isolado.
 
-### [ ] F04-05 — Compositor do `BOOT.md`
+### [x] F04-05 — Compositor do `BOOT.md`
 Template com identidade, equipe, missão, papel, tabela de colegas, a skill `trabalho-em-equipe` e as
 skills atribuídas. Truncagem inteligente acima de 12.000 caracteres.
 **Aceite:** snapshot com `insta` do `BOOT.md` de um agente de exemplo; truncagem testada.
 Depende de F04-04.
+> Feito: `skill/boot.rs` compõe o documento de cada agente com identidade, missão,
+> papel, colegas em ordem da equipe e a skill `trabalho-em-equipe` (texto canônico em
+> `skills/trabalho-em-equipe/SKILL.md`). Skills `bootstrap` entram com o corpo; as de
+> referência/MCP aparecem com descrição e caminho. Ao ultrapassar 12.000 caracteres,
+> limita campos longos, resume cada skill pela descrição e primeira seção e aponta
+> para o arquivo completo; se necessário, omite entradas finais com aviso. O supervisor
+> passa os colegas à materialização em todo start, que escreve o `BOOT.md` e devolve
+> uma ressalva se o conteúdo foi resumido. Testes: snapshot com `insta`, limite e
+> integração no start. A F04-06 fará a injeção; a F04-07 registrará a skill embutida
+> na biblioteca para materialização automática.
 
 ### [ ] F04-06 — Injeção no boot
 Escolher o melhor caminho conforme as capacidades do adaptador: `system_prompt_flag` → MCP →

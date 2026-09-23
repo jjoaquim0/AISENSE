@@ -3,6 +3,7 @@
 //! Formato compatível com as skills do Claude Code (ADR 0005): um diretório com um
 //! `SKILL.md` — frontmatter YAML + Markdown.
 
+mod boot;
 mod catalog;
 mod editor;
 mod library;
@@ -12,6 +13,7 @@ mod parse;
 mod resolve;
 mod watch;
 
+pub use boot::{compose_boot, BootDocument, BOOT_FILE, BOOT_MAX_CHARS};
 pub use catalog::{BuiltinSkill, SkillCatalog, BUILTIN_SKILLS, SKILL_FILE};
 pub use editor::{
     check_skill, delete_skill, duplicate_source, export_skill, import_skill, open_skill,

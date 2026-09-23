@@ -392,6 +392,11 @@ async fn start_reports_the_skills_it_took_and_the_ones_it_ignored() {
         .join(".aisense/agents")
         .join(agent.handle.as_str());
     assert!(dir.join("agent.json").exists());
+    let boot = std::fs::read_to_string(dir.join("BOOT.md")).unwrap();
+    assert!(boot.contains("# Você é @backend — Squad"));
+    assert!(boot.contains("## Como falar com a equipe"));
+    assert!(boot.contains("### geral (v1.0.0)"));
+    assert!(!boot.contains("### so-claude"));
     assert!(dir.join("skills/geral/SKILL.md").exists());
     assert!(!dir.join("skills/so-claude").exists());
     assert!(outcome.notes.is_empty(), "{:?}", outcome.notes);

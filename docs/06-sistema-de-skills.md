@@ -87,7 +87,8 @@ Tentar reinjetar no meio de uma conversa confunde a IA e torna o comportamento i
 ## Anatomia do `BOOT.md` gerado
 
 Este é o arquivo que faz o agente "nascer sabendo". Gerado do template
-`crates/aisense-core/templates/boot.md.hbs`:
+`crates/aisense-core/src/skill/boot.rs` (o texto canônico de comunicação fica em
+`skills/trabalho-em-equipe/SKILL.md`):
 
 ```markdown
 # Você é @backend — Squad Produto
@@ -117,10 +118,13 @@ Este é o arquivo que faz o agente "nascer sabendo". Gerado do template
 <conteúdo do SKILL.md>
 ```
 
-Limite de tamanho: se o `BOOT.md` passar de **12.000 caracteres**, o compositor inclui apenas
-`name` + `description` + a primeira seção de cada skill e adiciona
+Limite de tamanho: se o `BOOT.md` passar de **12.000 caracteres**, o compositor limita
+campos de identidade longos e a tabela de colegas, inclui `name` + `description` + a
+primeira seção de cada skill `bootstrap` e adiciona
 "o conteúdo completo está em `.aisense/agents/<handle>/skills/<name>/SKILL.md`, leia sob demanda".
-Isso evita estourar a janela de contexto logo no boot.
+Se ainda não couber, omite skills do fim da lista com aviso e aponta para a pasta
+materializada. Skills `reference` e `mcp` aparecem com descrição e caminho, sem o corpo.
+Isso evita estourar a janela de contexto logo no boot. O limite usa caracteres Unicode.
 
 ## A skill embutida `trabalho-em-equipe`
 

@@ -324,6 +324,7 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
             .get_team(&agent.team_id)
             .await?
             .ok_or_else(|| SupervisorError::TeamNotFound(agent.team_id.clone()))?;
+        let colleagues = store.list_agents(&team.id).await?;
         let adapter = self
             .shared
             .runtimes
@@ -356,10 +357,17 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
             tracing::warn!(agent = %agent_id, %warning, "diretório de trabalho com ressalva");
         }
 
-        // Materializa as skills e a identidade no diretório de trabalho (F04-04). Sem
-        // isso o agente sobe sem as skills, mas sobe: vira ressalva, não erro.
+        // Materializa skills, identidade e BOOT.md no diretório de trabalho
+        // (F04-04/05). Falha de disco vira ressalva, não impede o start.
         let notes = self
-            .materialize(&team, &agent, &adapter, &workdir, &skills.active)
+            .materialize(
+                &team,
+                &agent,
+                &colleagues,
+                &adapter,
+                &workdir,
+                &skills.active,
+            )
             .await;
 
         let token = generate_token()?;
@@ -478,11 +486,17 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
         &self,
         team: &crate::team::Team,
         agent: &crate::agent::Agent,
+        colleagues: &[crate::agent::Agent],
         adapter: &crate::adapter::Adapter,
         workdir: &Workdir,
         skills: &[crate::skill::Skill],
     ) -> Vec<String> {
-        let (team, agent, adapter) = (team.clone(), agent.clone(), adapter.clone());
+        let (team, agent, colleagues, adapter) = (
+            team.clone(),
+            agent.clone(),
+            colleagues.to_vec(),
+            adapter.clone(),
+        );
         let (path, skills) = (PathBuf::from(&workdir.path), skills.to_vec());
         let agent_id = agent.id.clone();
         let done = tokio::task::spawn_blocking(move || {
@@ -490,6 +504,7 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
                 workdir: &path,
                 agent: &agent,
                 team: &team,
+                colleagues: &colleagues,
                 adapter: &adapter,
                 skills: &skills,
                 now: now_ms(),
@@ -499,14 +514,14 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
         match done {
             Ok(Ok(done)) => done.warnings,
             Ok(Err(error)) => {
-                tracing::warn!(agent = %agent_id, %error, "skills não materializadas");
+                tracing::warn!(agent = %agent_id, %error, "boot não materializado");
                 vec![format!(
-                    "as skills não foram copiadas para o diretório de trabalho: {error}"
+                    "o boot do agente não foi preparado completamente: {error}"
                 )]
             }
             Err(error) => {
                 tracing::warn!(agent = %agent_id, %error, "materialização interrompida");
-                vec!["as skills não foram copiadas para o diretório de trabalho".into()]
+                vec!["o boot do agente não foi preparado completamente".into()]
             }
         }
     }
