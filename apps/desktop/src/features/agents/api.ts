@@ -7,8 +7,11 @@ import type { AgentPreview } from '@/types/generated/AgentPreview';
 import type { AgentState } from '@/types/generated/AgentState';
 import type { AgentStateChanged } from '@/types/generated/AgentStateChanged';
 import type { AgentUpdate } from '@/types/generated/AgentUpdate';
+import type { SessionId } from '@/types/generated/SessionId';
+import type { SessionSummary } from '@/types/generated/SessionSummary';
 import type { StartOutcome } from '@/types/generated/StartOutcome';
 import type { TeamId } from '@/types/generated/TeamId';
+import type { Transcript } from '@/types/generated/Transcript';
 
 /** Único ponto do front que chama os comandos de agente (docs/10). */
 export const agentsApi = {
@@ -34,6 +37,15 @@ export const agentsApi = {
   stop: (agentId: AgentId): Promise<void> => invoke('agent_stop', { agentId }),
   restart: (agentId: AgentId): Promise<StartOutcome> => invoke('agent_restart', { agentId }),
   state: (agentId: AgentId): Promise<AgentState> => invoke('agent_state', { agentId }),
+
+  /** Sessões do agente, mais recente primeiro (aba Logs do inspetor). */
+  sessions: (agentId: AgentId): Promise<SessionSummary[]> => invoke('agent_sessions', { agentId }),
+  /** O final da transcrição de uma sessão, já em texto. */
+  transcript: (agentId: AgentId, sessionId: SessionId): Promise<Transcript> =>
+    invoke('session_transcript', { agentId, sessionId }),
+  /** Grava a transcrição inteira em `path`; devolve os bytes escritos. */
+  exportTranscript: (agentId: AgentId, sessionId: SessionId, path: string): Promise<number> =>
+    invoke('session_export', { agentId, sessionId, path }),
 };
 
 /** Toda mudança de estado de qualquer agente (inclusive reinícios da política). */

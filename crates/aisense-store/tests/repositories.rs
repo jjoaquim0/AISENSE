@@ -231,6 +231,7 @@ fn session(agent: &Agent, started_at: i64) -> SessionRecord {
         ended_at: None,
         exit_code: None,
         log_path: "/tmp/agente.log".into(),
+        log_offset: u64::try_from(started_at * 100).ok(),
     }
 }
 
@@ -251,6 +252,11 @@ async fn sessions_record_start_and_end(repo: impl Repo) {
     assert_eq!(listed[1].ended_at, Some(15));
     assert_eq!(listed[1].exit_code, Some(3));
     assert_eq!(listed[1].pid, Some(4242));
+    assert_eq!(
+        listed[1].log_offset,
+        Some(1000),
+        "onde a sessão começa no log"
+    );
 
     // Sessão podada ou inexistente: fim silencioso, não erro.
     repo.end_session(&SessionId::new(), 1, None).await.unwrap();

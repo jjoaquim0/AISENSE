@@ -154,7 +154,8 @@ CREATE TABLE sessions (
   started_at INTEGER NOT NULL,
   ended_at   INTEGER,
   exit_code  INTEGER,
-  log_path   TEXT NOT NULL
+  log_path   TEXT NOT NULL,
+  log_offset INTEGER         -- bytes do log no início da sessão (0003); a sessão vai até a seguinte
 );
 CREATE INDEX idx_sessions_agent ON sessions(agent_id, started_at DESC);
 

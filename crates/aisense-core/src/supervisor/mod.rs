@@ -348,6 +348,8 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
             .config
             .logs_dir
             .join(format!("{}.log", agent.id.as_str()));
+        // A sessão nova começa onde o log está agora: a anterior já saiu e drenou (F03-09).
+        let log_offset = std::fs::metadata(&log_path).map(|m| m.len()).unwrap_or(0);
         let (recorded_tx, recorded_rx) = watch::channel(false);
         // Criado antes do spawn, como o receptor principal do PTY: a saída do boot
         // fica no canal até a tarefa do detector começar a ler.
@@ -419,6 +421,7 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
             ended_at: None,
             exit_code: None,
             log_path: log_path.display().to_string(),
+            log_offset: Some(log_offset),
         };
         if let Err(error) = store.start_session(&record).await {
             // O agente já está de pé; perder o histórico não é motivo para derrubá-lo.

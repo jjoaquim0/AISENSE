@@ -12,6 +12,7 @@ use crate::Store;
 
 fn from_row(row: &SqliteRow) -> RepoResult<SessionRecord> {
     let pid: Option<i64> = row.try_get("pid").map_err(backend)?;
+    let offset: Option<i64> = row.try_get("log_offset").map_err(backend)?;
     Ok(SessionRecord {
         id: SessionId::from_raw(row.try_get::<String, _>("id").map_err(backend)?),
         agent_id: AgentId::from_raw(row.try_get::<String, _>("agent_id").map_err(backend)?),
@@ -20,6 +21,7 @@ fn from_row(row: &SqliteRow) -> RepoResult<SessionRecord> {
         ended_at: row.try_get("ended_at").map_err(backend)?,
         exit_code: row.try_get("exit_code").map_err(backend)?,
         log_path: row.try_get("log_path").map_err(backend)?,
+        log_offset: offset.and_then(|o| u64::try_from(o).ok()),
     })
 }
 
@@ -27,8 +29,9 @@ impl SessionRepository for Store {
     async fn start_session(&self, session: &SessionRecord) -> RepoResult<()> {
         let mut tx = self.pool().begin().await.map_err(backend)?;
         sqlx::query(
-            "INSERT INTO sessions (id, agent_id, pid, started_at, ended_at, exit_code, log_path) \
-             VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO sessions \
+             (id, agent_id, pid, started_at, ended_at, exit_code, log_path, log_offset) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(session.id.as_str())
         .bind(session.agent_id.as_str())
@@ -37,6 +40,7 @@ impl SessionRepository for Store {
         .bind(session.ended_at)
         .bind(session.exit_code)
         .bind(&session.log_path)
+        .bind(session.log_offset.and_then(|o| i64::try_from(o).ok()))
         .execute(&mut *tx)
         .await
         .map_err(|err| {
@@ -86,7 +90,8 @@ impl SessionRepository for Store {
         limit: usize,
     ) -> RepoResult<Vec<SessionRecord>> {
         let rows = sqlx::query(
-            "SELECT id, agent_id, pid, started_at, ended_at, exit_code, log_path FROM sessions \
+            "SELECT id, agent_id, pid, started_at, ended_at, exit_code, log_path, log_offset \
+             FROM sessions \
              WHERE agent_id = ? ORDER BY started_at DESC, id DESC LIMIT ?",
         )
         .bind(agent_id.as_str())

@@ -222,8 +222,9 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(count, 1);
+        let latest = MIGRATOR.iter().map(|m| m.version).max().unwrap();
         assert!(
-            !backup_path(&path, 2).exists(),
+            !backup_path(&path, latest).exists(),
             "an up-to-date database is not backed up"
         );
     }
@@ -251,7 +252,9 @@ mod tests {
         }
 
         let store = Store::open(&path).await.unwrap();
-        assert_eq!(store.applied_versions().await.unwrap(), [1, 2]);
+        // Todas as migrações, não um número fixo: cada migração nova não quebra este teste.
+        let all: Vec<i64> = MIGRATOR.iter().map(|m| m.version).collect();
+        assert_eq!(store.applied_versions().await.unwrap(), all);
         assert!(backup_path(&path, 1).exists(), "backup of v1 must exist");
     }
 }
