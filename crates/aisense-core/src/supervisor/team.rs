@@ -142,7 +142,13 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
             match self.start(&agent.id).await {
                 Ok(outcome) => {
                     let skill_notes = outcome.skills.ignored.into_iter().map(|s| s.message);
-                    for message in outcome.workdir.warning.into_iter().chain(skill_notes) {
+                    let notes = outcome
+                        .workdir
+                        .warning
+                        .into_iter()
+                        .chain(skill_notes)
+                        .chain(outcome.notes);
+                    for message in notes {
                         report.notices.push(AgentNotice {
                             agent_id: agent.id.clone(),
                             message,

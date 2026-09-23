@@ -66,12 +66,29 @@ no boot. Depende de F04-02.
 > agente e devolve a ignorada) e no front (a aba mostra a frase). As skills resolvidas ainda não
 > chegam ao processo — isso é a materialização (F04-04) e a injeção (F04-06).
 
-### [ ] F04-04 — Materialização
+### [x] F04-04 — Materialização
 Copiar as skills resolvidas para `<workdir>/.aisense/skills/` e, quando o adaptador declarar
 `skills.dir`, também para lá (ex.: `.claude/skills/`). Limpar resíduos de skills removidas.
 Escrever `.aisense/agent.json`.
 **Aceite:** iniciar o agente duas vezes com skills diferentes não deixa arquivo órfão.
 Depende de F04-03.
+> Feito: `aisense-core/src/skill/materialize.rs`, chamado pelo supervisor em todo start, fora
+> das threads assíncronas. **Mudança de layout (docs 02, 05 e 06 atualizados):** uma pasta por
+> agente, `.aisense/agents/<handle>/{agent.json, skills/}` — no modo compartilhado (o padrão)
+> vários agentes usam o mesmo diretório e um `agent.json` na raiz seria sobrescrito a cada start.
+> As skills do agente são reescritas do zero a cada boot (a do usuário com os arquivos de apoio,
+> sem links simbólicos nem `.git`; o `SKILL.md` é o texto já validado). `agent.json` traz
+> identidade, equipe, missão e as skills em ordem — **sem o token** (R3). Handle renomeado: a
+> pasta antiga do mesmo agente sai. Pasta nativa do runtime (`skills.dir`, ex. `.claude/skills/`):
+> copia para lá **sem nunca sobrescrever** o que o AISENSE não criou (vira ressalva); o manifesto
+> `.aisense/native-skills.json` guarda os donos de cada pasta, e ela só sai quando o último agente
+> deixa de usá-la; `skills.dir` que aponte para fora do diretório é recusado. `.gitignore` em
+> `.aisense/` escrito uma vez, ignorando tudo menos `notes/`. Falha de disco não impede o start:
+> volta como ressalva em `StartOutcome.notes`, mostrada na UI e no relatório do ▶. Aceite como
+> teste: dois inícios com skills diferentes deixam exatamente os arquivos da segunda lista, em
+> `.aisense/` e em `.claude/skills/`. **Limite conhecido:** num diretório compartilhado, a pasta
+> nativa é uma só — um agente claude enxerga lá as skills dos outros agentes claude da equipe
+> (o `BOOT.md` de cada um, F04-05, só cita as dele). Com bancada própria (docs/16), fica isolado.
 
 ### [ ] F04-05 — Compositor do `BOOT.md`
 Template com identidade, equipe, missão, papel, tabela de colegas, a skill `trabalho-em-equipe` e as
@@ -81,7 +98,7 @@ Depende de F04-04.
 
 ### [ ] F04-06 — Injeção no boot
 Escolher o melhor caminho conforme as capacidades do adaptador: `system_prompt_flag` → MCP →
-stdin (fallback "leia .aisense/BOOT.md e siga"). Registrar qual caminho foi usado.
+stdin (fallback "leia .aisense/agents/<handle>/BOOT.md e siga"). Registrar qual caminho foi usado.
 **Aceite:** os 3 caminhos testados; o de stdin espera o primeiro `idle` antes de digitar.
 Depende de F04-05, F03-01.
 

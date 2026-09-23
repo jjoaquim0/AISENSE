@@ -121,6 +121,13 @@ fn harness() -> Harness {
 }
 
 impl Harness {
+    /// Diretório de trabalho da equipe, um por teste: o start escreve `.aisense/` nele.
+    fn workdir(&self) -> String {
+        let dir = self.logs.join("work");
+        std::fs::create_dir_all(&dir).unwrap();
+        dir.display().to_string()
+    }
+
     async fn agent(&self, args: Vec<String>, policy: RestartPolicy) -> AgentId {
         self.agent_with("custom", args, policy).await
     }
@@ -129,7 +136,7 @@ impl Harness {
         let team = Team::create(
             &TeamDraft {
                 name: "Squad".into(),
-                workdir: std::env::temp_dir().display().to_string(),
+                workdir: self.workdir(),
                 ..TeamDraft::default()
             },
             1,
@@ -377,6 +384,17 @@ async fn start_reports_the_skills_it_took_and_the_ones_it_ignored() {
         IgnoreReason::Incompatible { .. }
     ));
     assert!(h.supervisor.state(&id).is_running());
+
+    // Materializou no diretório da equipe: identidade e só a skill que entrou (F04-04).
+    let agent = h.store.get_agent(&id).await.unwrap().unwrap();
+    let team = h.store.get_team(&agent.team_id).await.unwrap().unwrap();
+    let dir = PathBuf::from(&team.workdir)
+        .join(".aisense/agents")
+        .join(agent.handle.as_str());
+    assert!(dir.join("agent.json").exists());
+    assert!(dir.join("skills/geral/SKILL.md").exists());
+    assert!(!dir.join("skills/so-claude").exists());
+    assert!(outcome.notes.is_empty(), "{:?}", outcome.notes);
 }
 
 /// Repositório git com um commit, para os testes de bancada.
@@ -506,7 +524,7 @@ impl Harness {
         let team = Team::create(
             &TeamDraft {
                 name: "Squad".into(),
-                workdir: std::env::temp_dir().display().to_string(),
+                workdir: self.workdir(),
                 ..TeamDraft::default()
             },
             1,

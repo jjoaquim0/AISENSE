@@ -67,13 +67,13 @@ Consulte `references/checklist.md` quando o diff tocar em concorrência ou I/O.
         ▼
  Boot do agente
    1. resolve   → lê SKILL.md, valida frontmatter, checa targets vs adapter
-   2. materializa → copia para <workdir>/.aisense/skills/<name>/
+   2. materializa → copia para <workdir>/.aisense/agents/<handle>/skills/<name>/
                     e, se o adaptador tiver skills.dir, também para lá (ex.: .claude/skills/)
-   3. compõe    → gera <workdir>/.aisense/BOOT.md
+   3. compõe    → gera <workdir>/.aisense/agents/<handle>/BOOT.md
    4. injeta    → pelo melhor caminho que o adaptador suportar:
                   a) system_prompt_flag  (preferido: não polui o histórico)
                   b) MCP                 (skill exposta como recurso/ferramenta)
-                  c) stdin               (fallback universal: "leia .aisense/BOOT.md e siga")
+                  c) stdin               (fallback universal: "leia .aisense/agents/<handle>/BOOT.md e siga")
         ▼
  Agente rodando com as skills ativas
         │  usuário edita a skill na biblioteca
@@ -119,7 +119,7 @@ Este é o arquivo que faz o agente "nascer sabendo". Gerado do template
 
 Limite de tamanho: se o `BOOT.md` passar de **12.000 caracteres**, o compositor inclui apenas
 `name` + `description` + a primeira seção de cada skill e adiciona
-"o conteúdo completo está em `.aisense/skills/<name>/SKILL.md`, leia sob demanda".
+"o conteúdo completo está em `.aisense/agents/<handle>/skills/<name>/SKILL.md`, leia sob demanda".
 Isso evita estourar a janela de contexto logo no boot.
 
 ## A skill embutida `trabalho-em-equipe`

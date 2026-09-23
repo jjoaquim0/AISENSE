@@ -61,13 +61,15 @@ pub fn parse_skill(source: &str, path: &str, origin: SkillSource) -> Result<Skil
     })?;
     let root = docs.into_iter().next().unwrap_or(Yaml::Null);
 
-    validate(&root, front.body, origin).map_err(|bad| {
+    let mut skill = validate(&root, front.body, origin).map_err(|bad| {
         let line = bad
             .key
             .and_then(|key| find_yaml_key_line(front.yaml, key))
             .map(|l| front.first_line + l - 1);
         problem(line, bad.message)
-    })
+    })?;
+    source.clone_into(&mut skill.raw);
+    Ok(skill)
 }
 
 struct Frontmatter<'a> {
@@ -241,6 +243,7 @@ fn validate(root: &Yaml, body: &str, source: SkillSource) -> Result<Skill, Inval
         env,
         body,
         source,
+        raw: String::new(),
     })
 }
 

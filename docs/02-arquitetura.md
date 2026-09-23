@@ -57,8 +57,8 @@ UI: "Iniciar @backend"
      └─ core::AgentSupervisor::start(agent)
          1. resolve o adaptador (adapters/codex.toml)
          2. resolve as skills atribuídas          → docs/06
-         3. materializa skills em <cwd>/.aisense/skills/ (+ .claude/skills/ se aplicável)
-         4. gera .aisense/BOOT.md e .aisense/agent.json
+         3. materializa skills em <cwd>/.aisense/agents/<handle>/skills/ (+ .claude/skills/ se aplicável)
+         4. gera .aisense/agents/<handle>/BOOT.md e agent.json
          5. monta env: AISENSE_SOCKET, AISENSE_AGENT_ID, AISENSE_TOKEN,
                        AISENSE_TEAM_ID, PATH += <dir dos sidecars>
          6. pty::spawn(cmd, args, cwd, env)
@@ -66,7 +66,7 @@ UI: "Iniciar @backend"
          8. injeta o bootstrap conforme a capacidade do adaptador:
             • flag de system prompt  (ex.: --append-system-prompt)  ← preferido
             • MCP                    (aisense-mcp já no mcp config)
-            • stdin                  (digita uma linha "leia .aisense/BOOT.md")
+            • stdin                  (digita uma linha "leia .aisense/agents/<handle>/BOOT.md")
  └─ evento agent:state { id, state: "starting" → "idle" }
 ```
 
@@ -168,14 +168,21 @@ Já o **diretório de trabalho da equipe** (escolhido pelo usuário, ex.: seu re
 
 ```
 <workdir>/.aisense/
-├── agent.json                   identidade do agente (para a IA se reconhecer)
-├── BOOT.md                      prompt de bootstrap gerado
-├── skills/<nome>/SKILL.md       skills materializadas
+├── .gitignore                   gerado uma vez: ignora tudo menos notes/
+├── agents/<handle>/             uma pasta por agente (vários dividem o diretório no modo compartilhado)
+│   ├── agent.json               identidade do agente (para a IA se reconhecer)
+│   ├── BOOT.md                  prompt de bootstrap gerado
+│   └── skills/<nome>/SKILL.md   skills materializadas, com os arquivos de apoio
+├── native-skills.json           dono de cada skill copiada para o `skills.dir` do runtime
+├── notes/                       notas da equipe (docs/15) — do usuário, vão para o git
 └── inbox/                       (opcional) mensagens como arquivos, para runtimes limitados
 ```
 
-`.aisense/` no diretório do usuário é descartável: pode ser regenerado a qualquer boot e deve entrar
-no `.gitignore` sugerido pelo app.
+`.aisense/` no diretório do usuário é descartável (menos `notes/`): é regenerado a cada boot, e o
+`.gitignore` que o app escreve ali — só se ainda não existir — deixa de fora tudo menos as notas.
+Quando o adaptador declara `skills.dir` (ex.: `.claude/skills/`), as skills também são copiadas
+para lá, **sem nunca sobrescrever** uma pasta que o AISENSE não criou; o manifesto
+`native-skills.json` diz o que é nosso e quando pode sair.
 
 ## Onde estender
 
