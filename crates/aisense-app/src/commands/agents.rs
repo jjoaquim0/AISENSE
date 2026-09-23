@@ -3,8 +3,8 @@
 use std::sync::Arc;
 
 use aisense_core::agent::{
-    create_agent, duplicate_agent, update_agent, Agent, AgentDraft, AgentOpError, AgentState,
-    AgentUpdate, Handle,
+    create_agent, duplicate_agent, reorder_agents, update_agent, Agent, AgentDraft, AgentOpError,
+    AgentState, AgentUpdate, Handle,
 };
 use aisense_core::repo::{AgentRepository, RepoError};
 use aisense_core::state::StateConfidence;
@@ -175,6 +175,19 @@ pub async fn agent_duplicate(
     agent_id: AgentId,
 ) -> Result<Agent, CommandError> {
     duplicate_agent(&*store, &agent_id, now_ms())
+        .await
+        .map_err(op_error)
+}
+
+/// Nova ordem dos agentes da equipe, arrastada na sidebar (F03-07). Devolve a lista
+/// já na ordem gravada.
+#[tauri::command]
+pub async fn agents_reorder(
+    store: State<'_, Store>,
+    team_id: TeamId,
+    order: Vec<AgentId>,
+) -> Result<Vec<Agent>, CommandError> {
+    reorder_agents(&*store, &team_id, &order)
         .await
         .map_err(op_error)
 }

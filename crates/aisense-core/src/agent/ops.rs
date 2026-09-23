@@ -93,6 +93,38 @@ fn copy_name(name: &str) -> String {
     format!("{}{SUFFIX}", base.trim_end())
 }
 
+/// Reordenação da sidebar (F03-07). A ordem é a da equipe inteira — também é a ordem em
+/// que ▶ sobe os agentes —, então precisa listar cada agente exatamente uma vez; uma
+/// lista velha (agente criado ou excluído no meio do arraste) é recusada, não remendada.
+/// Só grava quem mudou de lugar, e posição não mexe em `updated_at`, como no layout.
+pub async fn reorder_agents<S: AgentRepository>(
+    store: &S,
+    team_id: &TeamId,
+    order: &[AgentId],
+) -> Result<Vec<Agent>, AgentOpError> {
+    let current = store.list_agents(team_id).await?;
+    let unique: std::collections::HashSet<&AgentId> = order.iter().collect();
+    let complete = unique.len() == order.len()
+        && order.len() == current.len()
+        && current.iter().all(|a| unique.contains(&a.id));
+    if !complete {
+        return Err(ValidationError::InvalidOrder.into());
+    }
+    let mut reordered = Vec::with_capacity(order.len());
+    for (index, id) in order.iter().enumerate() {
+        let Some(mut agent) = current.iter().find(|a| &a.id == id).cloned() else {
+            return Err(ValidationError::InvalidOrder.into());
+        };
+        let position = i32::try_from(index).map_err(|_| ValidationError::InvalidOrder)?;
+        if agent.position != position {
+            agent.position = position;
+            store.update_agent(&agent).await?;
+        }
+        reordered.push(agent);
+    }
+    Ok(reordered)
+}
+
 /// `running` diz se o agente está com processo vivo agora; decide o aviso de reinício.
 pub async fn update_agent<S: AgentRepository>(
     store: &S,
@@ -256,6 +288,63 @@ mod tests {
 
         let third = duplicate_agent(&store, &original.id, 3).await.unwrap();
         assert_eq!(third.handle.as_str(), "backend-3");
+    }
+
+    #[tokio::test]
+    async fn reorder_rewrites_positions_and_the_team_order() {
+        let store = InMemoryStore::new();
+        let t = team(&store).await;
+        let mut ids = Vec::new();
+        for handle in ["ana", "bia", "cid"] {
+            ids.push(
+                create_agent(&store, &t.id, &draft(handle), 1)
+                    .await
+                    .unwrap()
+                    .id,
+            );
+        }
+        let order = vec![ids[2].clone(), ids[0].clone(), ids[1].clone()];
+        let reordered = reorder_agents(&store, &t.id, &order).await.unwrap();
+        assert_eq!(
+            reordered.iter().map(|a| a.position).collect::<Vec<_>>(),
+            [0, 1, 2]
+        );
+        let listed: Vec<_> = store
+            .list_agents(&t.id)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|a| a.handle.as_str().to_owned())
+            .collect();
+        assert_eq!(listed, ["cid", "ana", "bia"]);
+        assert!(
+            reordered.iter().all(|a| a.updated_at == 1),
+            "posição não é edição"
+        );
+    }
+
+    #[tokio::test]
+    async fn reorder_refuses_a_stale_or_partial_list() {
+        let store = InMemoryStore::new();
+        let t = team(&store).await;
+        let a = create_agent(&store, &t.id, &draft("ana"), 1).await.unwrap();
+        let b = create_agent(&store, &t.id, &draft("bia"), 1).await.unwrap();
+        let bad = [
+            vec![a.id.clone()],
+            vec![a.id.clone(), a.id.clone()],
+            vec![a.id.clone(), b.id.clone(), AgentId::new()],
+            vec![b.id.clone(), AgentId::new()],
+        ];
+        for order in bad {
+            let error = reorder_agents(&store, &t.id, &order).await.unwrap_err();
+            assert_eq!(error.code(), "invalid_order");
+        }
+        let listed = store.list_agents(&t.id).await.unwrap();
+        assert_eq!(
+            (listed[0].position, listed[1].position),
+            (0, 1),
+            "nada gravado"
+        );
     }
 
     #[tokio::test]

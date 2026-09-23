@@ -57,7 +57,7 @@ CREATE TABLE agents (
   restart_policy TEXT NOT NULL DEFAULT 'on-crash',  -- never | on-crash | always
   delivery_mode TEXT NOT NULL DEFAULT 'pull',       -- pull | push | hook   (ver docs/07)
   autonomy      TEXT NOT NULL DEFAULT 'ask',        -- ask | trusted        (ver docs/11)
-  position      INTEGER NOT NULL DEFAULT 0,
+  position      INTEGER NOT NULL DEFAULT 0,         -- ordem da equipe: sidebar e ▶ (`agents_reorder`)
   created_at    INTEGER NOT NULL,
   updated_at    INTEGER NOT NULL,
   UNIQUE (team_id, handle)

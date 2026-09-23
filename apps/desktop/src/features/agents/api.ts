@@ -23,6 +23,9 @@ export const agentsApi = {
     invoke('agent_previews', { agentIds, lines }),
   /** Mesma configuração, handle e cor livres (menu ⋮ do painel). */
   duplicate: (agentId: AgentId): Promise<Agent> => invoke('agent_duplicate', { agentId }),
+  /** Nova ordem da equipe inteira (sidebar); devolve a lista já reordenada. */
+  reorder: (teamId: TeamId, order: AgentId[]): Promise<Agent[]> =>
+    invoke('agents_reorder', { teamId, order }),
   remove: (agentId: AgentId): Promise<void> => invoke('agent_delete', { agentId }),
   suggestHandle: (name: string): Promise<string | null> => invoke('handle_suggest', { name }),
 

@@ -102,10 +102,23 @@ Depende de F03-03, F03-04, F01-07.
 > Aceite como teste: 6 agentes num runtime de **uma thread só**, com uma tarefa-relógio ao lado;
 > a equipe sobe em ordem, com o intervalo, e o relógio continua batendo durante todo o start.
 
-### [ ] F03-07 — Sidebar de agentes
+### [x] F03-07 — Sidebar de agentes
 Lista com estado ao vivo, badge de mensagens pendentes (preparado para a Fase 5), reordenação por
 arrastar, clique foca o painel, duplo clique abre o inspetor.
 **Aceite:** a lista reflete mudanças de estado em <200 ms. Depende de F03-01.
+> Feito: `features/team-room/components/AgentSidebar.tsx`, agora **na sidebar do shell** (doc 09),
+> não mais numa coluna dentro da sala. A sala continua dona dos agentes e da seleção e coloca a
+> lista lá por portal (`features/shell/slots.tsx`, `ShellSlot`); o inspetor usa o mesmo caminho.
+> Estado ao vivo por `useLiveStates`: o evento `agent:state` atualiza a lista direto, sem a volta
+> ao core que recarregava todas as equipes a cada mudança — teste mede a atualização (bem abaixo
+> de 200 ms, na mesma renderização). Reordenar pela alça (mouse ou teclado, dnd-kit) grava a
+> `position` via `agents_reorder`, que exige a equipe inteira exatamente uma vez e recusa lista
+> velha; essa é a ordem da equipe (a de ▶), separada da ordem dos painéis da Grid. Clique
+> seleciona/foca o painel; duplo clique abre o inspetor, que por ora mostra o cabeçalho do agente
+> (estado, runtime, pasta, papel) — as abas vêm na F03-09. Badge `PendingBadge` pronto sobre o
+> ponto, na cor do remetente, sem fonte até a Fase 05. Leitores de tela ouvem só o que pede
+> atenção (aguardando, erro, parou); trabalhando/ocioso alternam demais para anunciar.
+> **Não conferido na janela** (sem tela aqui).
 
 ### [ ] F03-08 — Navegação por teclado
 `⌘1..9`, `⌘G` (ciclar vistas), `⌘T`, `⌘W`, `⌘\`, `⌘B`, `Esc Esc` para sair do foco do terminal.

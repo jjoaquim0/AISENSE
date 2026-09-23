@@ -1,11 +1,12 @@
 import { Moon, PanelRight, Plus, Sun } from 'lucide-react';
-import { type ReactNode, useMemo } from 'react';
-import { IconButton, ScrollArea, StatusDot, Tooltip } from '@/components/ui';
+import { type ReactNode, useCallback, useMemo } from 'react';
+import { IconButton, Tooltip } from '@/components/ui';
 import { formatShortcut } from '@/components/ui/Kbd';
 import { useTeams } from '@/features/teams/store';
 import { isDark, useTheme } from '@/lib/theme';
 import { useShortcuts } from '@/lib/useShortcuts';
 import { ResizeHandle } from './ResizeHandle';
+import { type SlotName, useShellSlots } from './slots';
 import { INSPECTOR_BOUNDS, SIDEBAR_BOUNDS, usePanels } from './usePanels';
 
 /**
@@ -127,6 +128,22 @@ function TeamRail() {
   );
 }
 
+/** Onde a tela aberta coloca seu conteúdo (`ShellSlot`); vazio, mostra `fallback`. */
+function SlotHost({ name, fallback }: { name: SlotName; fallback: ReactNode }) {
+  const setHost = useShellSlots((s) => s.setHost);
+  const filled = useShellSlots((s) => (s.filled[name] ?? 0) > 0);
+  const ref = useCallback(
+    (element: HTMLDivElement | null) => setHost(name, element),
+    [name, setHost],
+  );
+  return (
+    <>
+      {!filled && fallback}
+      <div ref={ref} className="flex min-h-0 flex-1 flex-col" />
+    </>
+  );
+}
+
 function Sidebar({ width }: { width: number }) {
   return (
     <aside
@@ -134,17 +151,17 @@ function Sidebar({ width }: { width: number }) {
       style={{ width }}
       className="flex shrink-0 flex-col border-r border-subtle bg-surface"
     >
-      <ScrollArea className="flex-1">
-        <section className="px-2 py-3">
-          <h2 className="px-2.5 pb-1 text-caption tracking-[0.02em] text-muted uppercase">
-            Agentes
-          </h2>
-          <p className="px-2.5 py-1.5 text-caption text-muted">Nenhuma equipe selecionada.</p>
-        </section>
-      </ScrollArea>
-      <div className="border-t border-subtle px-2.5 py-2">
-        <StatusDot state="stopped" withLabel />
-      </div>
+      <SlotHost
+        name="sidebar"
+        fallback={
+          <section className="px-2 py-3">
+            <h2 className="px-2.5 pb-1 text-caption tracking-[0.02em] text-muted uppercase">
+              Agentes
+            </h2>
+            <p className="px-2.5 py-1.5 text-caption text-muted">Nenhuma equipe aberta.</p>
+          </section>
+        }
+      />
     </aside>
   );
 }
@@ -159,7 +176,14 @@ function Inspector({ width }: { width: number }) {
       <div className="border-b border-subtle px-3 py-2">
         <h2 className="text-caption tracking-[0.02em] text-muted uppercase">Inspetor</h2>
       </div>
-      <p className="px-3 py-2 text-caption text-muted">Selecione um agente para ver os detalhes.</p>
+      <SlotHost
+        name="inspector"
+        fallback={
+          <p className="px-3 py-2 text-caption text-muted">
+            Selecione um agente para ver os detalhes.
+          </p>
+        }
+      />
     </aside>
   );
 }

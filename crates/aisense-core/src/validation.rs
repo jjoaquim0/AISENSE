@@ -25,6 +25,8 @@ pub enum ValidationError {
     InvalidEnvKey(String),
     #[error("environment variable {0} is managed by AISENSE and cannot be overridden")]
     ReservedEnvKey(String),
+    #[error("the new order must list every agent of the team exactly once")]
+    InvalidOrder,
 }
 
 impl ValidationError {
@@ -38,6 +40,7 @@ impl ValidationError {
             Self::TooLong { .. } => "field_too_long",
             Self::InvalidEnvKey(_) => "invalid_env_key",
             Self::ReservedEnvKey(_) => "reserved_env_key",
+            Self::InvalidOrder => "invalid_order",
         }
     }
 }

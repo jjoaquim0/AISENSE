@@ -13,8 +13,8 @@
 ## Situação em uma frase
 
 Fundação, terminal (PTY + xterm) e o domínio persistido de equipes e agentes estão em código e
-testados; falta conferência visual da janela. O trabalho corrente é a Fase 02: adaptadores de
-runtime e, depois, o supervisor que sobe os agentes.
+testados; falta conferência visual da janela. O trabalho corrente é a Fase 03 (Sala da Equipe):
+restam a navegação por teclado (F03-08) e o inspetor do agente (F03-09).
 
 ## Progresso por fase
 
@@ -23,7 +23,7 @@ runtime e, depois, o supervisor que sobe os agentes.
 | 00 — Fundação | 🟨 Em andamento | 6 feitas, 3 parciais de 9 |
 | 01 — Terminal Core | 🟨 Em andamento | 4 feitas, 4 parciais de 8 |
 | 02 — Equipes e Agentes | 🟨 Código completo | 11 de 11 feitas — falta a demonstração na janela |
-| 03 — Sala da Equipe | 🟨 Em andamento | 6 feitas de 9 |
+| 03 — Sala da Equipe | 🟨 Em andamento | 7 feitas de 9 |
 | 04 — Sistema de Skills | ⬜ Não iniciada | 0/9 |
 | 05 — Barramento | ⬜ Não iniciada | 0/13 |
 | 06 — Quadro Kanban | ⬜ Não iniciada | 0/11 |
@@ -42,6 +42,7 @@ pendente e não bloqueia nada da Fase 03.
 
 | Tarefa | Situação |
 |---|---|
+| F03-07 Sidebar de agentes | ✅ lista na sidebar do shell (portal), estado direto do evento, reordenar grava `position` (`agents_reorder`), duplo clique abre o inspetor (cabeçalho do agente; abas na F03-09), badge de mensagens pronto para a Fase 05 |
 | F03-01 Detector de estado | ✅ `StateDetector` (tela via `vt100`, regras do `docs/05`), tarefa por sessão no supervisor, `agent:state` com `confidence` |
 | F03-06 Controles da equipe | ✅ ▶ escalonado (300 ms), ⏸ e ⟳ com confirmação e progresso ao vivo (`team:progress`) |
 | F03-05 Visibilidade | ✅ agentes nascem invisíveis; só o painel na tela (e com a janela em primeiro plano) recebe `pty:data`; reidratação ordenada ao voltar |
@@ -237,3 +238,4 @@ Bugs encontrados pelos próprios testes, todos corrigidos na origem:
 | 2026-09-23 | Claude | F03-04 (vista Foco com miniaturas leves) e correção do preset inicial da Grid |
 | 2026-09-23 | Claude | F03-05 (só o painel visível recebe saída ao vivo; agentes nascem invisíveis) |
 | 2026-09-23 | Claude | F03-06 (iniciar/parar/reiniciar a equipe com progresso, sem travar a interface) |
+| 2026-09-23 | Claude | F03-07 (sidebar de agentes no shell, estado ao vivo sem ida ao core, reordenação persistida) |
