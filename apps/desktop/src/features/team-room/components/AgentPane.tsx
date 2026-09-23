@@ -17,6 +17,7 @@ import type { Agent } from '@/types/generated/Agent';
 import type { AgentState } from '@/types/generated/AgentState';
 import type { StateConfidence } from '@/types/generated/StateConfidence';
 import { isRunning, type PaneAction, paneMenu } from '../paneMenu';
+import type { DragHandle } from './GridView';
 
 interface AgentPaneProps {
   agent: Agent;
@@ -31,6 +32,8 @@ interface AgentPaneProps {
   clearSignal?: number;
   onAction: (action: PaneAction) => void;
   onFocus?: () => void;
+  /** Cabeçalho vira alça de arraste na vista Grid. */
+  dragHandle?: DragHandle;
   className?: string;
 }
 
@@ -49,6 +52,7 @@ export function AgentPane({
   clearSignal,
   onAction,
   onFocus,
+  dragHandle,
   className,
 }: AgentPaneProps) {
   const running = isRunning(state);
@@ -68,8 +72,11 @@ export function AgentPane({
       style={{ borderLeftColor: `var(--agent-${agent.color})` }}
     >
       <div
+        ref={dragHandle?.setRef}
+        {...dragHandle?.props}
         className={cn(
           'flex items-center gap-2 border-b border-subtle px-3 py-1.5',
+          dragHandle && 'cursor-grab active:cursor-grabbing',
           focused && 'bg-hover',
         )}
       >

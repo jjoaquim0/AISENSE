@@ -107,6 +107,18 @@ pub async fn team_create(
     Ok(team)
 }
 
+/// Modo de vista e posição dos painéis da Sala da Equipe (F03-03).
+#[tauri::command]
+pub async fn team_set_layout(
+    store: State<'_, Store>,
+    team_id: TeamId,
+    layout: serde_json::Value,
+) -> Result<(), CommandError> {
+    aisense_core::team::save_layout(&*store, &team_id, layout)
+        .await
+        .map_err(|e| CommandError::new(e.code(), e.to_string(), None))
+}
+
 #[tauri::command]
 pub async fn team_set_archived(
     store: State<'_, Store>,

@@ -21,6 +21,9 @@ export const teamsApi = {
   /** O core confere `confirmName` de novo: a interface não é a única barreira. */
   remove: (teamId: TeamId, confirmName: string): Promise<void> =>
     invoke('team_delete', { teamId, confirmName }),
+  /** Estado da Sala da Equipe (vista, ordem e posição dos painéis). */
+  setLayout: (teamId: TeamId, layout: Record<string, unknown>): Promise<void> =>
+    invoke('team_set_layout', { teamId, layout }),
   /** Quem não subiu (com o motivo) e quem subiu com ressalva. */
   start: (teamId: TeamId): Promise<TeamStartReport> => invoke('team_start', { teamId }),
 };

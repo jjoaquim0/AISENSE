@@ -1,5 +1,6 @@
 import { Users } from 'lucide-react';
 import { EmptyState, TooltipProvider } from '@/components/ui';
+import { GridBench } from '@/features/dev/GridBench';
 import { KitchenSink } from '@/features/dev/KitchenSink';
 import { AppShell } from '@/features/shell/AppShell';
 import { TeamsHome } from '@/features/teams/TeamsHome';
@@ -7,6 +8,9 @@ import { isDesktop } from '@/lib/api';
 
 export function App() {
   // Amostra do design system, só em desenvolvimento (F00-03 / F00-06).
+  if (import.meta.env.DEV && window.location.hash.startsWith('#/dev/grid')) {
+    return <GridBench />;
+  }
   if (import.meta.env.DEV && window.location.hash === '#/dev') {
     return (
       <TooltipProvider delayDuration={300}>
