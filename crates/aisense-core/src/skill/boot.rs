@@ -61,7 +61,7 @@ pub fn compose_boot(
     let mut omitted = 0;
     for (index, skill) in skills.iter().enumerate() {
         let summary = skill_section(agent.handle.as_str(), skill, true);
-        let reserve = OMITTED.chars().count() + 20;
+        let reserve = OMITTED.chars().count() + 80;
         if base.chars().count() + summary.chars().count() + reserve > BOOT_MAX_CHARS {
             omitted = skills.len() - index;
             break;
@@ -113,7 +113,7 @@ fn render_base(
         }
     };
     let mut result = format!(
-        "# Você é @{} — {}\n\n## Identidade\n- Seu endereço no barramento: **@{}**\n- Sua equipe: **{}**\n- Missão da equipe: {}\n- Seu papel: {}\n- Diretório de trabalho: {}\n\n## Sua equipe\n| Endereço | Papel | Runtime |\n|---|---|---|\n",
+        "# Você é {} — {}\n\n## Identidade\n- Seu endereço no barramento: **{}**\n- Sua equipe: **{}**\n- Missão da equipe: {}\n- Seu papel: {}\n- Diretório de trabalho: {}\n\n## Sua equipe\n| Endereço | Papel | Runtime |\n|---|---|---|\n",
         agent.handle,
         team.name,
         agent.handle,
@@ -138,7 +138,7 @@ fn render_base(
             .replace(['\r', '\n'], " ")
             .replace('|', "\\|");
         result.push_str(&format!(
-            "| @{} | {} | {} |\n",
+            "| {} | {} | {} |\n",
             colleague.handle, role, colleague.adapter_id
         ));
     }
