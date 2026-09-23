@@ -135,8 +135,7 @@ fn render_base(
     };
     for colleague in others.iter().take(visible) {
         let role = limit(&colleague.role, 80)
-            .replace('\r', " ")
-            .replace('\n', " ")
+            .replace(['\r', '\n'], " ")
             .replace('|', "\\|");
         result.push_str(&format!(
             "| @{} | {} | {} |\n",
