@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  FileCode,
   Folder,
   Pencil,
   Play,
@@ -13,6 +14,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button, Dialog, EmptyState, IconButton, StatusDot, Tooltip } from '@/components/ui';
 import { AgentFormDialog } from '@/features/agents/AgentFormDialog';
 import { agentsApi, onAgentState } from '@/features/agents/api';
+import { ProjectCommandsDialog } from '@/features/project/ProjectCommandsDialog';
 import { Terminal } from '@/features/terminal/Terminal';
 import { cn } from '@/lib/cn';
 import type { Agent } from '@/types/generated/Agent';
@@ -36,6 +38,7 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
   const [deleting, setDeleting] = useState<Agent | null>(null);
   const [notice, setNotice] = useState<{ text: string; restart?: Agent } | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const [commandsOpen, setCommandsOpen] = useState(false);
 
   const stateOf = useCallback(
     (id: string): AgentState => summary.agents.find((a) => a.id === id)?.state ?? 'stopped',
@@ -88,6 +91,9 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
             <Folder size={11} /> <span className="font-mono">{team.workdir}</span>
           </p>
         </div>
+        <Button onClick={() => setCommandsOpen(true)}>
+          <FileCode size={13} /> Comandos
+        </Button>
         <Button onClick={() => void act(() => teamsApi.start(team.id))}>
           <Play size={13} /> Iniciar equipe
         </Button>
@@ -247,6 +253,12 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
               : { text: `@${agent.handle} foi salvo.` },
           );
         }}
+      />
+
+      <ProjectCommandsDialog
+        workdir={team.workdir}
+        open={commandsOpen}
+        onOpenChange={setCommandsOpen}
       />
 
       {deleting && (

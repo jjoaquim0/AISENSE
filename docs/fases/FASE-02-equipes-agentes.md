@@ -131,12 +131,22 @@ Ver [16 — Bancadas](../16-bancadas.md).
 **Aceite:** dois agentes de uma equipe `per-agent` editam o mesmo arquivo sem se atropelar; excluir
 um agente com trabalho pendente é recusado com mensagem clara. Depende de F02-06.
 
-### [ ] F02-11 — `aisense.toml` (comandos do projeto)
+### [x] F02-11 — `aisense.toml` (comandos do projeto)
 Parser, validação e detecção automática que **propõe** um arquivo (nunca cria sozinho) a partir de
 `pnpm-lock.yaml`, `Cargo.toml`, `pyproject.toml` ou `Makefile`.
 Ver [17 — Comandos do Projeto](../17-comandos-do-projeto.md).
 **Aceite:** TOML inválido é reportado com caminho e linha sem derrubar o app; a proposta aparece na
 UI com o conteúdo gerado para revisão.
+> Feito: `aisense-core/src/project/`. `parse_project_config` aceita `test = "..."` e
+> `test = { run, timeout_s }`, recusa campo desconhecido, gate que não existe em `[commands]` e
+> `bench.copy` fora do repositório (`..`, caminho absoluto — seria levar segredos para a bancada).
+> `load_project` devolve `found` / `invalid` (com `caminho:linha:coluna`) / `missing` com a
+> proposta; a detecção reconhece pnpm, npm, yarn, Cargo, uv e Makefile e só propõe scripts que
+> existem no `package.json`. Toda proposta gerada é testada como `aisense.toml` válido. Os
+> utilitários de linha/coluna foram para `toml_pos.rs`, compartilhados com os adaptadores.
+> App: `project_lookup` e `project_accept` (valida o conteúdo e **nunca** sobrescreve um arquivo
+> existente). Front: botão "Comandos" na visão da equipe com a tabela, o erro ou a proposta
+> editável. O `aisense run` em si é da Fase 05 (barramento) e a lista no `BOOT.md`, da Fase 04.
 
 ## Critérios de saída
 - [ ] CRUD completo de equipes e agentes, persistido

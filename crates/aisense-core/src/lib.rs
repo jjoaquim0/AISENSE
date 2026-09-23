@@ -9,10 +9,12 @@ mod color;
 mod command_error;
 mod ids;
 mod paths;
+pub mod project;
 pub mod repo;
 pub mod supervisor;
 pub mod team;
 mod time;
+mod toml_pos;
 mod validation;
 
 pub use app_info::AppInfo;

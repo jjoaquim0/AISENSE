@@ -9,6 +9,7 @@ use super::model::{
     SkillsTarget, StateRules,
 };
 use crate::agent::RESERVED_ENV_PREFIX;
+use crate::toml_pos::{find_key_line, line_col};
 
 pub const ADAPTER_ID_MAX: usize = 64;
 pub const ADAPTER_NAME_MAX: usize = 64;
@@ -266,41 +267,6 @@ fn is_valid_env_key(key: &str) -> bool {
     let mut chars = key.chars();
     matches!(chars.next(), Some(c) if c.is_ascii_alphabetic() || c == '_')
         && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
-}
-
-/// Converte um deslocamento em bytes para linha e coluna, ambas a partir de 1.
-fn line_col(source: &str, offset: usize) -> (u32, u32) {
-    let before = source.get(..offset).unwrap_or(source);
-    let line = before.matches('\n').count() + 1;
-    let column = before
-        .rsplit('\n')
-        .next()
-        .map_or(0, |tail| tail.chars().count())
-        + 1;
-    (to_u32(line), to_u32(column))
-}
-
-/// Linha da primeira atribuição `key = ...` (ou tabela `[key]`). Melhor esforço: se o
-/// campo faltou, não há linha para apontar e o aviso sai só com o caminho.
-fn find_key_line(source: &str, key: &str) -> Option<u32> {
-    source
-        .lines()
-        .position(|line| {
-            let line = line.trim_start();
-            let table = line
-                .strip_prefix('[')
-                .and_then(|rest| rest.strip_suffix(']').or(Some(rest)))
-                .is_some_and(|name| name.trim() == key);
-            let assignment = line
-                .strip_prefix(key)
-                .is_some_and(|rest| rest.trim_start().starts_with(['=', '.']));
-            table || assignment
-        })
-        .map(|index| to_u32(index + 1))
-}
-
-fn to_u32(n: usize) -> u32 {
-    u32::try_from(n).unwrap_or(u32::MAX)
 }
 
 #[cfg(test)]

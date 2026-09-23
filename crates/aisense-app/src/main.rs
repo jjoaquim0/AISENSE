@@ -83,6 +83,8 @@ fn main() {
             commands::teams::team_set_archived,
             commands::teams::team_delete,
             commands::teams::team_start,
+            commands::project::project_lookup,
+            commands::project::project_accept,
         ])
         .on_window_event(move |window, event| {
             // Fechar a janela precisa matar os processos dos agentes; senão eles
