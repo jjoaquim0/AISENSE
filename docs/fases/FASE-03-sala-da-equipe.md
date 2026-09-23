@@ -120,10 +120,23 @@ arrastar, clique foca o painel, duplo clique abre o inspetor.
 > atenção (aguardando, erro, parou); trabalhando/ocioso alternam demais para anunciar.
 > **Não conferido na janela** (sem tela aqui).
 
-### [ ] F03-08 — Navegação por teclado
+### [x] F03-08 — Navegação por teclado
 `⌘1..9`, `⌘G` (ciclar vistas), `⌘T`, `⌘W`, `⌘\`, `⌘B`, `Esc Esc` para sair do foco do terminal.
 Camada de atalhos global respeitando o foco do xterm.
 **Aceite:** com o terminal focado, `⌘1` funciona e não vaza a tecla para o shell. Depende de F03-03.
+> Feito: `lib/{shortcuts.ts, useShortcuts.ts}` — um listener só, na **captura** da janela (antes
+> do textarea do xterm), com camadas empilhadas (a sala sobre o shell) — e
+> `features/team-room/shortcuts.ts` com a regra de cada atalho. `⌘N` foca o painel N da ordem
+> dos painéis (a das miniaturas), traz de volta à grade quem estava fora e põe o teclado no
+> terminal (`features/terminal/focus.ts`); dígito lido do `code` físico (AZERTY). `⌘W` tira o
+> painel da grade e encolhe o preset — o agente segue rodando; `⌘\` sobe para o próximo preset
+> (no Foco, volta à grade); `⌘G` alterna Grade/Foco; `⌘T` abre "Novo agente"; `⌘B` já existia.
+> `Esc Esc` em 400 ms leva o foco ao painel (`data-agent-pane`, com anel); a primeira `Esc` ainda
+> vai ao processo. Terminal com `role="application"` e a instrução de saída (doc 08).
+> **Decisão (ADR 0007):** com o terminal focado, fora do macOS só `⌘1..9` são interceptados —
+> `Ctrl+W`, `Ctrl+B`, `Ctrl+\`... continuam do shell. Atalhos não disparam dentro de diálogos.
+> Aceite como teste: um "xterm" com textarea ouvindo teclas; `Ctrl+1` roda o atalho, fica com
+> `defaultPrevented` e o textarea não vê a tecla. **Não conferido na janela.**
 
 ### [ ] F03-09 — Inspetor do agente (T6)
 Abas Visão, Config e Logs (as abas Skills e Caixa entram nas fases 4 e 5).

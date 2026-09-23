@@ -1,4 +1,5 @@
 import { LayoutGrid, SquareSplitVertical } from 'lucide-react';
+import { formatShortcut } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import { ROOM_VIEWS, type RoomView } from '../roomView';
 
@@ -31,6 +32,7 @@ export function ViewPicker({
             role="radio"
             aria-checked={value === view}
             onClick={() => onChange(view)}
+            title={`${label} · ${formatShortcut('⌘G')} alterna a vista`}
             className={cn(
               'flex items-center gap-1 rounded px-2 py-0.5 text-caption',
               value === view ? 'bg-active text-primary' : 'text-muted hover:text-primary',

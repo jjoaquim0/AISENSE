@@ -13,17 +13,18 @@ nos 3 SOs antes do merge (o usuário mergeia). Commits com o ID da tarefa no tí
 
 ## Situação em uma frase
 
-Fundação, terminal, equipes/agentes persistidos e **7 das 9 tarefas da Sala da Equipe** estão em
-código e testados. Próximo: **F03-08 (teclado)**, depois F03-09 (inspetor), que fecham a Fase 03.
+Fundação, terminal, equipes/agentes persistidos e **8 das 9 tarefas da Sala da Equipe** estão em
+código e testados. Próximo: **F03-09 (inspetor)**, que fecha a Fase 03.
 
 ## Para quem chega agora (retomada)
 
 1. Leia `AGENTS.md` e este arquivo inteiro; depois `docs/fases/FASE-03-sala-da-equipe.md` — cada
    tarefa feita tem uma nota `> Feito:` dizendo onde está o código e o que ficou de fora.
-2. Próxima tarefa: **F03-08**. Pontos de partida: `lib/useShortcuts.ts` (camada de atalhos),
-   `features/shell/AppShell.tsx` (⌘B/⌘I) e `features/teams/TeamView.tsx` (vistas, seleção). A
-   sidebar da F03-07 mora em `features/team-room/components/AgentSidebar.tsx` e reordena a
-   **ordem da equipe** (`agents.position`), não `grid.order` — ver a nota da F03-07.
+2. Próxima tarefa: **F03-09** (inspetor, abas Visão/Config/Logs). Ponto de partida:
+   `features/team-room/components/AgentInspector.tsx` (hoje só o cabeçalho), colocado no inspetor
+   do shell por `ShellSlot` em `features/teams/TeamView.tsx`; o formulário do T5 está em
+   `features/agents/AgentFormDialog.tsx`. A sidebar (F03-07) reordena a **ordem da equipe**
+   (`agents.position`), não `grid.order`. Atalhos: `useShortcuts` + ADR 0007.
 3. Onde as coisas moram na Fase 03: `aisense-core/src/state/` (detector), `supervisor/team.rs`
    (▶ ⏸ ⟳), `apps/desktop/src/features/team-room/` (painel, grid, foco, controles, layout).
 4. Verificação que se espera antes de cada PR: `pnpm lint`, `pnpm typecheck`, `pnpm test`,
@@ -41,7 +42,7 @@ código e testados. Próximo: **F03-08 (teclado)**, depois F03-09 (inspetor), qu
 | 00 — Fundação | 🟨 Em andamento | 6 feitas, 3 parciais de 9 |
 | 01 — Terminal Core | 🟨 Em andamento | 4 feitas, 4 parciais de 8 |
 | 02 — Equipes e Agentes | 🟨 Código completo | 11 de 11 feitas — falta a demonstração na janela |
-| 03 — Sala da Equipe | 🟨 Em andamento | 7 feitas de 9 |
+| 03 — Sala da Equipe | 🟨 Em andamento | 8 feitas de 9 |
 | 04 — Sistema de Skills | ⬜ Não iniciada | 0/9 |
 | 05 — Barramento | ⬜ Não iniciada | 0/13 |
 | 06 — Quadro Kanban | ⬜ Não iniciada | 0/11 |
@@ -67,8 +68,8 @@ pendente e não bloqueia nada da Fase 03.
 | F03-05 Visibilidade | ✅ agentes nascem invisíveis; só o painel na tela (e com a janela em primeiro plano) recebe `pty:data`; reidratação ordenada ao voltar |
 | F03-06 Controles da equipe | ✅ ▶ escalonado (300 ms), ⏸ e ⟳ com confirmação e progresso ao vivo (`team:progress`) |
 | F03-07 Sidebar de agentes | ✅ lista na sidebar do shell (portal), estado direto do evento, reordenar grava `position` (`agents_reorder`), duplo clique abre o inspetor (cabeçalho do agente; abas na F03-09), badge de mensagens pronto para a Fase 05 |
-| F03-08 Navegação por teclado | ⬜ **próxima** |
-| F03-09 Inspetor do agente | ⬜ |
+| F03-08 Navegação por teclado | ✅ camada única na captura da janela; ⌘1..9 valem com o terminal focado sem vazar para o shell; ⌘G, ⌘T, ⌘W (fecha o painel, não o agente), ⌘\\, Esc Esc; fora do macOS o resto fica com o shell ([ADR 0007](adr/0007-atalhos-com-o-terminal-focado.md)) |
+| F03-09 Inspetor do agente | ⬜ **próxima** |
 
 O agente agora fica em `starting` até o detector ler a primeira tela — antes, processo vivo era
 `idle` na hora. Transcrições dos testes são sintéticas; ver ressalva no documento da fase.
@@ -204,6 +205,7 @@ Bugs encontrados pelos próprios testes, todos corrigidos na origem:
   Viraram tarefas nas Fases 02, 04, 05 e 06 — não são fase nova.
 - **Quadro Kanban é subsistema de primeira classe**, um por equipe, com API completa para agentes
   (`claim` atômico, WIP aplicado, automações de conjunto fechado) → [13](13-quadro-kanban.md)
+- Atalhos com o terminal focado: só `⌘1..9` fora do macOS, `Esc Esc` para sair → [ADR 0007](adr/0007-atalhos-com-o-terminal-focado.md)
 - Entrega de mensagens **híbrida**: caixa de entrada + injeção opcional no PTY → [ADR 0006](adr/0006-entrega-de-mensagens.md)
 - Front em **React 19 + TypeScript + Tailwind 4 + Radix**, terminal com **xterm.js/WebGL**
 
@@ -260,3 +262,4 @@ Bugs encontrados pelos próprios testes, todos corrigidos na origem:
 | 2026-09-23 | Claude | F03-06 (iniciar/parar/reiniciar a equipe com progresso, sem travar a interface) |
 | 2026-09-23 | Claude | Retomada documentada no topo deste arquivo para continuar em outra sessão; próxima tarefa F03-07 |
 | 2026-09-23 | Claude | F03-07 (sidebar de agentes no shell, estado ao vivo sem ida ao core, reordenação persistida) |
+| 2026-09-23 | Claude | F03-08 (atalhos de teclado com o terminal focado; ADR 0007) |

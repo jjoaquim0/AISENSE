@@ -225,3 +225,9 @@ o visual é nosso.
 | `Esc Esc` | Sair do foco do terminal para a navegação da UI |
 
 Todos remapeáveis em Configurações → Atalhos. No Linux/Windows, `⌘` vira `Ctrl`.
+
+**Com o terminal focado** ([ADR 0007](adr/0007-atalhos-com-o-terminal-focado.md)): `⌘1`–`⌘9`
+valem sempre e a tecla não chega ao shell. No macOS, todos os outros também valem. No
+Linux/Windows os outros ficam com o shell (`Ctrl+W`, `Ctrl+B`, `Ctrl+\`... são teclas dele):
+use `Esc Esc` para voltar à interface e então o atalho. `⌘W` fecha o **painel** (ele vai para
+"Fora da grade"), nunca o agente; `⌘\` abre lugar para mais um painel (próximo preset).

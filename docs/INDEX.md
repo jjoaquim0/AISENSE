@@ -60,6 +60,7 @@ Para entender o projeto pela primeira vez, leia nesta sequência (≈45 min):
 | [0004](adr/0004-protocolo-do-barramento.md) | Protocolo do barramento: NDJSON sobre socket local |
 | [0005](adr/0005-skills-markdown.md) | Skills em Markdown + frontmatter, compatível com Claude Code |
 | [0006](adr/0006-entrega-de-mensagens.md) | Entrega híbrida: caixa de entrada + injeção no PTY |
+| [0007](adr/0007-atalhos-com-o-terminal-focado.md) | Atalhos com o terminal focado: só ⌘1..9 fora do macOS, Esc Esc para sair |
 
 ### Fases de desenvolvimento
 | Fase | Título | Depende de |
