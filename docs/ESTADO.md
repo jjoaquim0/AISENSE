@@ -13,18 +13,17 @@ nos 3 SOs antes do merge (o usuário mergeia). Commits com o ID da tarefa no tí
 
 ## Situação em uma frase
 
-Fundação, terminal, equipes/agentes persistidos e **6 das 9 tarefas da Sala da Equipe** estão em
-código, testados e com CI verde nos 3 SOs. Próximo: **F03-07 (sidebar de agentes)**, depois F03-08
-(teclado) e F03-09 (inspetor), que fecham a Fase 03.
+Fundação, terminal, equipes/agentes persistidos e **7 das 9 tarefas da Sala da Equipe** estão em
+código e testados. Próximo: **F03-08 (teclado)**, depois F03-09 (inspetor), que fecham a Fase 03.
 
 ## Para quem chega agora (retomada)
 
 1. Leia `AGENTS.md` e este arquivo inteiro; depois `docs/fases/FASE-03-sala-da-equipe.md` — cada
    tarefa feita tem uma nota `> Feito:` dizendo onde está o código e o que ficou de fora.
-2. Próxima tarefa: **F03-07**. Ponto de partida: a lista de agentes à esquerda em
-   `apps/desktop/src/features/teams/TeamView.tsx` (vira o componente da sidebar); estado ao vivo já
-   chega por `agent:state` (com `confidence`); a ordem dos agentes é `grid.order` em
-   `features/team-room/hooks/useTeamLayout.ts` — reordenar na sidebar deve mexer nela.
+2. Próxima tarefa: **F03-08**. Pontos de partida: `lib/useShortcuts.ts` (camada de atalhos),
+   `features/shell/AppShell.tsx` (⌘B/⌘I) e `features/teams/TeamView.tsx` (vistas, seleção). A
+   sidebar da F03-07 mora em `features/team-room/components/AgentSidebar.tsx` e reordena a
+   **ordem da equipe** (`agents.position`), não `grid.order` — ver a nota da F03-07.
 3. Onde as coisas moram na Fase 03: `aisense-core/src/state/` (detector), `supervisor/team.rs`
    (▶ ⏸ ⟳), `apps/desktop/src/features/team-room/` (painel, grid, foco, controles, layout).
 4. Verificação que se espera antes de cada PR: `pnpm lint`, `pnpm typecheck`, `pnpm test`,
@@ -42,7 +41,7 @@ código, testados e com CI verde nos 3 SOs. Próximo: **F03-07 (sidebar de agent
 | 00 — Fundação | 🟨 Em andamento | 6 feitas, 3 parciais de 9 |
 | 01 — Terminal Core | 🟨 Em andamento | 4 feitas, 4 parciais de 8 |
 | 02 — Equipes e Agentes | 🟨 Código completo | 11 de 11 feitas — falta a demonstração na janela |
-| 03 — Sala da Equipe | 🟨 Em andamento | 6 feitas de 9 |
+| 03 — Sala da Equipe | 🟨 Em andamento | 7 feitas de 9 |
 | 04 — Sistema de Skills | ⬜ Não iniciada | 0/9 |
 | 05 — Barramento | ⬜ Não iniciada | 0/13 |
 | 06 — Quadro Kanban | ⬜ Não iniciada | 0/11 |
@@ -67,8 +66,8 @@ pendente e não bloqueia nada da Fase 03.
 | F03-04 Vista Foco | ✅ terminal grande + miniaturas de texto (sem xterm) vindas da tela do detector, a 2 fps; vista salva por equipe |
 | F03-05 Visibilidade | ✅ agentes nascem invisíveis; só o painel na tela (e com a janela em primeiro plano) recebe `pty:data`; reidratação ordenada ao voltar |
 | F03-06 Controles da equipe | ✅ ▶ escalonado (300 ms), ⏸ e ⟳ com confirmação e progresso ao vivo (`team:progress`) |
-| F03-07 Sidebar de agentes | ⬜ **próxima** |
-| F03-08 Navegação por teclado | ⬜ |
+| F03-07 Sidebar de agentes | ✅ lista na sidebar do shell (portal), estado direto do evento, reordenar grava `position` (`agents_reorder`), duplo clique abre o inspetor (cabeçalho do agente; abas na F03-09), badge de mensagens pronto para a Fase 05 |
+| F03-08 Navegação por teclado | ⬜ **próxima** |
 | F03-09 Inspetor do agente | ⬜ |
 
 O agente agora fica em `starting` até o detector ler a primeira tela — antes, processo vivo era
@@ -260,3 +259,4 @@ Bugs encontrados pelos próprios testes, todos corrigidos na origem:
 | 2026-09-23 | Claude | F03-05 (só o painel visível recebe saída ao vivo; agentes nascem invisíveis) |
 | 2026-09-23 | Claude | F03-06 (iniciar/parar/reiniciar a equipe com progresso, sem travar a interface) |
 | 2026-09-23 | Claude | Retomada documentada no topo deste arquivo para continuar em outra sessão; próxima tarefa F03-07 |
+| 2026-09-23 | Claude | F03-07 (sidebar de agentes no shell, estado ao vivo sem ida ao core, reordenação persistida) |

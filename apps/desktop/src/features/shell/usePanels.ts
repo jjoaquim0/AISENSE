@@ -56,6 +56,8 @@ interface PanelStore extends PanelState {
   setInspectorWidth: (width: number) => void;
   toggleSidebar: () => void;
   toggleInspector: () => void;
+  /** Duplo clique num agente da sidebar abre o inspetor, nunca o fecha. */
+  showInspector: () => void;
 }
 
 export const usePanels = create<PanelStore>((set, get) => {
@@ -71,6 +73,9 @@ export const usePanels = create<PanelStore>((set, get) => {
     setInspectorWidth: (width) => commit({ inspectorWidth: clamp(width, INSPECTOR_BOUNDS) }),
     toggleSidebar: () => commit({ sidebarVisible: !get().sidebarVisible }),
     toggleInspector: () => commit({ inspectorVisible: !get().inspectorVisible }),
+    showInspector: () => {
+      if (!get().inspectorVisible) commit({ inspectorVisible: true });
+    },
   };
 });
 
