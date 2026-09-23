@@ -11,8 +11,9 @@ import type { StateEvent } from '../hooks/useLiveStates';
 import { isRunning } from '../sidebar';
 import { LogsTab } from './inspector/LogsTab';
 import { OverviewTab } from './inspector/OverviewTab';
+import { SkillsTab } from './inspector/SkillsTab';
 
-export type InspectorTab = 'overview' | 'config' | 'logs';
+export type InspectorTab = 'overview' | 'skills' | 'config' | 'logs';
 
 interface AgentInspectorProps {
   agent: Agent | null;
@@ -28,8 +29,8 @@ interface AgentInspectorProps {
 }
 
 /**
- * Inspetor do agente (docs/09, T6) no painel direito: abas Visão, Config e Logs. Skills
- * e Caixa entram nas Fases 04 e 05.
+ * Inspetor do agente (docs/09, T6) no painel direito: abas Visão, Skills, Config e Logs.
+ * A Caixa entra na Fase 05.
  */
 export function AgentInspector({
   agent,
@@ -95,6 +96,7 @@ export function AgentInspector({
       >
         <TabsList>
           <TabsTrigger value="overview">Visão</TabsTrigger>
+          <TabsTrigger value="skills">Skills</TabsTrigger>
           <TabsTrigger value="config">Config</TabsTrigger>
           <TabsTrigger value="logs">Logs</TabsTrigger>
         </TabsList>
@@ -107,6 +109,9 @@ export function AgentInspector({
             sessions={sessions}
             teamWorkdir={teamWorkdir}
           />
+        </TabsContent>
+        <TabsContent value="skills">
+          <SkillsTab agent={agent} running={isRunning(state)} />
         </TabsContent>
         <TabsContent value="config">
           <AgentFormFields

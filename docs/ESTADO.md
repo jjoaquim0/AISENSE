@@ -22,10 +22,10 @@ código e testados; a Fase 03 ainda tem conferência na janela e dois critérios
 
 1. Leia `AGENTS.md` e este arquivo inteiro; depois `docs/fases/FASE-03-sala-da-equipe.md` — cada
    tarefa feita tem uma nota `> Feito:` dizendo onde está o código e o que ficou de fora.
-2. Próxima tarefa: **F04-02** (registro/persistência de skills e hot-reload), em
-   `docs/fases/FASE-04-skills.md`. O parser e o catálogo da F04-01 estão em
-   `aisense-core/src/skill/`; o hot-reload dos adaptadores (`adapter/watch.rs`) é o modelo a
-   seguir. Onde a Fase 03 deixou as coisas: sidebar e inspetor entram no shell por `ShellSlot`
+2. Próxima tarefa: **F04-03** (resolução das skills de um agente no boot), em
+   `docs/fases/FASE-04-skills.md`. Skills em `aisense-core/src/skill/` (parser, catálogo,
+   `SkillLibrary`, hot-reload); atribuições por `SkillRepository`; aba Skills do inspetor em
+   `features/team-room/components/inspector/SkillsTab.tsx`. Onde a Fase 03 deixou as coisas: sidebar e inspetor entram no shell por `ShellSlot`
    (`features/shell/slots.tsx`); o inspetor tem as abas Visão/Config/Logs e espera Skills
    (Fase 04) e Caixa (Fase 05); a sidebar reordena a **ordem da equipe** (`agents.position`);
    atalhos em `useShortcuts` + ADR 0007; transcrições em `aisense-core/src/transcript.rs`.
@@ -47,7 +47,7 @@ código e testados; a Fase 03 ainda tem conferência na janela e dois critérios
 | 01 — Terminal Core | 🟨 Em andamento | 4 feitas, 4 parciais de 8 |
 | 02 — Equipes e Agentes | 🟨 Código completo | 11 de 11 feitas — falta a demonstração na janela |
 | 03 — Sala da Equipe | 🟨 Código completo | 9 de 9 feitas — faltam conferência na janela e dois critérios de saída |
-| 04 — Sistema de Skills | 🟨 Em andamento | 1 feita de 9 |
+| 04 — Sistema de Skills | 🟨 Em andamento | 2 feitas de 9 |
 | 05 — Barramento | ⬜ Não iniciada | 0/13 |
 | 06 — Quadro Kanban | ⬜ Não iniciada | 0/11 |
 | 07 — Coordenação | ⬜ Não iniciada | 0/6 |
@@ -65,6 +65,7 @@ saída que só uma máquina com GPU e os runtimes reais resolvem. Nada da Fase 0
 | Tarefa | Situação |
 |---|---|
 | F04-01 Parser e validador | ✅ `SKILL.md` com `caminho:linha` nos erros, campos desconhecidos ignorados (compatível com Claude Code), catálogo embutidas + `~/.aisense/skills/`; `yaml-rust2` no lugar do `gray_matter` |
+| F04-02 Registro e persistência | ✅ `skills`/`agent_skills` em SQLite e memória (mesmo contrato), sync sem apagar o que sumiu do disco, hot-reload recursivo com `skills:changed`, aba Skills do inspetor |
 
 **Fase 03 — Sala da Equipe** (iniciada em 2026-09-23 a pedido do usuário). Exceção consciente à R1:
 as 11 tarefas da Fase 02 estão feitas, mas a **demonstração na janela** (criar "Squad Produto",
@@ -277,3 +278,4 @@ Bugs encontrados pelos próprios testes, todos corrigidos na origem:
 | 2026-09-23 | Claude | F03-08 (atalhos de teclado com o terminal focado; ADR 0007) |
 | 2026-09-23 | Claude | F03-09 (inspetor com Visão, Config e Logs; transcrição por sessão). Fase 03 com código completo |
 | 2026-09-23 | Claude | Início da Fase 04 a pedido do usuário; F04-01 (parser e catálogo de skills) |
+| 2026-09-23 | Claude | F04-02 (skills no banco, hot-reload da biblioteca, aba Skills do inspetor) |

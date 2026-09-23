@@ -5,11 +5,13 @@ use std::collections::BTreeMap;
 use std::sync::{Mutex, MutexGuard};
 
 use super::{
-    AgentRepository, RepoError, RepoResult, SessionRecord, SessionRepository, TeamFilter,
-    TeamRepository, SESSIONS_KEPT_PER_AGENT,
+    dedup_agent_skills, skill_origin, AgentRepository, AgentSkill, RepoError, RepoResult,
+    SessionRecord, SessionRepository, SkillRecord, SkillRepository, TeamFilter, TeamRepository,
+    SESSIONS_KEPT_PER_AGENT,
 };
 use crate::agent::{Agent, Handle};
-use crate::ids::{AgentId, SessionId, TeamId};
+use crate::ids::{AgentId, SessionId, SkillId, TeamId};
+use crate::skill::Skill;
 use crate::team::Team;
 use crate::time::Millis;
 
@@ -19,6 +21,10 @@ struct Inner {
     agents: BTreeMap<String, Agent>,
     /// Em ordem de início.
     sessions: Vec<SessionRecord>,
+    /// Por `slug`.
+    skills: BTreeMap<String, SkillRecord>,
+    /// Por agente, na ordem de injeção.
+    agent_skills: BTreeMap<String, Vec<AgentSkill>>,
 }
 
 #[derive(Default)]
@@ -100,6 +106,10 @@ impl TeamRepository for InMemoryStore {
             return Err(RepoError::TeamNotFound(id.clone()));
         }
         inner.agents.retain(|_, a| a.team_id != *id);
+        let alive_agents: Vec<String> = inner.agents.keys().cloned().collect();
+        inner
+            .agent_skills
+            .retain(|agent, _| alive_agents.contains(agent));
         let agents = &inner.agents;
         let alive: Vec<SessionRecord> = inner
             .sessions
@@ -184,6 +194,7 @@ impl AgentRepository for InMemoryStore {
         match inner.agents.remove(id.as_str()) {
             Some(_) => {
                 inner.sessions.retain(|s| s.agent_id != *id);
+                inner.agent_skills.remove(id.as_str());
                 Ok(())
             }
             None => Err(RepoError::AgentNotFound(id.clone())),
@@ -243,6 +254,81 @@ impl SessionRepository for InMemoryStore {
             .filter(|s| s.agent_id == *agent_id)
             .take(limit)
             .cloned()
+            .collect())
+    }
+}
+
+impl SkillRepository for InMemoryStore {
+    async fn sync_skills(&self, skills: &[Skill], now: Millis) -> RepoResult<Vec<SkillRecord>> {
+        let mut inner = self.lock();
+        for skill in skills {
+            let (source, path) = skill_origin(skill);
+            match inner.skills.get_mut(&skill.name) {
+                Some(record) if record.matches(skill) => {}
+                Some(record) => {
+                    record.description.clone_from(&skill.description);
+                    record.version.clone_from(&skill.version);
+                    source.clone_into(&mut record.source);
+                    record.path = path;
+                    record.targets.clone_from(&skill.targets);
+                    record.updated_at = now;
+                }
+                None => {
+                    let record = SkillRecord {
+                        id: SkillId::new(),
+                        slug: skill.name.clone(),
+                        description: skill.description.clone(),
+                        version: skill.version.clone(),
+                        source: source.to_owned(),
+                        path,
+                        targets: skill.targets.clone(),
+                        created_at: now,
+                        updated_at: now,
+                    };
+                    inner.skills.insert(skill.name.clone(), record);
+                }
+            }
+        }
+        Ok(inner.skills.values().cloned().collect())
+    }
+
+    async fn list_skills(&self) -> RepoResult<Vec<SkillRecord>> {
+        Ok(self.lock().skills.values().cloned().collect())
+    }
+
+    async fn agent_skills(&self, agent_id: &AgentId) -> RepoResult<Vec<AgentSkill>> {
+        Ok(self
+            .lock()
+            .agent_skills
+            .get(agent_id.as_str())
+            .cloned()
+            .unwrap_or_default())
+    }
+
+    async fn set_agent_skills(&self, agent_id: &AgentId, skills: &[AgentSkill]) -> RepoResult<()> {
+        let mut inner = self.lock();
+        if !inner.agents.contains_key(agent_id.as_str()) {
+            return Err(RepoError::AgentNotFound(agent_id.clone()));
+        }
+        if let Some(missing) = skills
+            .iter()
+            .find(|s| !inner.skills.values().any(|r| r.id == s.skill_id))
+        {
+            return Err(RepoError::SkillNotFound(missing.skill_id.clone()));
+        }
+        inner
+            .agent_skills
+            .insert(agent_id.as_str().to_owned(), dedup_agent_skills(skills));
+        Ok(())
+    }
+
+    async fn skill_users(&self, skill_id: &SkillId) -> RepoResult<Vec<AgentId>> {
+        Ok(self
+            .lock()
+            .agent_skills
+            .iter()
+            .filter(|(_, list)| list.iter().any(|s| s.skill_id == *skill_id))
+            .map(|(agent, _)| AgentId::from_raw(agent.clone()))
             .collect())
     }
 }

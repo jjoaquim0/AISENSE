@@ -8,6 +8,7 @@ mod app_info;
 pub mod bench;
 mod color;
 mod command_error;
+pub mod fswatch;
 mod ids;
 mod paths;
 pub mod project;

@@ -4,9 +4,13 @@
 //! `SKILL.md` — frontmatter YAML + Markdown.
 
 mod catalog;
+mod library;
 mod model;
 mod parse;
+mod watch;
 
 pub use catalog::{BuiltinSkill, SkillCatalog, BUILTIN_SKILLS, SKILL_FILE};
+pub use library::{SkillEntry, SkillLibrary, SkillLibraryView};
 pub use model::{Skill, SkillInject, SkillProblem, SkillSource};
 pub use parse::{parse_skill, SKILL_DESCRIPTION_MAX, SKILL_FILE_MAX_BYTES, SKILL_NAME_MAX};
+pub use watch::SkillWatcher;

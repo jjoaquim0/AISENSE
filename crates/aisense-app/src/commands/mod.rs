@@ -9,6 +9,7 @@ pub mod agents;
 pub mod project;
 pub mod pty;
 pub mod runtimes;
+pub mod skills;
 pub mod teams;
 
 use aisense_core::{AppInfo, CommandError};

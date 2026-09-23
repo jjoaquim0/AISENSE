@@ -7,6 +7,7 @@ mod convert;
 mod db;
 mod error;
 mod sessions;
+mod skills;
 mod teams;
 
 pub use db::{Store, MIGRATOR};
