@@ -48,11 +48,23 @@ Depende de F04-01, F02-02.
 > no boot é da F04-03). Aceite como teste: no core, criar/editar/apagar um `SKILL.md` recarrega
 > o catálogo; no front, `skills:changed` refaz a lista sem reiniciar.
 
-### [ ] F04-03 — Resolução por agente
+### [x] F04-03 — Resolução por agente
 Dado um agente, resolver as skills habilitadas, filtrar por `targets` vs `adapter_id`, ordenar por
 `priority` e depois `position`, reportar incompatibilidades.
 **Aceite:** skill com `targets: [claude]` atribuída a um agente `codex` gera aviso na UI e é ignorada
 no boot. Depende de F04-02.
+> Feito: `aisense-core/src/skill/resolve.rs` (`resolve_agent_skills`). Entram as habilitadas que
+> estão no disco e rodam no runtime; ordem por `priority` e, empatando, pela posição que o
+> usuário deu (ordenação estável). As que ficam de fora viram `IgnoredSkill` com o motivo
+> (`incompatible` com runtime e `targets`, ou `missing`) e uma frase pronta em pt-BR. O
+> supervisor resolve em todo start (a biblioteca entrou no `SupervisorConfig`) e devolve o
+> plano em `StartOutcome.skills`; ignorar **não impede** o start. Na UI: o start de um agente e
+> o ▶ da equipe mostram as ignoradas junto das ressalvas de bancada, e a aba Skills do inspetor
+> mostra "No próximo início" (ativas em ordem e ignoradas com o porquê) pelo comando novo
+> `agent_skills_plan`, atualizado ao mexer na lista e a cada recarga da biblioteca. Aceite como
+> teste no core (skill só do claude num agente codex: fora, com aviso; o supervisor sobe o
+> agente e devolve a ignorada) e no front (a aba mostra a frase). As skills resolvidas ainda não
+> chegam ao processo — isso é a materialização (F04-04) e a injeção (F04-06).
 
 ### [ ] F04-04 — Materialização
 Copiar as skills resolvidas para `<workdir>/.aisense/skills/` e, quando o adaptador declarar

@@ -3,8 +3,10 @@
 
 use std::sync::{Arc, Mutex};
 
-use aisense_core::repo::{AgentSkill, RepoError, SkillRepository};
-use aisense_core::skill::{SkillCatalog, SkillLibrary, SkillLibraryView, SkillWatcher};
+use aisense_core::repo::{AgentRepository, AgentSkill, RepoError, SkillRepository};
+use aisense_core::skill::{
+    resolve_agent_skills, SkillCatalog, SkillLibrary, SkillLibraryView, SkillPlan, SkillWatcher,
+};
 use aisense_core::{now_ms, AgentId, CommandError, DataDir};
 use aisense_store::Store;
 use tauri::{AppHandle, Emitter, State};
@@ -83,4 +85,23 @@ pub async fn agent_skills_set(
         .set_agent_skills(&agent_id, &skills)
         .await
         .map_err(repo_error)
+}
+
+/// O que o agente levaria se subisse agora: as skills ativas, em ordem, e as ignoradas
+/// com o porquê (runtime incompatível, fora do disco). F04-03.
+#[tauri::command]
+pub async fn agent_skills_plan(
+    library: State<'_, Library>,
+    store: State<'_, Store>,
+    agent_id: AgentId,
+) -> Result<SkillPlan, CommandError> {
+    let agent = store
+        .get_agent(&agent_id)
+        .await
+        .map_err(repo_error)?
+        .ok_or_else(|| repo_error(RepoError::AgentNotFound(agent_id.clone())))?;
+    let resolved = resolve_agent_skills(&*store, &library.catalog(), &agent_id, &agent.adapter_id)
+        .await
+        .map_err(repo_error)?;
+    Ok(resolved.plan())
 }

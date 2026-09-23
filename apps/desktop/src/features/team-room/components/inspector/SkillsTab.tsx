@@ -15,6 +15,7 @@ import { errorMessage } from '@/features/teams/api';
 import type { Agent } from '@/types/generated/Agent';
 import type { AgentSkill } from '@/types/generated/AgentSkill';
 import type { SkillEntry } from '@/types/generated/SkillEntry';
+import type { SkillPlan } from '@/types/generated/SkillPlan';
 
 interface SkillsTabProps {
   agent: Agent;
@@ -31,6 +32,7 @@ export function SkillsTab({ agent, running }: SkillsTabProps) {
   const [assigned, setAssigned] = useState<AgentSkill[] | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [changed, setChanged] = useState(false);
+  const [plan, setPlan] = useState<SkillPlan | null>(null);
 
   useEffect(() => {
     setAssigned(null);
@@ -40,6 +42,16 @@ export function SkillsTab({ agent, running }: SkillsTabProps) {
       .then(setAssigned)
       .catch((e: unknown) => setProblem(errorMessage(e)));
   }, [agent.id]);
+
+  // O plano do próximo boot muda com a lista e com a biblioteca (hot-reload).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `assigned` e `library` pedem releitura
+  useEffect(() => {
+    if (!assigned) return;
+    skillsApi
+      .plan(agent.id)
+      .then(setPlan)
+      .catch(() => setPlan(null));
+  }, [agent.id, assigned, library]);
 
   const save = (next: AgentSkill[]) => {
     const before = assigned;
@@ -70,6 +82,25 @@ export function SkillsTab({ agent, running }: SkillsTabProps) {
         <p className="text-caption text-failed" role="alert">
           {problem ?? libraryProblem}
         </p>
+      )}
+
+      {plan && (plan.active.length > 0 || plan.ignored.length > 0) && (
+        <section
+          aria-label="No próximo início"
+          className="rounded-md border border-subtle px-2.5 py-2"
+        >
+          <h4 className="pb-0.5 text-caption tracking-[0.02em] text-muted uppercase">
+            No próximo início
+          </h4>
+          <p className="text-caption text-secondary">
+            {plan.active.length > 0 ? plan.active.join(' → ') : 'Nenhuma skill entra.'}
+          </p>
+          {plan.ignored.map((ignored) => (
+            <p key={ignored.name} className="text-caption text-awaiting">
+              {ignored.message}
+            </p>
+          ))}
+        </section>
       )}
 
       <section aria-label="Skills do agente">

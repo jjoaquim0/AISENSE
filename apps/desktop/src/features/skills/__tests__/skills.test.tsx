@@ -9,12 +9,14 @@ import type { SkillLibraryView } from '@/types/generated/SkillLibraryView';
 const library = vi.fn();
 const ofAgent = vi.fn();
 const setForAgent = vi.fn();
+const plan = vi.fn();
 let changed: () => void = () => {};
 vi.mock('@/features/skills/api', () => ({
   skillsApi: {
     library: () => library(),
     ofAgent: (...a: unknown[]) => ofAgent(...a),
     setForAgent: (...a: unknown[]) => setForAgent(...a),
+    plan: (...a: unknown[]) => plan(...a),
   },
   onSkillsChanged: (handler: () => void) => {
     changed = handler;
@@ -73,6 +75,7 @@ describe('aba Skills', () => {
     root = createRoot(host);
     ofAgent.mockResolvedValue([{ skillId: 'revisor', enabled: true }]);
     setForAgent.mockResolvedValue(undefined);
+    plan.mockResolvedValue({ active: [], ignored: [] });
   });
   afterEach(() => {
     act(() => root.unmount());
@@ -106,6 +109,25 @@ describe('aba Skills', () => {
     library.mockResolvedValue(view([entry('revisor', { targets: ['claude'] })]));
     await render();
     expect(host.textContent).toContain('Não roda em codex (só claude).');
+  });
+
+  it('mostra o que entra no próximo início e o que fica de fora, com o porquê', async () => {
+    library.mockResolvedValue(view([entry('revisor', { targets: ['claude'] }), entry('docs')]));
+    plan.mockResolvedValue({
+      active: ['docs'],
+      ignored: [
+        {
+          name: 'revisor',
+          reason: { kind: 'incompatible', adapterId: 'codex', targets: ['claude'] },
+          message: 'skill revisor ignorada: não roda em codex (só claude)',
+        },
+      ],
+    });
+    await render();
+    const next = host.querySelector('[aria-label="No próximo início"]');
+    expect(next?.textContent).toContain('docs');
+    expect(next?.textContent).toContain('skill revisor ignorada: não roda em codex (só claude)');
+    expect(plan).toHaveBeenCalledWith('agt_1');
   });
 
   it('adicionar grava a lista inteira e pede reinício com o agente rodando', async () => {

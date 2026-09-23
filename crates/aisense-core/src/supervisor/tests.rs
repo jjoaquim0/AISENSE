@@ -70,6 +70,7 @@ struct Harness {
     pty: Arc<PtyManager>,
     recorder: Arc<Recorder>,
     logs: PathBuf,
+    skills: Arc<crate::skill::SkillLibrary>,
 }
 
 impl Drop for Harness {
@@ -90,6 +91,7 @@ fn harness() -> Harness {
     let runtimes = Arc::new(RuntimeRegistry::new(AdapterCatalog::load_from(
         &builtins, None,
     )));
+    let skills = Arc::new(crate::skill::SkillLibrary::default());
     let supervisor = AgentSupervisor::new(
         Arc::clone(&store),
         runtimes,
@@ -105,6 +107,7 @@ fn harness() -> Harness {
                 inherited_path: std::env::var_os("PATH"),
             },
             size: TerminalSize::default(),
+            skills: Arc::clone(&skills),
         },
     );
     Harness {
@@ -113,6 +116,7 @@ fn harness() -> Harness {
         pty,
         recorder,
         logs,
+        skills,
     }
 }
 
@@ -332,6 +336,47 @@ async fn each_session_knows_where_it_starts_in_the_log() {
             t.text
         );
     }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn start_reports_the_skills_it_took_and_the_ones_it_ignored() {
+    use crate::repo::{AgentSkill, SkillRepository};
+    use crate::skill::{IgnoreReason, SkillCatalog};
+
+    let h = harness();
+    let id = h.agent(long_running(), RestartPolicy::Never).await;
+    let skills: &[crate::skill::BuiltinSkill] = &[
+        (
+            "geral",
+            "---\nname: geral\ndescription: Serve a todos.\n---\ncorpo\n",
+        ),
+        (
+            "so-claude",
+            "---\nname: so-claude\ndescription: Só claude.\ntargets: [claude]\n---\ncorpo\n",
+        ),
+    ];
+    h.skills.set_catalog(SkillCatalog::load_from(skills, None));
+    h.skills.sync(&*h.store, 1).await.unwrap();
+    let records = h.store.list_skills().await.unwrap();
+    let assigned: Vec<_> = records
+        .iter()
+        .map(|r| AgentSkill {
+            skill_id: r.id.clone(),
+            enabled: true,
+        })
+        .collect();
+    h.store.set_agent_skills(&id, &assigned).await.unwrap();
+
+    // O agente de teste roda no adaptador `custom`: a skill só do claude fica de fora,
+    // e o agente sobe mesmo assim.
+    let outcome = h.supervisor.start(&id).await.unwrap();
+    assert_eq!(outcome.skills.active, ["geral"]);
+    assert_eq!(outcome.skills.ignored.len(), 1);
+    assert!(matches!(
+        outcome.skills.ignored[0].reason,
+        IgnoreReason::Incompatible { .. }
+    ));
+    assert!(h.supervisor.state(&id).is_running());
 }
 
 /// Repositório git com um commit, para os testes de bancada.

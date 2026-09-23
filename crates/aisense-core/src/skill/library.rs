@@ -18,6 +18,14 @@ pub struct SkillLibrary {
     catalog: RwLock<Arc<SkillCatalog>>,
 }
 
+impl std::fmt::Debug for SkillLibrary {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SkillLibrary")
+            .field("skills", &self.catalog().skills().count())
+            .finish()
+    }
+}
+
 impl SkillLibrary {
     pub fn new(catalog: SkillCatalog) -> Self {
         Self {
