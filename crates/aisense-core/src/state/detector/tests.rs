@@ -271,3 +271,13 @@ fn prompt_redrawn_in_place_is_read_as_the_final_screen() {
     assert_eq!(d.screen_tail(), "$");
     assert_eq!(d.tick(t0 + Duration::from_secs(1)).unwrap().state, Idle);
 }
+
+#[test]
+fn last_lines_are_what_a_thumbnail_shows() {
+    let r = rules("shell");
+    let t0 = Instant::now();
+    let mut d = StateDetector::new(&r, 24, 80, t0);
+    d.feed(b"\x1b[31mum\x1b[0m\r\n\r\ndois\r\ntr\xc3\xaas\r\n$ ", t0);
+    assert_eq!(d.last_lines(2), ["três", "$"]);
+    assert_eq!(d.last_lines(10), ["um", "dois", "três", "$"]);
+}

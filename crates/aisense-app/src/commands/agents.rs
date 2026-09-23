@@ -9,8 +9,8 @@ use aisense_core::agent::{
 use aisense_core::repo::{AgentRepository, RepoError};
 use aisense_core::state::StateConfidence;
 use aisense_core::supervisor::{
-    AgentStateChanged, AgentSupervisor, LaunchContext, StartOutcome, SupervisorConfig,
-    SupervisorError, SupervisorObserver,
+    AgentPreview, AgentStateChanged, AgentSupervisor, LaunchContext, StartOutcome,
+    SupervisorConfig, SupervisorError, SupervisorObserver,
 };
 use aisense_core::{now_ms, AgentId, CommandError, DataDir, TeamId};
 use aisense_pty::TerminalSize;
@@ -156,6 +156,16 @@ pub async fn agent_delete(
     // Para e remove a bancada; com trabalho não commitado nela, recusa (`docs/16`).
     supervisor.retire(&agent_id).await.map_err(command_error)?;
     store.delete_agent(&agent_id).await.map_err(repo_error)
+}
+
+/// Últimas linhas da tela de cada agente, para as miniaturas da vista Foco (F03-04).
+#[tauri::command]
+pub fn agent_previews(
+    supervisor: State<'_, Supervisor>,
+    agent_ids: Vec<AgentId>,
+    lines: usize,
+) -> Vec<AgentPreview> {
+    supervisor.previews(&agent_ids, lines)
 }
 
 /// "Duplicar" do menu do painel: mesma configuração, handle e cor livres.

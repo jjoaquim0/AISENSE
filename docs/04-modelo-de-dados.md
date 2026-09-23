@@ -175,6 +175,7 @@ e preserva as outras:
 
 ```jsonc
 {
+  "view": "grid",                  // "grid" | "focus" (Fluxo e Timeline chegam nas Fases 5 e 7)
   "grid": {
     "preset": "4",                 // "1" | "2" | "3" | "4" | "6" | "9" | "free"
     "order": ["agt_…", "agt_…"],   // nos presets, só os N primeiros aparecem

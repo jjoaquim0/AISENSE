@@ -16,9 +16,11 @@ import { AgentFormDialog } from '@/features/agents/AgentFormDialog';
 import { agentsApi, onAgentState } from '@/features/agents/api';
 import { ProjectCommandsDialog } from '@/features/project/ProjectCommandsDialog';
 import { AgentPane } from '@/features/team-room/components/AgentPane';
-import { GridView } from '@/features/team-room/components/GridView';
+import { FocusView } from '@/features/team-room/components/FocusView';
+import { type DragHandle, GridView } from '@/features/team-room/components/GridView';
 import { PresetPicker } from '@/features/team-room/components/PresetPicker';
-import { useGridLayout } from '@/features/team-room/hooks/useGridLayout';
+import { ViewPicker } from '@/features/team-room/components/ViewPicker';
+import { useTeamLayout } from '@/features/team-room/hooks/useTeamLayout';
 import type { PaneAction } from '@/features/team-room/paneMenu';
 import { cn } from '@/lib/cn';
 import type { Agent } from '@/types/generated/Agent';
@@ -46,7 +48,7 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
   const [problem, setProblem] = useState<string | null>(null);
   const [commandsOpen, setCommandsOpen] = useState(false);
   const [confidence, setConfidence] = useState<Record<string, StateConfidence>>({});
-  const [grid, setGrid] = useGridLayout(
+  const { grid, setGrid, view, setView } = useTeamLayout(
     team,
     agents.map((a) => a.id),
     setProblem,
@@ -110,6 +112,25 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
 
   // "Limpar" do menu: um contador por agente que o terminal observa.
   const [clears, setClears] = useState<Record<string, number>>({});
+  const renderPane = (id: string, drag?: DragHandle) => {
+    const agent = agents.find((a) => a.id === id);
+    if (!agent) return null;
+    return (
+      <AgentPane
+        agent={agent}
+        state={stateOf(agent.id)}
+        confidence={confidence[agent.id]}
+        branch={branches[agent.id]}
+        focused={agent.id === selectedId}
+        clearSignal={clears[agent.id]}
+        dragHandle={drag}
+        onFocus={() => setSelectedId(agent.id)}
+        onAction={(action) => paneAction(agent, action)}
+        className="min-w-0 flex-1"
+      />
+    );
+  };
+
   const paneAction = (agent: Agent, action: PaneAction) => {
     switch (action) {
       case 'start':
@@ -149,7 +170,10 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
             <Folder size={11} /> <span className="font-mono">{team.workdir}</span>
           </p>
         </div>
-        <PresetPicker value={grid.preset} onChange={(preset) => setGrid({ ...grid, preset })} />
+        <ViewPicker value={view} onChange={setView} />
+        {view === 'grid' && (
+          <PresetPicker value={grid.preset} onChange={(preset) => setGrid({ ...grid, preset })} />
+        )}
         <Button onClick={() => setCommandsOpen(true)}>
           <FileCode size={13} /> Comandos
         </Button>
@@ -275,29 +299,23 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
         </ul>
 
         <section aria-label="Terminais da equipe" className="flex min-w-0 flex-1 flex-col p-2">
-          {agents.length > 0 ? (
+          {agents.length > 0 && view === 'focus' ? (
+            <FocusView
+              order={grid.order}
+              agents={agents}
+              focusedId={selectedId}
+              stateOf={stateOf}
+              confidenceOf={(id) => confidence[id]}
+              renderPane={(id) => renderPane(id)}
+              onFocus={setSelectedId}
+              onAdd={() => setForm({ open: true })}
+            />
+          ) : agents.length > 0 ? (
             <GridView
               layout={grid}
               onChange={setGrid}
               labelOf={(id) => `@${handleOf(id)}`}
-              renderPane={(id, drag) => {
-                const agent = agents.find((a) => a.id === id);
-                if (!agent) return null;
-                return (
-                  <AgentPane
-                    agent={agent}
-                    state={stateOf(agent.id)}
-                    confidence={confidence[agent.id]}
-                    branch={branches[agent.id]}
-                    focused={agent.id === selectedId}
-                    clearSignal={clears[agent.id]}
-                    dragHandle={drag}
-                    onFocus={() => setSelectedId(agent.id)}
-                    onAction={(action) => paneAction(agent, action)}
-                    className="min-w-0 flex-1"
-                  />
-                );
-              }}
+              renderPane={renderPane}
             />
           ) : (
             <EmptyState

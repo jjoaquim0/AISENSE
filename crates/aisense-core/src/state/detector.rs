@@ -154,14 +154,20 @@ impl StateDetector {
     /// As últimas linhas não vazias da tela, sem ANSI — o que os regex enxergam.
     /// Serve também ao "modo calibração" da UI.
     pub fn screen_tail(&self) -> String {
+        self.last_lines(TAIL_LINES).join("\n")
+    }
+
+    /// As `count` últimas linhas não vazias da tela, sem ANSI. É o que as miniaturas
+    /// da vista Foco mostram: texto da tela de verdade, sem precisar de um xterm.
+    pub fn last_lines(&self, count: usize) -> Vec<String> {
         let contents = self.screen.screen().contents();
         let lines: Vec<&str> = contents
             .lines()
             .map(str::trim_end)
             .filter(|l| !l.trim().is_empty())
             .collect();
-        let start = lines.len().saturating_sub(TAIL_LINES);
-        lines[start..].join("\n")
+        let start = lines.len().saturating_sub(count);
+        lines[start..].iter().map(|l| (*l).to_owned()).collect()
     }
 
     /// Decide pela **linha mais baixa** que casar com algum regex; na mesma linha,

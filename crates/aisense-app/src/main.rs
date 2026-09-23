@@ -78,6 +78,7 @@ fn main() {
             commands::agents::agent_update,
             commands::agents::agent_delete,
             commands::agents::agent_duplicate,
+            commands::agents::agent_previews,
             commands::agents::handle_suggest,
             commands::teams::teams_list,
             commands::teams::team_template_plan,
