@@ -10,6 +10,8 @@ export const terminalApi = {
   kill: (agentId: string): Promise<void> => invoke('pty_kill', { agentId }),
   /** Histórico em base64, para reidratar o xterm de uma vez só. */
   snapshot: (agentId: string): Promise<string> => invoke('pty_snapshot', { agentId }),
+  /** Liga os eventos do agente e devolve o histórico em base64 para reidratar. */
+  show: (agentId: string): Promise<string> => invoke('pty_show', { agentId }),
   /** Esquece o histórico retido (o log em disco fica). */
   clear: (agentId: string): Promise<void> => invoke('pty_clear', { agentId }),
   setVisible: (agentId: string, visible: boolean): Promise<void> =>

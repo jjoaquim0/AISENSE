@@ -385,7 +385,8 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
             recorded: recorded_rx,
             detector: detector_tx,
         });
-        if let Err(error) = self.shared.pty.spawn(agent_id.as_str(), spec, hook) {
+        // Nasce invisível: só um painel na tela liga os eventos (F03-05).
+        if let Err(error) = self.shared.pty.spawn_hidden(agent_id.as_str(), spec, hook) {
             self.set_state(agent_id, AgentState::Failed);
             return Err(error.into());
         }

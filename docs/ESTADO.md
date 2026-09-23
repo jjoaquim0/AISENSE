@@ -23,7 +23,7 @@ runtime e, depois, o supervisor que sobe os agentes.
 | 00 — Fundação | 🟨 Em andamento | 6 feitas, 3 parciais de 9 |
 | 01 — Terminal Core | 🟨 Em andamento | 4 feitas, 4 parciais de 8 |
 | 02 — Equipes e Agentes | 🟨 Código completo | 11 de 11 feitas — falta a demonstração na janela |
-| 03 — Sala da Equipe | 🟨 Em andamento | 4 feitas de 9 |
+| 03 — Sala da Equipe | 🟨 Em andamento | 5 feitas de 9 |
 | 04 — Sistema de Skills | ⬜ Não iniciada | 0/9 |
 | 05 — Barramento | ⬜ Não iniciada | 0/13 |
 | 06 — Quadro Kanban | ⬜ Não iniciada | 0/11 |
@@ -43,6 +43,7 @@ pendente e não bloqueia nada da Fase 03.
 | Tarefa | Situação |
 |---|---|
 | F03-01 Detector de estado | ✅ `StateDetector` (tela via `vt100`, regras do `docs/05`), tarefa por sessão no supervisor, `agent:state` com `confidence` |
+| F03-05 Visibilidade | ✅ agentes nascem invisíveis; só o painel na tela (e com a janela em primeiro plano) recebe `pty:data`; reidratação ordenada ao voltar |
 | F03-04 Vista Foco | ✅ terminal grande + miniaturas de texto (sem xterm) vindas da tela do detector, a 2 fps; vista salva por equipe |
 | F03-03 Vista Grid | ✅ presets 1/2/3/4/6/9 + livre, arrastar/redimensionar, layout salvo por equipe; 60 fps arrastando (terminais parados, sem GPU) — 9 terminais ativos a 55 fps só verificável com GPU |
 | F03-02 Painel de agente | ✅ `AgentPane` com borda na cor do agente, estado com forma + texto, menu `⋮` (reiniciar, parar/iniciar, limpar, duplicar, configurar) |
@@ -233,3 +234,4 @@ Bugs encontrados pelos próprios testes, todos corrigidos na origem:
 | 2026-09-23 | Claude | Causa real do CI vermelho no Windows: ConPTY fechado cedo demais perdia as últimas linhas; corrigido. F03-02 (painel de agente com menu ⋮, duplicar e limpar) |
 | 2026-09-23 | Claude | F03-03 (vista Grid com dnd-kit, modo livre, layout por equipe) e bancada de desempenho `#/dev/grid` |
 | 2026-09-23 | Claude | F03-04 (vista Foco com miniaturas leves) e correção do preset inicial da Grid |
+| 2026-09-23 | Claude | F03-05 (só o painel visível recebe saída ao vivo; agentes nascem invisíveis) |

@@ -92,6 +92,14 @@ pub fn pty_snapshot(manager: State<'_, Manager>, agent_id: String) -> Result<Str
     Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
 }
 
+/// Um painel apareceu na tela: liga os eventos deste agente e devolve o histórico,
+/// em base64, para o xterm reidratar de uma vez (F03-05).
+#[tauri::command]
+pub fn pty_show(manager: State<'_, Manager>, agent_id: String) -> Result<String, CommandError> {
+    let bytes = manager.show(&agent_id).map_err(pty_error)?;
+    Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
+}
+
 /// "Limpar" do menu do painel: esquece o histórico retido (o log em disco fica).
 #[tauri::command]
 pub fn pty_clear(manager: State<'_, Manager>, agent_id: String) -> Result<(), CommandError> {

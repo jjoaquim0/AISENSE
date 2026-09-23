@@ -72,11 +72,22 @@ Um terminal grande + tira de miniaturas com as últimas 4 linhas renderizadas fo
 > Corrigido de carona um defeito da F03-03: equipe sem layout salvo abria com a lista de agentes
 > ainda vazia, ganhava o preset "1" e ficava presa nele.
 
-### [ ] F03-05 — Gestão de visibilidade
+### [x] F03-05 — Gestão de visibilidade
 Integrar com `pty_set_visible`: painel fora da tela ou em vista que não o mostra é marcado invisível;
 ao ficar visível, reidrata com snapshot.
 **Aceite:** com 9 agentes ativos em modo Foco, apenas 1 emite eventos `pty:data`.
 Depende de F03-03, F03-04, F01-07.
+> Feito: o supervisor sobe agentes com `PtyManager::spawn_hidden` — **invisíveis por padrão**;
+> antes todo agente emitia eventos mesmo sem painel. O `<Terminal />` liga os eventos só quando
+> está de fato na tela (`IntersectionObserver` + janela em primeiro plano) via o novo `pty_show`,
+> que liga a emissão e devolve o histórico com o lote travado; ao sumir, desmontar ou a janela ir
+> para segundo plano, desliga. A reidratação passa por um portão (`HydrationGate`) que segura a
+> saída ao vivo até o histórico ser escrito, para ela não aparecer acima dele.
+> Aceite como teste em `aisense-pty` (9 sessões produzindo saída, um `show`: só ele emite, os
+> outros guardam tudo no ring) e no front (contrato show/esconder/desmontar/segundo plano).
+> **Limite conhecido:** um chunk que já estava no ring mas ainda não tinha passado pelo lote no
+> instante do `show` pode aparecer duas vezes — janela de milissegundos, a mesma que o painel
+> já tinha ao montar. Eliminá-la pede numerar a saída; fica anotado se aparecer na prática.
 
 ### [ ] F03-06 — Controles da equipe
 ▶ Iniciar equipe (sobe os `autostart` em ordem, com escalonamento de 300 ms entre spawns),
