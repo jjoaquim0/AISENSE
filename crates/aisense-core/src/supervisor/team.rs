@@ -141,7 +141,8 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
             progress(self.progress(team_id, op, index, total, Some(&agent.id), false));
             match self.start(&agent.id).await {
                 Ok(outcome) => {
-                    if let Some(message) = outcome.workdir.warning {
+                    let skill_notes = outcome.skills.ignored.into_iter().map(|s| s.message);
+                    for message in outcome.workdir.warning.into_iter().chain(skill_notes) {
                         report.notices.push(AgentNotice {
                             agent_id: agent.id.clone(),
                             message,

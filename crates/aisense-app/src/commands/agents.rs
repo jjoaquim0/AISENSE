@@ -53,6 +53,7 @@ pub fn setup(
     store: Store,
     runtimes: Registry,
     pty: Manager,
+    skills: super::skills::Library,
 ) -> Supervisor {
     // Em desenvolvimento e no pacote, `aisense` e `aisense-mcp` ficam ao lado do app.
     let sidecar_dir = std::env::current_exe()
@@ -73,6 +74,7 @@ pub fn setup(
                 inherited_path: std::env::var_os("PATH"),
             },
             size: TerminalSize::default(),
+            skills,
         },
     )
 }

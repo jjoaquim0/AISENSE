@@ -30,7 +30,10 @@ use crate::agent::{AgentState, RestartPolicy};
 use crate::bench::{prepare_workdir, remove_bench, BenchError, Workdir};
 use crate::ids::{AgentId, SessionId, TeamId};
 use crate::project::{load_project, ProjectLookup};
-use crate::repo::{AgentRepository, RepoError, SessionRecord, SessionRepository, TeamRepository};
+use crate::repo::{
+    AgentRepository, RepoError, SessionRecord, SessionRepository, SkillRepository, TeamRepository,
+};
+use crate::skill::{resolve_agent_skills, SkillLibrary, SkillPlan};
 use crate::state::{Detection, StateConfidence, StateDetector};
 use crate::time::now_ms;
 
@@ -55,6 +58,8 @@ pub struct AgentStateChanged {
 #[ts(export, export_to = "../../../apps/desktop/src/types/generated/")]
 pub struct StartOutcome {
     pub workdir: Workdir,
+    /// Skills que o agente levou e as que ficaram de fora, com o porquê (F04-03).
+    pub skills: SkillPlan,
 }
 
 /// Uma ressalva sobre um agente que subiu (sem git, setup que falhou...).
@@ -108,8 +113,14 @@ enum DetectorInput {
 }
 
 /// As portas de que o supervisor precisa, juntas.
-pub trait SupervisorStore: TeamRepository + AgentRepository + SessionRepository + 'static {}
-impl<T: TeamRepository + AgentRepository + SessionRepository + 'static> SupervisorStore for T {}
+pub trait SupervisorStore:
+    TeamRepository + AgentRepository + SessionRepository + SkillRepository + 'static
+{
+}
+impl<T: TeamRepository + AgentRepository + SessionRepository + SkillRepository + 'static>
+    SupervisorStore for T
+{
+}
 
 #[derive(Debug, Clone)]
 pub struct SupervisorConfig {
@@ -120,6 +131,8 @@ pub struct SupervisorConfig {
     pub launch: LaunchContext,
     /// Tamanho inicial do terminal; a UI redimensiona quando o painel abre.
     pub size: TerminalSize,
+    /// Biblioteca de skills atual: o start resolve as do agente contra ela (F04-03).
+    pub skills: Arc<SkillLibrary>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -312,6 +325,19 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
             .adapter(&agent.adapter_id)
             .ok_or_else(|| SupervisorError::UnknownAdapter(agent.adapter_id.clone()))?;
 
+        // Skills: as habilitadas, no disco e compatíveis com o runtime (`docs/06`). As que
+        // ficam de fora não impedem o start — voltam no resultado para a UI avisar.
+        let skills = resolve_agent_skills(
+            &**store,
+            &self.shared.config.skills.catalog(),
+            agent_id,
+            &agent.adapter_id,
+        )
+        .await?;
+        for ignored in &skills.ignored {
+            tracing::warn!(agent = %agent_id, %ignored, "skill ignorada no boot");
+        }
+
         // Bancada: pode criar worktree, copiar arquivos e rodar o setup — tudo
         // bloqueante, então fora das threads do runtime assíncrono.
         let workdir = match self.prepare_workdir(&team, &agent).await {
@@ -430,7 +456,10 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
         let _ = recorded_tx.send(true);
 
         // Fica em `starting` até o detector ler a primeira tela (F03-01).
-        Ok(StartOutcome { workdir })
+        Ok(StartOutcome {
+            workdir,
+            skills: skills.plan(),
+        })
     }
 
     async fn prepare_workdir(

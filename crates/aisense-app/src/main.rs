@@ -48,6 +48,7 @@ fn main() {
                 store.clone(),
                 std::sync::Arc::clone(&registry),
                 setup_manager,
+                std::sync::Arc::clone(&library),
             );
             app.manage(store);
             app.manage(registry);
@@ -102,6 +103,7 @@ fn main() {
             commands::skills::skills_library,
             commands::skills::agent_skills_get,
             commands::skills::agent_skills_set,
+            commands::skills::agent_skills_plan,
             commands::project::project_lookup,
             commands::project::project_accept,
         ])
