@@ -94,3 +94,9 @@ jobs:
 
       - name: Compilar o app
         run: cargo build -p aisense-app
+
+      # O job `check` só roda testes no Linux. O PTY do Windows (ConPTY) tem outra
+      # semântica — EOF, kill, pedido de cursor — e já escondeu bugs que só apareciam lá.
+      - name: Testes do PTY (Windows)
+        if: matrix.os == 'windows-latest'
+        run: cargo test -p aisense-pty

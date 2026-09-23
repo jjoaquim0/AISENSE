@@ -11,6 +11,8 @@ mod log;
 mod manager;
 mod ring;
 mod session;
+#[cfg(test)]
+mod test_support;
 mod wire;
 
 pub use batch::{Batcher, DEFAULT_WINDOW};

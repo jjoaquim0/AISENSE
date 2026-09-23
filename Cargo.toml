@@ -38,3 +38,7 @@ lto = true
 opt-level = "s"
 strip = true
 panic = "abort"
+
+# portable-pty com as flags do ConPTY corrigidas para o Windows 10 (ver vendor/portable-pty/AISENSE.md).
+[patch.crates-io]
+portable-pty = { path = "vendor/portable-pty" }

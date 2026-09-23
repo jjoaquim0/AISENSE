@@ -91,8 +91,11 @@ impl PtySpawn {
     }
 }
 
+type Master = Arc<Mutex<Option<Box<dyn MasterPty + Send>>>>;
+
 pub struct PtySession {
-    master: Mutex<Box<dyn MasterPty + Send>>,
+    /// `None` depois que o processo termina no Windows — ver `close_console_on_exit`.
+    master: Master,
     writer: Mutex<Box<dyn Write + Send>>,
     killer: Mutex<Box<dyn ChildKiller + Send + Sync>>,
     output: broadcast::Sender<Bytes>,
@@ -194,6 +197,8 @@ impl PtySession {
         // A espera pelo processo é bloqueante e mora na própria thread; o `killer` foi
         // clonado antes, então parar o agente não depende desta thread.
         let running_for_waiter = Arc::clone(&running);
+        let master: Master = Arc::new(Mutex::new(Some(pair.master)));
+        let master_for_waiter = Arc::clone(&master);
         std::thread::Builder::new()
             .name("aisense-pty-wait".into())
             .spawn(move || {
@@ -205,6 +210,7 @@ impl PtySession {
                     }
                 };
                 running_for_waiter.store(false, Ordering::SeqCst);
+                close_console_on_exit(&master_for_waiter);
                 let _ = exit_tx.send(Some(code));
             })
             .map_err(|error| PtyError::Spawn {
@@ -213,7 +219,7 @@ impl PtySession {
             })?;
 
         Ok(Self {
-            master: Mutex::new(pair.master),
+            master,
             primary: Mutex::new(Some(primary)),
             writer: Mutex::new(writer),
             killer: Mutex::new(killer),
@@ -262,6 +268,8 @@ impl PtySession {
     pub fn resize(&self, size: TerminalSize) -> Result<(), PtyError> {
         let master = self.master.lock().map_err(|_| PtyError::Closed)?;
         master
+            .as_ref()
+            .ok_or(PtyError::Closed)?
             .resize(size.into())
             .map_err(|error| PtyError::Resize(error.to_string()))
     }
@@ -304,6 +312,22 @@ impl PtySession {
             if exit.changed().await.is_err() {
                 return -1;
             }
+        }
+    }
+}
+
+/// No Windows, a leitura de um ConPTY **não** vê EOF quando o processo termina: o
+/// pseudo-console continua aberto e a thread de leitura ficaria parada para sempre —
+/// e com ela o evento de término, do qual o supervisor depende para reiniciar
+/// agentes. Soltar o master (o escravo já foi solto no spawn) chama
+/// `ClosePseudoConsole`, que entrega o que falta da saída e fecha o pipe.
+///
+/// Em Unix o EOF já vem com a morte do processo; o master fica para quem ainda
+/// quiser consultá-lo.
+fn close_console_on_exit(master: &Master) {
+    if cfg!(windows) {
+        if let Ok(mut master) = master.lock() {
+            drop(master.take());
         }
     }
 }
@@ -367,14 +391,7 @@ mod tests {
     use super::*;
     use crate::ring::DEFAULT_MAX_BYTES;
 
-    /// Um comando de shell que funciona nos três sistemas.
-    fn shell(script: &str) -> PtySpawn {
-        if cfg!(windows) {
-            PtySpawn::new("cmd").arg("/C").arg(script)
-        } else {
-            PtySpawn::new("sh").arg("-c").arg(script)
-        }
-    }
+    use crate::test_support::*;
 
     /// Procura uma linha exata na saída.
     ///
@@ -421,7 +438,7 @@ mod tests {
 
     #[tokio::test]
     async fn escreve_no_processo_como_se_fosse_digitado() {
-        let session = PtySession::spawn(shell("cat")).unwrap();
+        let session = PtySession::spawn(echo_stdin()).unwrap();
         session.write(b"linha digitada\n").unwrap();
         let output = wait_for(&session, "linha digitada").await;
         assert!(output.contains("linha digitada"), "{output:?}");
@@ -430,7 +447,7 @@ mod tests {
 
     #[tokio::test]
     async fn entrega_a_saida_a_quem_assina() {
-        let session = PtySession::spawn(shell("cat")).unwrap();
+        let session = PtySession::spawn(echo_stdin()).unwrap();
         let mut stream = session.subscribe();
 
         session.write(b"pelo-broadcast\n").unwrap();
@@ -455,21 +472,30 @@ mod tests {
     #[tokio::test]
     async fn o_processo_enxerga_o_tamanho_do_terminal() {
         // Se o tamanho não chegasse ao processo, TUIs como htop desenhariam errado.
-        let session = PtySession::spawn(shell("stty size").size(TerminalSize {
+        let session = PtySession::spawn(print_size().size(TerminalSize {
             rows: 40,
             cols: 132,
         }))
         .unwrap();
-        let output = wait_for(&session, "40").await;
-        assert!(
-            output.contains("40 132"),
-            "esperava '40 132', veio: {output:?}"
-        );
+        if cfg!(windows) {
+            // `mode con` sai localizado ("Linhas: 40", "Colunas: 132").
+            let output = wait_for(&session, "132").await;
+            assert!(
+                output.contains("40"),
+                "esperava 40 linhas, veio: {output:?}"
+            );
+        } else {
+            let output = wait_for(&session, "40").await;
+            assert!(
+                output.contains("40 132"),
+                "esperava '40 132', veio: {output:?}"
+            );
+        }
     }
 
     #[tokio::test]
     async fn redimensionar_nao_falha_com_a_sessao_viva() {
-        let session = PtySession::spawn(shell("cat")).unwrap();
+        let session = PtySession::spawn(echo_stdin()).unwrap();
         session
             .resize(TerminalSize {
                 rows: 50,
@@ -481,7 +507,7 @@ mod tests {
 
     #[tokio::test]
     async fn kill_encerra_um_processo_que_ficaria_parado() {
-        let session = PtySession::spawn(shell("sleep 60")).unwrap();
+        let session = PtySession::spawn(long_running()).unwrap();
         assert!(session.is_running());
         session.kill().unwrap();
 
@@ -526,7 +552,7 @@ mod tests {
     async fn o_ambiente_chega_ao_processo() {
         // É assim que AISENSE_TOKEN e AISENSE_AGENT_HANDLE chegam ao agente.
         let session = PtySession::spawn(
-            shell("echo handle=$AISENSE_AGENT_HANDLE").env("AISENSE_AGENT_HANDLE", "backend"),
+            print_env("AISENSE_AGENT_HANDLE", "handle").env("AISENSE_AGENT_HANDLE", "backend"),
         )
         .unwrap();
         let output = wait_for(&session, "handle=backend").await;
@@ -541,7 +567,7 @@ mod tests {
         let path = dir.path().join("agente.log");
 
         let session = PtySession::spawn_with_ring(
-            shell("for i in $(seq 1 300); do echo linha $i; done").log_path(&path),
+            many_lines(300).log_path(&path),
             RingBuffer::new(10, DEFAULT_MAX_BYTES),
         )
         .unwrap();
@@ -567,7 +593,7 @@ mod tests {
     #[tokio::test]
     async fn aguenta_saida_volumosa_sem_estourar_a_memoria() {
         let session = PtySession::spawn_with_ring(
-            shell("for i in $(seq 1 20000); do echo linha $i; done"),
+            many_lines(VOLUME_LINES),
             RingBuffer::new(500, DEFAULT_MAX_BYTES),
         )
         .unwrap();

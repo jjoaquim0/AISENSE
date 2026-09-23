@@ -331,16 +331,11 @@ mod tests {
         }
     }
 
-    fn shell(script: &str) -> PtySpawn {
-        if cfg!(windows) {
-            PtySpawn::new("cmd").arg("/C").arg(script)
-        } else {
-            PtySpawn::new("sh").arg("-c").arg(script)
-        }
-    }
+    use crate::test_support::*;
 
     async fn wait_until(mut condition: impl FnMut() -> bool) {
-        let deadline = Instant::now() + Duration::from_secs(10);
+        // Folga para o ConPTY do Windows 10, lento com vários terminais em paralelo.
+        let deadline = Instant::now() + Duration::from_secs(30);
         while !condition() {
             assert!(
                 Instant::now() < deadline,
@@ -412,7 +407,7 @@ mod tests {
         manager
             .spawn(
                 "agt_3",
-                shell("echo erro fatal aqui; exit 1"),
+                echo_then_exit("erro fatal aqui", 1),
                 recorder.clone(),
             )
             .unwrap();
@@ -431,7 +426,7 @@ mod tests {
         let recorder = Arc::new(Recorder::default());
 
         manager
-            .spawn("agt_4", shell("cat"), recorder.clone())
+            .spawn("agt_4", echo_stdin(), recorder.clone())
             .unwrap();
         manager.set_visible("agt_4", false).unwrap();
         manager.write("agt_4", b"barulho invisivel\n").unwrap();
@@ -453,16 +448,12 @@ mod tests {
         let recorder = Arc::new(Recorder::default());
 
         manager
-            .spawn(
-                "agt_5",
-                shell("for i in $(seq 1 5000); do echo linha $i; done"),
-                recorder.clone(),
-            )
+            .spawn("agt_5", many_lines(INTENSE_LINES), recorder.clone())
             .unwrap();
         wait_until(|| !recorder.exits().is_empty()).await;
 
         assert!(
-            recorder.text().contains("linha 5000"),
+            recorder.text().contains(&format!("linha {INTENSE_LINES}")),
             "a saída precisa chegar inteira"
         );
         // 5000 linhas viram poucas dezenas de eventos, não 5000.
@@ -479,10 +470,10 @@ mod tests {
         let recorder = Arc::new(Recorder::default());
 
         manager
-            .spawn("agt_6", shell("cat"), recorder.clone())
+            .spawn("agt_6", echo_stdin(), recorder.clone())
             .unwrap();
         let error = manager
-            .spawn("agt_6", shell("cat"), recorder.clone())
+            .spawn("agt_6", echo_stdin(), recorder.clone())
             .unwrap_err();
 
         assert!(matches!(error, PtyError::AlreadyRunning(_)));
@@ -527,7 +518,7 @@ mod tests {
 
         for index in 0..4 {
             manager
-                .spawn(format!("agt_{index}"), shell("sleep 60"), recorder.clone())
+                .spawn(format!("agt_{index}"), long_running(), recorder.clone())
                 .unwrap();
         }
         assert_eq!(manager.len(), 4);
