@@ -22,7 +22,7 @@ código e testados; a Fase 03 ainda tem conferência na janela e dois critérios
 
 1. Leia `AGENTS.md` e este arquivo inteiro; depois `docs/fases/FASE-03-sala-da-equipe.md` — cada
    tarefa feita tem uma nota `> Feito:` dizendo onde está o código e o que ficou de fora.
-2. Próxima tarefa: **F04-05** (compositor do `BOOT.md`, em `.aisense/agents/<handle>/`), em
+2. Próxima tarefa: **F04-06** (injeção do `BOOT.md` no boot conforme o adaptador), em
    `docs/fases/FASE-04-skills.md`. Skills em `aisense-core/src/skill/` (parser, catálogo,
    `SkillLibrary`, hot-reload); atribuições por `SkillRepository`; aba Skills do inspetor em
    `features/team-room/components/inspector/SkillsTab.tsx`. Onde a Fase 03 deixou as coisas: sidebar e inspetor entram no shell por `ShellSlot`
@@ -47,7 +47,7 @@ código e testados; a Fase 03 ainda tem conferência na janela e dois critérios
 | 01 — Terminal Core | 🟨 Em andamento | 4 feitas, 4 parciais de 8 |
 | 02 — Equipes e Agentes | 🟨 Código completo | 11 de 11 feitas — falta a demonstração na janela |
 | 03 — Sala da Equipe | 🟨 Código completo | 9 de 9 feitas — faltam conferência na janela e dois critérios de saída |
-| 04 — Sistema de Skills | 🟨 Em andamento | 4 feitas de 9 |
+| 04 — Sistema de Skills | 🟨 Em andamento | 5 feitas de 9 |
 | 05 — Barramento | ⬜ Não iniciada | 0/13 |
 | 06 — Quadro Kanban | ⬜ Não iniciada | 0/11 |
 | 07 — Coordenação | ⬜ Não iniciada | 0/6 |
@@ -66,6 +66,7 @@ saída que só uma máquina com GPU e os runtimes reais resolvem. Nada da Fase 0
 |---|---|
 | F04-01 Parser e validador | ✅ `SKILL.md` com `caminho:linha` nos erros, campos desconhecidos ignorados (compatível com Claude Code), catálogo embutidas + `~/.aisense/skills/`; `yaml-rust2` no lugar do `gray_matter` |
 | F04-04 Materialização | ✅ `.aisense/agents/<handle>/` (uma pasta por agente) com `agent.json` e skills; cópia na pasta nativa do runtime sem sobrescrever o que é do usuário, com manifesto de donos; sem órfãos entre boots |
+| F04-05 Compositor do BOOT.md | ✅ identidade, equipe, colegas e skills, com fallback de 12.000 caracteres; arquivo criado a cada start e aviso de truncagem. A injeção é a F04-06; o registro da skill embutida na biblioteca é a F04-07 |
 | F04-03 Resolução por agente | ✅ ativas por prioridade e posição, ignoradas com motivo (runtime, fora do disco); o start devolve o plano e a UI avisa; "No próximo início" na aba Skills |
 | F04-02 Registro e persistência | ✅ `skills`/`agent_skills` em SQLite e memória (mesmo contrato), sync sem apagar o que sumiu do disco, hot-reload recursivo com `skills:changed`, aba Skills do inspetor |
 

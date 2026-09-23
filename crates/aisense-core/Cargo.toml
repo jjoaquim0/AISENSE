@@ -27,3 +27,4 @@ yaml-rust2.workspace = true
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
 tempfile = "3"
+insta = { version = "1", default-features = false }
