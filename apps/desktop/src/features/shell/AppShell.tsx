@@ -1,10 +1,11 @@
-import { Moon, PanelRight, Plus, Sun } from 'lucide-react';
+import { BookOpen, Moon, PanelRight, Plus, Sun, Users } from 'lucide-react';
 import { type ReactNode, useCallback, useMemo } from 'react';
 import { IconButton, Tooltip } from '@/components/ui';
 import { formatShortcut } from '@/components/ui/Kbd';
 import { useTeams } from '@/features/teams/store';
 import { isDark, useTheme } from '@/lib/theme';
 import { useShortcuts } from '@/lib/useShortcuts';
+import { type Screen, useNav } from './nav';
 import { ResizeHandle } from './ResizeHandle';
 import { type SlotName, useShellSlots } from './slots';
 import { INSPECTOR_BOUNDS, SIDEBAR_BOUNDS, usePanels } from './usePanels';
@@ -109,22 +110,53 @@ function TitleBar({
 
 function TeamRail() {
   const openWizard = useTeams((s) => s.setWizardOpen);
+  const go = useNav((s) => s.go);
   return (
     <nav
       aria-label="Equipes"
       className="flex w-12 shrink-0 flex-col items-center gap-2 border-r border-subtle bg-surface py-3"
     >
+      <RailButton screen="teams" label="Equipes" icon={<Users size={16} />} />
       <Tooltip content="Nova equipe" side="right">
         <button
           type="button"
           aria-label="Nova equipe"
-          onClick={() => openWizard(true)}
+          onClick={() => {
+            go('teams');
+            openWizard(true);
+          }}
           className="flex size-8 items-center justify-center rounded-lg border border-dashed border-strong text-muted transition-colors duration-100 hover:border-accent hover:text-accent"
         >
           <Plus size={16} />
         </button>
       </Tooltip>
+      <div className="mt-auto">
+        <RailButton screen="skills" label="Biblioteca de skills" icon={<BookOpen size={16} />} />
+      </div>
     </nav>
+  );
+}
+
+function RailButton({ screen, label, icon }: { screen: Screen; label: string; icon: ReactNode }) {
+  const current = useNav((s) => s.screen);
+  const go = useNav((s) => s.go);
+  const active = current === screen;
+  return (
+    <Tooltip content={label} side="right">
+      <button
+        type="button"
+        aria-label={label}
+        aria-current={active ? 'page' : undefined}
+        onClick={() => go(screen)}
+        className={
+          active
+            ? 'flex size-8 items-center justify-center rounded-lg bg-hover text-primary'
+            : 'flex size-8 items-center justify-center rounded-lg text-muted transition-colors duration-100 hover:bg-hover hover:text-primary'
+        }
+      >
+        {icon}
+      </button>
+    </Tooltip>
   );
 }
 

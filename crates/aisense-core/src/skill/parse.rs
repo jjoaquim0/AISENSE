@@ -79,6 +79,13 @@ struct Frontmatter<'a> {
     first_line: u32,
 }
 
+/// Linha do arquivo em que uma chave do frontmatter aparece — para apontar erros que
+/// não são do parser (nome repetido, runtime desconhecido) no mesmo `caminho:linha`.
+pub(super) fn frontmatter_key_line(source: &str, key: &str) -> Option<u32> {
+    let front = split_frontmatter(source)?;
+    find_yaml_key_line(front.yaml, key).map(|l| front.first_line + l - 1)
+}
+
 /// Separa `---\n<yaml>\n---\n<corpo>`. Aceita BOM e `\r\n` (arquivos do Windows).
 fn split_frontmatter(source: &str) -> Option<Frontmatter<'_>> {
     let source = source.strip_prefix('\u{feff}').unwrap_or(source);

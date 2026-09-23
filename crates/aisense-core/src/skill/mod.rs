@@ -4,6 +4,7 @@
 //! `SKILL.md` — frontmatter YAML + Markdown.
 
 mod catalog;
+mod editor;
 mod library;
 mod materialize;
 mod model;
@@ -12,6 +13,11 @@ mod resolve;
 mod watch;
 
 pub use catalog::{BuiltinSkill, SkillCatalog, BUILTIN_SKILLS, SKILL_FILE};
+pub use editor::{
+    check_skill, delete_skill, duplicate_source, export_skill, import_skill, open_skill,
+    open_skill_file, save_skill, skill_users, OpenedSkill, SkillCheck, SkillEditError, SkillUser,
+    SKILL_BOOT_LIMIT,
+};
 pub use library::{SkillEntry, SkillLibrary, SkillLibraryView};
 pub use materialize::{
     materialize, AgentCard, MaterializeError, MaterializeRequest, Materialized, AISENSE_DIR,

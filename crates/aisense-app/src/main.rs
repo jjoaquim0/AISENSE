@@ -54,6 +54,7 @@ fn main() {
             app.manage(registry);
             app.manage(supervisor);
             app.manage(library);
+            app.manage(commands::skills::SkillsHome(data.skills()));
             if let Some(watcher) = skill_watcher {
                 app.manage(watcher);
             }
@@ -104,6 +105,15 @@ fn main() {
             commands::skills::agent_skills_get,
             commands::skills::agent_skills_set,
             commands::skills::agent_skills_plan,
+            commands::skills::skill_check,
+            commands::skills::skill_open,
+            commands::skills::skill_open_file,
+            commands::skills::skill_save,
+            commands::skills::skill_duplicate,
+            commands::skills::skill_delete,
+            commands::skills::skill_import,
+            commands::skills::skill_export,
+            commands::skills::skill_users,
             commands::project::project_lookup,
             commands::project::project_accept,
         ])

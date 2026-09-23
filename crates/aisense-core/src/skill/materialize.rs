@@ -214,7 +214,7 @@ fn remove_stale_agent_dirs(
 
 /// Embutida: o `SKILL.md`. Do usuário: a pasta inteira (referências, scripts), sem links
 /// simbólicos nem `.git` — copiar um link poderia puxar arquivo de fora da skill.
-fn write_skill(skill: &Skill, dest: &Path) -> Result<(), MaterializeError> {
+pub(super) fn write_skill(skill: &Skill, dest: &Path) -> Result<(), MaterializeError> {
     fs::create_dir_all(dest).map_err(io_err(dest))?;
     if let SkillSource::User { dir } = &skill.source {
         copy_tree(Path::new(dir), dest)?;
@@ -225,7 +225,7 @@ fn write_skill(skill: &Skill, dest: &Path) -> Result<(), MaterializeError> {
     fs::write(&file, &skill.raw).map_err(io_err(&file))
 }
 
-fn copy_tree(from: &Path, to: &Path) -> Result<(), MaterializeError> {
+pub(super) fn copy_tree(from: &Path, to: &Path) -> Result<(), MaterializeError> {
     let entries = fs::read_dir(from).map_err(io_err(from))?;
     for entry in entries.filter_map(Result::ok) {
         let path = entry.path();
