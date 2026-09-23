@@ -6,6 +6,7 @@
 //! (regra R5), senão gerar tipos passa a exigir compilar a janela.
 
 pub mod pty;
+pub mod runtimes;
 
 use aisense_core::{AppInfo, CommandError};
 use aisense_pty::PtyError;

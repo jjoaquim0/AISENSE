@@ -73,6 +73,15 @@ CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = "1"
 - `command = "$SHELL"` significa "o shell padrão do sistema" e é resolvido pelo supervisor.
 - Dois arquivos do usuário com o mesmo `id`: vale o primeiro em ordem alfabética; o outro vira aviso.
 
+### Detecção
+
+- O `detect` roda com `stdin` fechado e timeout de 3 s; todos os adaptadores em paralelo.
+- Sucesso → disponível, com a primeira linha da saída como versão. Código de saída ≠ 0, timeout
+  ou executável ausente → indisponível, com o motivo e o `install_hint`.
+- Sem `detect`, basta `command` existir no `PATH`.
+- No Windows a busca no `PATH` tenta as extensões de `PATHEXT` (`claude` → `claude.cmd`).
+- O resultado fica em cache até o usuário pedir para procurar de novo ou o adaptador mudar.
+
 ## Adaptadores embutidos no v1
 
 | `id` | Runtime | MCP | Flag de system prompt | Notas |

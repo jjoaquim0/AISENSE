@@ -22,7 +22,7 @@ runtime e, depois, o supervisor que sobe os agentes.
 |---|---|---|
 | 00 — Fundação | 🟨 Em andamento | 6 feitas, 3 parciais de 9 |
 | 01 — Terminal Core | 🟨 Em andamento | 4 feitas, 4 parciais de 8 |
-| 02 — Equipes e Agentes | 🟨 Em andamento | 4 feitas de 11 |
+| 02 — Equipes e Agentes | 🟨 Em andamento | 5 feitas de 11 |
 | 03 — Sala da Equipe | ⬜ Não iniciada | 0/9 |
 | 04 — Sistema de Skills | ⬜ Não iniciada | 0/9 |
 | 05 — Barramento | ⬜ Não iniciada | 0/13 |
@@ -46,12 +46,17 @@ abertas e devem ser fechadas por quem tiver uma máquina com tela.
 | F02-02 Store SQLite e migrações | ✅ `Store::open` com WAL, FKs, backup antes de migrar; o app migra no `setup` |
 | F02-03 Repositórios | ✅ equipe e agente sobre SQLite; mesmo contrato testado contra SQLite e memória |
 | F02-04 Carregador de adaptadores | ✅ `AdapterCatalog` (embutidos + pasta do usuário, erro com `caminho:linha`) e `AdapterWatcher` (hot-reload) |
+| F02-05 Detecção de runtimes | ✅ `RuntimeRegistry` (detect em paralelo, timeout 3 s, cache), comando `runtimes_overview`, lista na tela inicial — vista na janela |
 
 Verificado aqui: `pnpm lint` e `pnpm test` limpos (62 core + 49 pty + 22 store + 99 front),
 `cargo clippy -p aisense-app -- -D warnings` e `cargo build -p aisense-app` ok.
 
-**Próximas:** F02-05 (detecção de runtimes, que também liga o catálogo ao app), F02-06
-(supervisor) e F02-07 (demais adaptadores embutidos) — todas destravadas pela F02-04. F02-08 (telas
+**Primeira abertura da janela (2026-09-22, Windows):** o app sobe, a tela inicial aparece e a lista
+de runtimes funciona — conferido pelo usuário. Para isso foi preciso criar
+`crates/aisense-app/capabilities/default.json`: sem ele o Tauri 2 nega `listen`, e nenhum evento do
+core (nem `pty:data`) chegaria ao front. O resto da conferência visual das Fases 00/01 continua aberto.
+
+**Próximas:** F02-06 (supervisor) e F02-07 (demais adaptadores embutidos). F02-08 (telas
 de equipe) já pode começar — só depende de F02-03 — mas precisa dos comandos Tauri de equipe,
 que ainda não existem.
 
@@ -187,3 +192,4 @@ Bugs encontrados pelos próprios testes, todos corrigidos na origem:
 | 2026-09-22 | Claude | D6 aprovada: docs 15, 16 e 17 escritos, gate de revisão no doc 13, e 6 tarefas novas distribuídas pelas Fases 02, 04, 05 e 06. Início da Fase 01 |
 | 2026-09-22 | Claude | Início da Fase 02 (a pedido do usuário, com 00/01 pendentes só de verificação visual). F02-01, F02-02 e F02-03 concluídas: domínio, SQLite com migrações e repositórios |
 | 2026-09-22 | Claude | Ambiente Windows do usuário montado (rustup, MSVC, pnpm). F02-04: carregador de adaptadores com hot-reload |
+| 2026-09-22 | Claude | F02-05: detecção de runtimes + lista na tela inicial; capabilities do Tauri criadas; primeira abertura da janela conferida pelo usuário |

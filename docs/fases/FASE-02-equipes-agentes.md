@@ -47,11 +47,18 @@ hot-reload com `notify`.
 > só `shell` (os demais são F02-07). `AdapterWatcher` recarrega com debounce de 200 ms.
 > A ligação com o app (estado Tauri + evento para a UI) fica para F02-05, que é quem expõe a lista.
 
-### [ ] F02-05 — Detecção de runtimes instalados
+### [x] F02-05 — Detecção de runtimes instalados
 Executar o `detect` de cada adaptador (com timeout de 3 s, em paralelo), cachear o resultado,
 expor versão e `install_hint`.
 **Aceite:** a UI lista runtimes disponíveis e indisponíveis com a dica de instalação.
 Depende de F02-04.
+> Feito: `aisense-core/src/adapter/detect.rs`. `RuntimeRegistry` guarda catálogo + cache por
+> adaptador (invalidado só quando `command`/`detect` mudam). `which` respeita `PATHEXT` no Windows
+> (CLIs do npm são `.cmd`). No app: comando `runtimes_overview(refresh)` em `spawn_blocking` e
+> evento `adapters:changed` do hot-reload. Na UI, `features/runtimes/RuntimeList` aparece na tela
+> inicial (o bloco "Encontramos no seu sistema" da T1). Conferido na janela, no Windows.
+> Junto: `crates/aisense-app/capabilities/default.json` — sem ele o Tauri 2 nega `listen` e nenhum
+> evento do core (inclusive `pty:data`) chegaria ao front.
 
 ### [ ] F02-06 — Supervisor de agentes
 `AgentSupervisor`: `start`/`stop`/`restart`, montagem do ambiente (variáveis do AISENSE + PATH dos

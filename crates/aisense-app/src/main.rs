@@ -12,9 +12,9 @@ use tracing_subscriber::EnvFilter;
 
 /// Abre o banco e aplica as migrações antes da janela existir: se falhar, o app
 /// não deve subir pela metade, com a UI mostrando dados que não persistem.
-fn open_store() -> Result<aisense_store::Store, Box<dyn std::error::Error>> {
-    let data = aisense_core::DataDir::resolve()
-        .ok_or("could not find the user's home directory; set AISENSE_HOME")?;
+fn open_store(
+    data: &aisense_core::DataDir,
+) -> Result<aisense_store::Store, Box<dyn std::error::Error>> {
     let path = data.database();
     Ok(tauri::async_runtime::block_on(aisense_store::Store::open(
         &path,
@@ -35,7 +35,15 @@ fn main() {
 
     tauri::Builder::default()
         .setup(|app| {
-            app.manage(open_store()?);
+            let data = aisense_core::DataDir::resolve()
+                .ok_or("could not find the user's home directory; set AISENSE_HOME")?;
+            app.manage(open_store(&data)?);
+            let (registry, watcher) = commands::runtimes::setup(app.handle(), &data);
+            app.manage(registry);
+            if let Some(watcher) = watcher {
+                // Guardado no estado só para viver enquanto o app viver.
+                app.manage(watcher);
+            }
             Ok(())
         })
         .manage(manager)
@@ -48,6 +56,7 @@ fn main() {
             commands::pty::pty_snapshot,
             commands::pty::pty_set_visible,
             commands::pty::pty_is_running,
+            commands::runtimes::runtimes_overview,
         ])
         .on_window_event(move |_window, event| {
             // Fechar a janela precisa matar os processos dos agentes; senão eles

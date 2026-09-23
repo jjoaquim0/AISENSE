@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Permissões da janela principal: comandos do app e eventos do core (listen/unlisten).",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

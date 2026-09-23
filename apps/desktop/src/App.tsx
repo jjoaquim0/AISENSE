@@ -2,6 +2,7 @@ import { Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { EmptyState, TooltipProvider } from '@/components/ui';
 import { KitchenSink } from '@/features/dev/KitchenSink';
+import { RuntimeList } from '@/features/runtimes/RuntimeList';
 import { AppShell } from '@/features/shell/AppShell';
 import { api, isDesktop } from '@/lib/api';
 
@@ -41,6 +42,7 @@ export function App() {
           icon={<Users size={22} />}
           title="Monte sua primeira equipe"
           description="Uma equipe reúne agentes em terminais reais que conversam entre si e compartilham um quadro de trabalho."
+          action={isDesktop() ? <RuntimeList /> : undefined}
           note={version ? `Fundação · v${version}` : 'Fase 00 — Fundação'}
         />
       </AppShell>
