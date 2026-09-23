@@ -166,7 +166,7 @@ Depende de F04-02.
 > (2) import/export em `.zip` (hoje só pasta; pede a crate `zip`). A tela de skills é carregada
 > sob demanda para o Markdown não pesar no bundle inicial.
 
-### [ ] F04-09 — Notas da equipe
+### [x] F04-09 — Notas da equipe
 Armazenamento em `<workdir>/.aisense/notes/`, leitura, `append` atômico (`O_APPEND`) e `write` com
 trava otimista por hash. Índice das notas (título e resumo, não o conteúdo) no `BOOT.md`, dentro do
 orçamento de 12.000 caracteres. Editor na UI reaproveitando o editor de skills.
@@ -174,6 +174,24 @@ Ver [15 — Notas da Equipe](../15-notas-da-equipe.md).
 **Aceite:** dois agentes dando `append` na mesma nota ao mesmo tempo não perdem conteúdo (teste de
 concorrência); `write` com hash desatualizado falha com `stale_note` e mostra o diff.
 Depende de F04-05.
+> Feito: `aisense-core/src/notes.rs` (`TeamNotes`): `<workdir>/.aisense/notes/<slug>.md` no
+> diretório **da equipe** (não na bancada do agente), slug `^[a-z0-9][a-z0-9-]*$`, título do
+> primeiro `#`. `append` numa escrita só com `O_APPEND` (mais uma trava por pasta no processo);
+> `write` exige o hash lido (FNV-1a 64, sem dependência nova) para substituir, falha com
+> `stale_note` e o diff (prefixo/sufixo comuns, linear) e só cria sem hash; troca atômica por
+> rename. Também `read --section`, `search` (literal, sem caixa, com linha), `create`,
+> `delete`, limites de 256 KB e 200 notas. Índice das 20 mais recentes na seção "Memória da
+> equipe" do `BOOT.md`, depois do protocolo da equipe. Comandos `notes_list`, `note_read`,
+> `note_create`, `note_save` (conflito volta como `stale`, não como erro), `note_append`,
+> `note_delete`, `notes_search`. UI: botão **Notas** na Sala da Equipe abre
+> `features/notes/NotesPanel.tsx` (lista, busca, editor com o preview das skills; confere o
+> disco a cada 3 s — sem edição acompanha, com edição avisa; salvar desatualizado mostra o diff
+> com "usar a do disco" ou "gravar a minha por cima"). Aceite: 8 threads × 50 `append` sem
+> perda (e 4 escritores com arquivos abertos separados, só com `O_APPEND`); `write` com hash
+> velho falha com `stale_note` e o diff; no front, o diálogo mostra o diff. **Fica para
+> depois:** `aisense notes ...` na CLI chega com o IPC (Fase 05) sobre o mesmo core; o
+> "histórico de quem mudou o quê" e o "por @quem" do índice precisam do autor, que vem pelo
+> barramento; a busca global `⌘⇧F` é da Fase 08.
 
 ## Critérios de saída
 - [ ] Agente sobe com identidade e skills aplicadas, sem intervenção

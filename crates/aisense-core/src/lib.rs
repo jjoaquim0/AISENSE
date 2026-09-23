@@ -10,6 +10,7 @@ mod color;
 mod command_error;
 pub mod fswatch;
 mod ids;
+pub mod notes;
 mod paths;
 pub mod project;
 pub mod repo;

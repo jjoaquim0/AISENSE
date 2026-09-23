@@ -183,7 +183,20 @@ pub fn materialize(req: &MaterializeRequest<'_>) -> Result<Materialized, Materia
     fs::write(&card_path, json + "\n").map_err(io_err(&card_path))?;
 
     let mut warnings = Vec::new();
-    let boot = compose_boot(req.agent, req.team, req.colleagues, req.workdir, req.skills);
+    // As notas são da equipe (no diretório dela, não na bancada do agente): só o índice
+    // entra (`docs/15`). Pasta ilegível não impede o boot — fica sem a seção.
+    let notes = crate::notes::TeamNotes::new(Path::new(&req.team.workdir))
+        .list()
+        .unwrap_or_default();
+    let notes_index = crate::notes::boot_index(&notes, req.now, crate::notes::NOTES_BOOT_INDEX);
+    let boot = compose_boot(
+        req.agent,
+        req.team,
+        req.colleagues,
+        req.workdir,
+        req.skills,
+        &notes_index,
+    );
     let boot_path = agent_dir.join(BOOT_FILE);
     fs::write(&boot_path, &boot.markdown).map_err(io_err(&boot_path))?;
     if boot.truncated {

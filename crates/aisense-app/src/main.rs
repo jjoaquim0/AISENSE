@@ -115,6 +115,13 @@ fn main() {
             commands::skills::skill_import,
             commands::skills::skill_export,
             commands::skills::skill_users,
+            commands::notes::notes_list,
+            commands::notes::note_read,
+            commands::notes::note_create,
+            commands::notes::note_save,
+            commands::notes::note_append,
+            commands::notes::note_delete,
+            commands::notes::notes_search,
             commands::project::project_lookup,
             commands::project::project_accept,
         ])

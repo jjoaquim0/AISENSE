@@ -27,6 +27,8 @@ pub fn compose_boot(
     colleagues: &[Agent],
     workdir: &Path,
     skills: &[Skill],
+    // Seção "Memória da equipe" já pronta (`notes::boot_index`, F04-09); vazia sem notas.
+    notes_index: &str,
 ) -> BootDocument {
     let teamwork = TEAMWORK_SKILL
         .split_once("\n---\n")
@@ -37,6 +39,7 @@ pub fn compose_boot(
         colleagues,
         &workdir.display().to_string(),
         teamwork,
+        notes_index,
         skills,
         false,
     );
@@ -55,6 +58,7 @@ pub fn compose_boot(
         colleagues,
         &workdir.display().to_string(),
         teamwork,
+        notes_index,
         true,
     );
     base.push_str("\n## Suas skills\n");
@@ -86,10 +90,19 @@ fn render(
     colleagues: &[Agent],
     workdir: &str,
     teamwork: &str,
+    notes_index: &str,
     skills: &[Skill],
     compact: bool,
 ) -> String {
-    let mut result = render_base(agent, team, colleagues, workdir, teamwork, compact);
+    let mut result = render_base(
+        agent,
+        team,
+        colleagues,
+        workdir,
+        teamwork,
+        notes_index,
+        compact,
+    );
     result.push_str("\n## Suas skills\n");
     for skill in skills {
         result.push_str(&skill_section(agent.handle.as_str(), skill, compact));
@@ -103,6 +116,7 @@ fn render_base(
     colleagues: &[Agent],
     workdir: &str,
     teamwork: &str,
+    notes_index: &str,
     compact: bool,
 ) -> String {
     let limit = |text: &str, max| {
@@ -151,6 +165,8 @@ fn render_base(
     result.push_str("\n## Como falar com a equipe\n");
     result.push_str(teamwork);
     result.push('\n');
+    // Índice limitado a 20 linhas curtas: cabe mesmo no modo compacto.
+    result.push_str(notes_index);
     result
 }
 
@@ -258,6 +274,7 @@ mod tests {
             &peers,
             Path::new("/projeto"),
             &[skill("revisor", "# Revisão\nVerifique o contrato.\n")],
+            "",
         );
         assert!(!doc.truncated);
         insta::assert_snapshot!(doc.markdown, @r###"
@@ -312,7 +329,7 @@ Verifique o contrato.
                 "z".repeat(9_000)
             ),
         );
-        let doc = compose_boot(&agent, &team, &peers, Path::new("/projeto"), &[long]);
+        let doc = compose_boot(&agent, &team, &peers, Path::new("/projeto"), &[long], "");
         assert!(doc.truncated);
         assert!(doc.markdown.chars().count() <= BOOT_MAX_CHARS);
         assert!(doc.markdown.contains("### grande (v1.0.0)"));
@@ -328,9 +345,20 @@ Verifique o contrato.
         let skills: Vec<_> = (0..100)
             .map(|n| skill(&format!("skill-{n}"), "# Início\nPasso inicial.\n"))
             .collect();
-        let doc = compose_boot(&agent, &team, &peers, Path::new("/projeto"), &skills);
+        let doc = compose_boot(&agent, &team, &peers, Path::new("/projeto"), &skills, "");
         assert!(doc.truncated);
         assert!(doc.markdown.chars().count() <= BOOT_MAX_CHARS);
         assert!(doc.markdown.contains("Parte das skills foi omitida"));
+    }
+
+    #[test]
+    fn indice_das_notas_entra_depois_do_protocolo_da_equipe() {
+        let (team, agent, peers) = fixture();
+        let index = "\n## Memória da equipe\n| decisoes | Decisões | agora |\n";
+        let doc = compose_boot(&agent, &team, &peers, Path::new("/projeto"), &[], index);
+        let teamwork = doc.markdown.find("## Como falar com a equipe").unwrap();
+        let notes = doc.markdown.find("## Memória da equipe").unwrap();
+        let skills = doc.markdown.find("## Suas skills").unwrap();
+        assert!(teamwork < notes && notes < skills);
     }
 }

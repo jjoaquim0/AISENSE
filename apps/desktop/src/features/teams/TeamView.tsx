@@ -1,5 +1,13 @@
-import { ArrowLeft, FileCode, Folder, Plus, RotateCw, SquareTerminal } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  ArrowLeft,
+  FileCode,
+  Folder,
+  NotebookPen,
+  Plus,
+  RotateCw,
+  SquareTerminal,
+} from 'lucide-react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, Dialog, EmptyState, IconButton } from '@/components/ui';
 import { AgentFormDialog } from '@/features/agents/AgentFormDialog';
 import { agentsApi } from '@/features/agents/api';
@@ -27,6 +35,11 @@ import type { TeamSummary } from '@/types/generated/TeamSummary';
 import { describeStartReport, errorMessage } from './api';
 import { useTeams } from './store';
 
+// Sob demanda: o editor de notas traz o preview de Markdown.
+const NotesPanel = lazy(() =>
+  import('@/features/notes/NotesPanel').then((m) => ({ default: m.NotesPanel })),
+);
+
 /**
  * Uma equipe aberta: os agentes, seus controles e o terminal do selecionado.
  * É o degrau até a Sala da Equipe da Fase 03 (grade, foco, fluxo, linha do tempo).
@@ -41,6 +54,7 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
   const [notice, setNotice] = useState<{ text: string; restart?: Agent } | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [commandsOpen, setCommandsOpen] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
   const { grid, setGrid, view, setView } = useTeamLayout(
     team,
     agents.map((a) => a.id),
@@ -188,6 +202,11 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+      {notesOpen && (
+        <Suspense fallback={null}>
+          <NotesPanel teamId={team.id} teamName={team.name} onClose={() => setNotesOpen(false)} />
+        </Suspense>
+      )}
       <ShellSlot name="sidebar">
         <AgentSidebar
           agents={agents}
@@ -241,6 +260,9 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
         {view === 'grid' && (
           <PresetPicker value={grid.preset} onChange={(preset) => setGrid({ ...grid, preset })} />
         )}
+        <Button onClick={() => setNotesOpen(true)}>
+          <NotebookPen size={13} /> Notas
+        </Button>
         <Button onClick={() => setCommandsOpen(true)}>
           <FileCode size={13} /> Comandos
         </Button>

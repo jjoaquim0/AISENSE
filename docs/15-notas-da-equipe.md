@@ -69,9 +69,12 @@ contexto logo no boot e desperdiçaria o que o agente nem vai usar.
 
 ## Interface
 
-Uma aba no inspetor da equipe: lista de notas, editor Markdown com preview (o mesmo do editor de
-skills), histórico de quem mudou o quê, e um aviso quando um agente altera uma nota que você está
-editando. Busca pelo `⌘⇧F` junto com terminais e mensagens.
+Botão **Notas** na Sala da Equipe (o inspetor é do agente; as notas são da equipe): lista,
+busca, editor Markdown com preview (o mesmo do editor de skills) e um aviso quando um agente
+altera a nota que você está editando — o painel confere o disco a cada 3 s. Salvar com a nota
+mudada mostra o diff e deixa escolher entre a versão do disco e a sua. Ainda por vir: histórico
+de quem mudou o quê (precisa do autor, que chega pelo barramento na Fase 05) e busca pelo `⌘⇧F`
+junto com terminais e mensagens (Fase 08).
 
 ## Limites
 
