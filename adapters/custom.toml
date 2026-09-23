@@ -1,0 +1,18 @@
+# Comando arbitrário: cada agente define o que roda (docs/05).
+id          = "custom"
+name        = "Comando customizado"
+description = "Qualquer programa de terminal, definido no próprio agente"
+icon        = "square-terminal"
+
+# O supervisor troca `$AGENT_COMMAND` pelo comando configurado no agente.
+command = "$AGENT_COMMAND"
+args    = []
+
+# Sem regex de estado: não há como saber o que o programa imprime. O detector cai no
+# caso "sem regex + silêncio", que marca ocioso com baixa confiança e usa entrega pull.
+[state]
+quiet_ms = 1000
+
+# Nada é injetado num programa desconhecido.
+[inject]
+mode = "none"

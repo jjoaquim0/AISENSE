@@ -10,7 +10,7 @@ mod watch;
 pub use catalog::{AdapterCatalog, Builtin, BUILTIN_ADAPTERS};
 pub use detect::{
     detect_runtime, resolve_command, which, RuntimeInfo, RuntimeOverview, RuntimeRegistry,
-    RuntimeStatus, DETECT_TIMEOUT, SHELL_PLACEHOLDER,
+    RuntimeStatus, AGENT_COMMAND_PLACEHOLDER, DETECT_TIMEOUT, SHELL_PLACEHOLDER,
 };
 pub use file::{parse_adapter, ADAPTER_ID_MAX, ADAPTER_NAME_MAX, QUIET_MS_RANGE};
 pub use model::{

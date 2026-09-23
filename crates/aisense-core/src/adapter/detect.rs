@@ -22,6 +22,10 @@ pub const DETECT_TIMEOUT: Duration = Duration::from_secs(3);
 /// Valor de `command` que significa "o shell padrão do sistema".
 pub const SHELL_PLACEHOLDER: &str = "$SHELL";
 
+/// Valor de `command` que significa "o agente diz qual comando rodar" (adaptador
+/// `custom`): o supervisor usa o comando configurado no agente.
+pub const AGENT_COMMAND_PLACEHOLDER: &str = "$AGENT_COMMAND";
+
 const VERSION_MAX_CHARS: usize = 80;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -35,6 +39,8 @@ pub enum RuntimeStatus {
     },
     /// `reason` é para o usuário (em inglês, como as demais mensagens do core).
     Missing { reason: String },
+    /// O comando é escolhido em cada agente; não há o que detectar antes.
+    PerAgent,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -94,11 +100,15 @@ fn executable_extensions(program: &Path, pathext: Option<OsString>) -> Vec<Strin
     if !cfg!(windows) || program.extension().is_some() {
         return vec![String::new()];
     }
+    // Sem a entrada vazia de propósito: o npm instala, ao lado de `codex.cmd`, um
+    // script `codex` sem extensão (para bash) que o Windows não executa. O próprio
+    // `cmd.exe` só tenta os nomes com as extensões do PATHEXT.
     let list = pathext
         .and_then(|v| v.into_string().ok())
         .unwrap_or_else(|| ".COM;.EXE;.BAT;.CMD".to_owned());
-    std::iter::once(String::new())
-        .chain(list.split(';').filter(|e| !e.is_empty()).map(str::to_owned))
+    list.split(';')
+        .filter(|e| !e.is_empty())
+        .map(str::to_owned)
         .collect()
 }
 
@@ -113,6 +123,9 @@ fn with_extensions(base: &Path, extensions: &[String]) -> Option<PathBuf> {
 
 /// Estado de um adaptador. Bloqueia por até `timeout`.
 pub fn detect_runtime(adapter: &Adapter, timeout: Duration) -> RuntimeStatus {
+    if adapter.command == AGENT_COMMAND_PLACEHOLDER {
+        return RuntimeStatus::PerAgent;
+    }
     let command = resolve_command(&adapter.command);
     let Some(detect) = &adapter.detect else {
         // Sem `detect`, basta o executável existir.
@@ -446,12 +459,46 @@ mod tests {
         );
     }
 
+    #[test]
+    fn custom_adapter_needs_no_detection() {
+        let catalog = AdapterCatalog::load_from(crate::adapter::BUILTIN_ADAPTERS, None);
+        let custom = catalog.get("custom").unwrap();
+        assert_eq!(
+            detect_runtime(custom, DETECT_TIMEOUT),
+            RuntimeStatus::PerAgent
+        );
+    }
+
+    /// Guarda contra flag errada num adaptador embutido: em toda máquina onde a CLI
+    /// existe, o `detect` precisa responder com sucesso (aceite da F02-07).
+    #[test]
+    fn installed_builtin_clis_answer_their_detect() {
+        let catalog = AdapterCatalog::load_from(crate::adapter::BUILTIN_ADAPTERS, None);
+        for adapter in catalog.adapters() {
+            let Some(detect) = &adapter.detect else {
+                continue;
+            };
+            if which(&resolve_command(&detect.command)).is_none() {
+                continue; // não instalada aqui
+            }
+            // Timeout generoso: CLIs em Node demoram a subir a frio.
+            let status = detect_runtime(adapter, Duration::from_secs(20));
+            assert!(
+                matches!(status, RuntimeStatus::Available { .. }),
+                "{} está instalado mas o detect falhou: {status:?}",
+                adapter.id
+            );
+        }
+    }
+
     #[cfg(windows)]
     #[test]
     fn which_finds_cmd_shims_through_pathext() {
         let dir = std::env::temp_dir().join(format!("aisense-which-{}", ulid::Ulid::new()));
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join("fakecli.cmd"), "@echo 1.0").unwrap();
+        // O script sem extensão que o npm instala para bash: não é executável no Windows.
+        std::fs::write(dir.join("fakecli"), "#!/bin/sh\necho 1.0\n").unwrap();
         let found = which_in(
             "fakecli",
             Some(dir.clone().into_os_string()),

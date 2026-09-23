@@ -1,0 +1,30 @@
+# OpenCode. Flags conferidas na versão 1.18.27 (2026-09-22).
+id          = "opencode"
+name        = "OpenCode"
+description = "Agente de código aberto, com vários provedores de modelo"
+icon        = "terminal-square"
+
+command      = "opencode"
+args         = []
+detect       = { command = "opencode", args = ["--version"] }
+install_hint = "npm i -g opencode-ai"
+
+# `--prompt` define a primeira mensagem da sessão; é por onde o bootstrap entra.
+[capabilities]
+mcp                = true
+system_prompt_flag = "--prompt"
+model_flag         = "--model"
+cwd_is_project     = true
+resume_flag        = "--continue"
+
+[state]
+idle_regex     = '(?m)^\s*[>┃]\s*$'
+busy_regex     = '(?i)(working|thinking|generating|esc to interrupt)'
+awaiting_regex = '(?i)(permission|allow|\(y/n\)|\[y/N\])'
+quiet_ms       = 500
+
+[inject]
+mode      = "stdin"
+submit    = "\r"
+prefix    = "[AISENSE] "
+max_chars = 4000

@@ -66,10 +66,17 @@ sidecars), registro de `sessions`, política de reinício com backoff exponencia
 **Aceite:** matar o processo externamente dispara a política de reinício corretamente; `never` não
 reinicia. Depende de F02-04, F01-01.
 
-### [ ] F02-07 — Adaptadores embutidos
+### [x] F02-07 — Adaptadores embutidos
 TOMLs de `claude`, `codex`, `opencode`, `gemini`, `shell` e `custom`, com regex de estado iniciais.
 **Aceite:** cada um sobe um processo real (quando instalado) e o shell funciona em qualquer máquina.
 Depende de F02-04.
+> Feito: `adapters/*.toml`. Flags de claude (2.1.260), codex (0.152.1) e opencode (1.18.27)
+> conferidas no `--help` das versões instaladas; **gemini não foi verificado** (não instalado).
+> O teste `installed_builtin_clis_answer_their_detect` roda o `detect` de verdade de toda CLI
+> embutida presente na máquina — flag errada quebra o teste onde a CLI existir. O `custom` usa
+> `command = "$AGENT_COMMAND"` e tem estado de detecção próprio (`perAgent`). Subir cada runtime
+> **dentro de um PTY** é exercitado pelo supervisor (F02-06). Os regex de estado são iniciais; a
+> calibração é da Fase 03.
 
 ### [ ] F02-08 — Telas de equipe
 T2 (lista de equipes), T3 (assistente de criação com modelos de equipe), arquivar e excluir com

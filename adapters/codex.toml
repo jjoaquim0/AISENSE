@@ -1,0 +1,30 @@
+# OpenAI Codex CLI. Flags conferidas na versão 0.152.1 (2026-09-22).
+id          = "codex"
+name        = "Codex CLI"
+description = "Agente de código da OpenAI no terminal"
+icon        = "code"
+
+command      = "codex"
+args         = []
+detect       = { command = "codex", args = ["--version"] }
+install_hint = "npm i -g @openai/codex"
+
+# Sem `system_prompt_flag`: o Codex lê instruções do AGENTS.md do projeto e de perfis
+# de configuração; o bootstrap entra por stdin (docs/02, fluxo 1, passo 8).
+# Sem `resume_flag`: retomar é o subcomando `codex resume --last`, não uma flag.
+[capabilities]
+mcp            = true
+model_flag     = "--model"
+cwd_is_project = true
+
+[state]
+idle_regex     = '(?m)^\s*›\s*$'
+busy_regex     = '(?i)(working|thinking|esc to interrupt)'
+awaiting_regex = '(?i)(allow command|approve|\(y/n\)|\[y/N\])'
+quiet_ms       = 400
+
+[inject]
+mode      = "stdin"
+submit    = "\r"
+prefix    = "[AISENSE] "
+max_chars = 4000

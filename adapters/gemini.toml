@@ -1,0 +1,30 @@
+# Gemini CLI. **Não verificado numa instalação real** — flags pela documentação do
+# projeto. Confira com `gemini --help` e ajuste quando alguém tiver a CLI instalada.
+id          = "gemini"
+name        = "Gemini CLI"
+description = "CLI do Google para os modelos Gemini"
+icon        = "gem"
+
+command      = "gemini"
+args         = []
+detect       = { command = "gemini", args = ["--version"] }
+install_hint = "npm i -g @google/gemini-cli"
+
+# O Gemini não tem flag de system prompt: as instruções entram como arquivo de
+# contexto (GEMINI.md), gerado pelo supervisor.
+[capabilities]
+mcp            = true
+model_flag     = "--model"
+cwd_is_project = true
+
+[state]
+idle_regex     = '(?m)^\s*>\s*$'
+busy_regex     = '(?i)(thinking|working|esc to cancel)'
+awaiting_regex = '(?i)(allow|approve|\(y/n\)|\[y/N\])'
+quiet_ms       = 500
+
+[inject]
+mode      = "stdin"
+submit    = "\r"
+prefix    = "[AISENSE] "
+max_chars = 4000

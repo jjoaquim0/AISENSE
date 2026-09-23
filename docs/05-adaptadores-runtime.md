@@ -93,6 +93,18 @@ CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = "1"
 | `shell` | Shell puro (`$SHELL`) | ❌ | — | O humano chama a IA que quiser; `aisense` já está no PATH |
 | `custom` | Comando arbitrário | ❌ | — | Usuário define `command`/`args` na UI do agente |
 
+Arquivos em [`adapters/`](../adapters/), embutidos no binário. Cabeçalho de cada TOML registra a
+versão da CLI em que as flags foram conferidas. Particularidades:
+
+- `codex` não tem flag de system prompt (lê `AGENTS.md` do projeto) e retomar é o subcomando
+  `codex resume --last`, por isso fica sem `resume_flag`.
+- `gemini` ainda **não foi conferido** numa instalação real.
+- `custom` usa `command = "$AGENT_COMMAND"`: o supervisor usa o comando do agente. Não tem regex
+  de estado nem injeção (`inject.mode = "none"`), e a detecção responde `perAgent`.
+- `shell` usa `command = "$SHELL"` (PowerShell no Windows).
+- No Windows, `which` só tenta nomes com extensões do `PATHEXT`: o npm instala também um script
+  `codex` sem extensão (para bash) que o Windows não executa.
+
 > **Atenção de manutenção:** flags de CLIs de terceiros mudam entre versões. O adaptador deve ser
 > tratado como *configuração que pode quebrar*, nunca como contrato estável. Por isso a UI mostra
 > o resultado de `detect` e permite editar o TOML sem sair do app (Configurações → Runtimes).

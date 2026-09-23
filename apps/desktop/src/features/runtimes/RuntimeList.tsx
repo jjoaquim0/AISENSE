@@ -1,4 +1,4 @@
-import { AlertTriangle, Check, RefreshCw, X } from 'lucide-react';
+import { AlertTriangle, Check, Minus, RefreshCw, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { IconButton, Tooltip } from '@/components/ui';
 import { cn } from '@/lib/cn';
@@ -88,17 +88,12 @@ export function RuntimeList() {
 
 function RuntimeRow({ runtime }: { runtime: RuntimeInfo }) {
   const { adapter, status } = runtime;
-  const available = status.status === 'available';
-  const detail = available ? (status.version ?? status.path) : 'não encontrado';
+  const { icon, label, color, detail } = describe(status);
 
   return (
     <li className="flex items-start gap-2.5 px-3 py-2">
-      <span
-        role="img"
-        aria-label={available ? 'Disponível' : 'Indisponível'}
-        className={cn('mt-0.5 shrink-0', available ? 'text-idle' : 'text-failed')}
-      >
-        {available ? <Check size={14} /> : <X size={14} />}
+      <span role="img" aria-label={label} className={cn('mt-0.5 shrink-0', color)}>
+        {icon}
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-3">
@@ -121,6 +116,32 @@ function RuntimeRow({ runtime }: { runtime: RuntimeInfo }) {
       </div>
     </li>
   );
+}
+
+function describe(status: RuntimeInfo['status']) {
+  switch (status.status) {
+    case 'available':
+      return {
+        icon: <Check size={14} />,
+        label: 'Disponível',
+        color: 'text-idle',
+        detail: status.version ?? status.path,
+      };
+    case 'missing':
+      return {
+        icon: <X size={14} />,
+        label: 'Indisponível',
+        color: 'text-failed',
+        detail: 'não encontrado',
+      };
+    case 'perAgent':
+      return {
+        icon: <Minus size={14} />,
+        label: 'Definido em cada agente',
+        color: 'text-muted',
+        detail: 'definido em cada agente',
+      };
+  }
 }
 
 function errorMessage(e: unknown): string {

@@ -1,0 +1,39 @@
+# Claude Code. Flags conferidas na versão 2.1.260 (2026-09-22).
+id          = "claude"
+name        = "Claude Code"
+description = "CLI oficial da Anthropic"
+icon        = "sparkles"
+
+command      = "claude"
+args         = []
+detect       = { command = "claude", args = ["--version"] }
+install_hint = "npm i -g @anthropic-ai/claude-code"
+
+[capabilities]
+mcp                = true
+system_prompt_flag = "--append-system-prompt"
+hooks              = true
+model_flag         = "--model"
+cwd_is_project     = true
+resume_flag        = "--continue"
+
+# Regex iniciais; a calibração fina é da Fase 03 (docs/05, "Calibração").
+[state]
+idle_regex     = '(?m)^\s*(?:│\s*)?[>❯]\s*$'
+busy_regex     = '(?i)(thinking|working|esc to interrupt)'
+awaiting_regex = '(?i)(do you want|\(y/n\)|\[y/N\]|permission)'
+quiet_ms       = 400
+
+[inject]
+mode      = "stdin"
+submit    = "\r"
+prefix    = "[AISENSE] "
+max_chars = 4000
+
+[skills]
+dir           = ".claude/skills"
+format        = "claude-skill"
+settings_file = ".claude/settings.json"
+
+[env]
+CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = "1"

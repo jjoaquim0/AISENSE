@@ -10,10 +10,32 @@ use super::model::{Adapter, AdapterProblem, AdapterSource};
 pub type Builtin = (&'static str, &'static str);
 
 /// Adaptadores mantidos pelo projeto (`adapters/` na raiz do repositório).
-pub const BUILTIN_ADAPTERS: &[Builtin] = &[(
-    "shell.toml",
-    include_str!("../../../../adapters/shell.toml"),
-)];
+pub const BUILTIN_ADAPTERS: &[Builtin] = &[
+    (
+        "claude.toml",
+        include_str!("../../../../adapters/claude.toml"),
+    ),
+    (
+        "codex.toml",
+        include_str!("../../../../adapters/codex.toml"),
+    ),
+    (
+        "opencode.toml",
+        include_str!("../../../../adapters/opencode.toml"),
+    ),
+    (
+        "gemini.toml",
+        include_str!("../../../../adapters/gemini.toml"),
+    ),
+    (
+        "shell.toml",
+        include_str!("../../../../adapters/shell.toml"),
+    ),
+    (
+        "custom.toml",
+        include_str!("../../../../adapters/custom.toml"),
+    ),
+];
 
 /// Resultado de uma carga. Sempre existe: arquivo ruim vira `problem`, nunca erro
 /// que impede o app de subir.
