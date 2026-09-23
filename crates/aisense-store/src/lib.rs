@@ -6,6 +6,7 @@ mod agents;
 mod convert;
 mod db;
 mod error;
+mod sessions;
 mod teams;
 
 pub use db::{Store, MIGRATOR};

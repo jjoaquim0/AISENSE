@@ -132,6 +132,12 @@ impl PtyManager {
             .unwrap_or(false)
     }
 
+    pub fn pid(&self, agent_id: &str) -> Option<u32> {
+        self.with(agent_id, |managed| managed.session.pid())
+            .ok()
+            .flatten()
+    }
+
     pub fn exit_code(&self, agent_id: &str) -> Option<i32> {
         self.with(agent_id, |managed| managed.session.exit_code())
             .ok()

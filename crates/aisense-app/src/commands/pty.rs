@@ -10,8 +10,14 @@ use tauri::{AppHandle, Emitter, State};
 use super::pty_error;
 
 /// Destino que transforma a saída coalescida em eventos Tauri.
-struct TauriSink {
+pub struct TauriSink {
     app: AppHandle,
+}
+
+impl TauriSink {
+    pub fn new(app: AppHandle) -> Self {
+        Self { app }
+    }
 }
 
 impl OutputSink for TauriSink {

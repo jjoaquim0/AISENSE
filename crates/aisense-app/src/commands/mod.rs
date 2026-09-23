@@ -5,6 +5,7 @@
 //! e é exportado com `ts-rs` — nunca defina aqui um tipo que vire TypeScript
 //! (regra R5), senão gerar tipos passa a exigir compilar a janela.
 
+pub mod agents;
 pub mod pty;
 pub mod runtimes;
 

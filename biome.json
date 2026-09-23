@@ -8,7 +8,8 @@
       "!**/dist",
       "!**/target",
       "!**/src/types/generated",
-      "!**/gen/schemas"
+      "!**/gen/schemas",
+      "!vendor"
     ]
   },
   "formatter": {

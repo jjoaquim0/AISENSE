@@ -7,13 +7,16 @@
 use std::collections::BTreeMap;
 
 use aisense_core::agent::{Agent, AgentDraft, DeliveryMode, Handle, RestartPolicy, Workbench};
-use aisense_core::repo::{AgentRepository, InMemoryStore, RepoError, TeamFilter, TeamRepository};
+use aisense_core::repo::{
+    AgentRepository, InMemoryStore, RepoError, SessionRecord, SessionRepository, TeamFilter,
+    TeamRepository, SESSIONS_KEPT_PER_AGENT,
+};
 use aisense_core::team::{Team, TeamDraft};
-use aisense_core::{AgentColor, AgentId, TeamId};
+use aisense_core::{AgentColor, AgentId, SessionId, TeamId};
 use aisense_store::Store;
 
-trait Repo: TeamRepository + AgentRepository {}
-impl<T: TeamRepository + AgentRepository> Repo for T {}
+trait Repo: TeamRepository + AgentRepository + SessionRepository {}
+impl<T: TeamRepository + AgentRepository + SessionRepository> Repo for T {}
 
 fn team(name: &str, now: i64) -> Team {
     Team::create(
@@ -219,6 +222,87 @@ async fn missing_entities_are_reported(repo: impl Repo) {
     assert_eq!(repo.get_agent(&a.id).await.unwrap(), None);
 }
 
+fn session(agent: &Agent, started_at: i64) -> SessionRecord {
+    SessionRecord {
+        id: SessionId::new(),
+        agent_id: agent.id.clone(),
+        pid: Some(4242),
+        started_at,
+        ended_at: None,
+        exit_code: None,
+        log_path: "/tmp/agente.log".into(),
+    }
+}
+
+async fn sessions_record_start_and_end(repo: impl Repo) {
+    let t = team("A", 1);
+    repo.create_team(&t).await.unwrap();
+    let a = add_agent(&repo, &t, "backend").await;
+
+    let first = session(&a, 10);
+    let second = session(&a, 20);
+    repo.start_session(&first).await.unwrap();
+    repo.start_session(&second).await.unwrap();
+    repo.end_session(&first.id, 15, Some(3)).await.unwrap();
+
+    let listed = repo.list_sessions(&a.id, 10).await.unwrap();
+    assert_eq!(listed.len(), 2);
+    assert_eq!(listed[0], second, "mais recente primeiro");
+    assert_eq!(listed[1].ended_at, Some(15));
+    assert_eq!(listed[1].exit_code, Some(3));
+    assert_eq!(listed[1].pid, Some(4242));
+
+    // Sessão podada ou inexistente: fim silencioso, não erro.
+    repo.end_session(&SessionId::new(), 1, None).await.unwrap();
+    assert!(matches!(
+        repo.start_session(&first).await,
+        Err(RepoError::AlreadyExists(_))
+    ));
+}
+
+async fn sessions_need_an_agent_and_follow_it(repo: impl Repo) {
+    let t = team("A", 1);
+    repo.create_team(&t).await.unwrap();
+    let a = add_agent(&repo, &t, "backend").await;
+    let ghost = Agent::create(t.id.clone(), &draft("fantasma"), &[], 1).unwrap();
+    assert!(matches!(
+        repo.start_session(&session(&ghost, 1)).await,
+        Err(RepoError::AgentNotFound(_))
+    ));
+
+    repo.start_session(&session(&a, 1)).await.unwrap();
+    repo.delete_agent(&a.id).await.unwrap();
+    assert!(repo.list_sessions(&a.id, 10).await.unwrap().is_empty());
+}
+
+async fn sessions_are_pruned_per_agent(repo: impl Repo) {
+    let t = team("A", 1);
+    repo.create_team(&t).await.unwrap();
+    let (a, b) = (
+        add_agent(&repo, &t, "alfa").await,
+        add_agent(&repo, &t, "beta").await,
+    );
+    repo.start_session(&session(&b, 0)).await.unwrap();
+    let total = SESSIONS_KEPT_PER_AGENT + 5;
+    for i in 0..total {
+        repo.start_session(&session(&a, i64::try_from(i).unwrap() + 1))
+            .await
+            .unwrap();
+    }
+    let kept = repo.list_sessions(&a.id, total).await.unwrap();
+    assert_eq!(kept.len(), SESSIONS_KEPT_PER_AGENT);
+    assert_eq!(
+        kept[0].started_at,
+        i64::try_from(total).unwrap(),
+        "fica o mais novo"
+    );
+    assert_eq!(
+        repo.list_sessions(&b.id, 10).await.unwrap().len(),
+        1,
+        "outro agente intacto"
+    );
+}
+
 macro_rules! contract {
     ($($name:ident),+ $(,)?) => {
         mod sqlite {
@@ -250,6 +334,9 @@ contract!(
     archiving_hides_but_keeps,
     updates_and_orders,
     missing_entities_are_reported,
+    sessions_record_start_and_end,
+    sessions_need_an_agent_and_follow_it,
+    sessions_are_pruned_per_agent,
 );
 
 // ───────────────────────── só SQLite ─────────────────────────

@@ -4,9 +4,9 @@
 > Toda sessão de desenvolvimento começa lendo isto e termina atualizando isto.
 > Se estiver desatualizado, o próximo agente se perde. Mantenha-o honesto.
 
-**Última atualização:** 2026-09-22
+**Última atualização:** 2026-09-23
 **Fase atual:** `FASE 02 — Equipes e Agentes` (em andamento; 00 e 01 com pendências só visuais)
-**Branch de desenvolvimento:** `claude/gifted-cray-29owpm`
+**Branch de desenvolvimento:** `main` (o usuário pediu commits direto na main)
 
 ---
 
@@ -22,7 +22,7 @@ runtime e, depois, o supervisor que sobe os agentes.
 |---|---|---|
 | 00 — Fundação | 🟨 Em andamento | 6 feitas, 3 parciais de 9 |
 | 01 — Terminal Core | 🟨 Em andamento | 4 feitas, 4 parciais de 8 |
-| 02 — Equipes e Agentes | 🟨 Em andamento | 6 feitas de 11 |
+| 02 — Equipes e Agentes | 🟨 Em andamento | 7 feitas de 11 |
 | 03 — Sala da Equipe | ⬜ Não iniciada | 0/9 |
 | 04 — Sistema de Skills | ⬜ Não iniciada | 0/9 |
 | 05 — Barramento | ⬜ Não iniciada | 0/13 |
@@ -48,6 +48,7 @@ abertas e devem ser fechadas por quem tiver uma máquina com tela.
 | F02-04 Carregador de adaptadores | ✅ `AdapterCatalog` (embutidos + pasta do usuário, erro com `caminho:linha`) e `AdapterWatcher` (hot-reload) |
 | F02-05 Detecção de runtimes | ✅ `RuntimeRegistry` (detect em paralelo, timeout 3 s, cache), comando `runtimes_overview`, lista na tela inicial — vista na janela |
 | F02-07 Adaptadores embutidos | ✅ claude, codex, opencode (flags conferidas nas versões instaladas), gemini (não conferido), shell, custom |
+| F02-06 Supervisor | ✅ start/stop/restart, ambiente `AISENSE_*`, sessões, reinício com backoff; comandos `agent_*` e evento `agent:state` |
 
 Verificado aqui: `pnpm lint` e `pnpm test` limpos (62 core + 49 pty + 22 store + 99 front),
 `cargo clippy -p aisense-app -- -D warnings` e `cargo build -p aisense-app` ok.
@@ -57,9 +58,9 @@ de runtimes funciona — conferido pelo usuário. Para isso foi preciso criar
 `crates/aisense-app/capabilities/default.json`: sem ele o Tauri 2 nega `listen`, e nenhum evento do
 core (nem `pty:data`) chegaria ao front. O resto da conferência visual das Fases 00/01 continua aberto.
 
-**Próximas:** F02-06 (supervisor, destrava F02-10). F02-08 (telas
-de equipe) já pode começar — só depende de F02-03 — mas precisa dos comandos Tauri de equipe,
-que ainda não existem.
+**Próximas:** F02-08 (telas de equipe) e F02-09 (painel do agente) — o que falta para ver um
+agente subir pela interface; ambas precisam primeiro dos comandos Tauri de CRUD de equipe e agente,
+que ainda não existem. Depois, F02-10 (bancadas) e F02-11 (`aisense.toml`).
 
 Duas decisões desta fase que valem lembrar:
 1. Os modelos serializam em **camelCase** para o front; o SQL segue snake_case e o store traduz.
@@ -197,3 +198,4 @@ Bugs encontrados pelos próprios testes, todos corrigidos na origem:
 | 2026-09-22 | Claude | F02-05: detecção de runtimes + lista na tela inicial; capabilities do Tauri criadas; primeira abertura da janela conferida pelo usuário |
 | 2026-09-22 | Claude | F02-07: adaptadores embutidos; `which` deixa de achar o script sem extensão do npm no Windows |
 | 2026-09-23 | Claude | PTY no Windows: 49/49 testes. ConPTY não dava EOF ao fim do processo, travava com as flags do `portable-pty` (cópia em `vendor/`) e o `kill` tinha resultado invertido. Testes do PTY no job Windows do CI |
+| 2026-09-23 | Claude | F02-06: supervisor de agentes com sessões e política de reinício; biome passa a ignorar `vendor/` |

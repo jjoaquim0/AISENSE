@@ -48,12 +48,15 @@ dependencies = [
 name = "aisense-core"
 version = "0.1.0"
 dependencies = [
+ "aisense-pty",
+ "getrandom 0.3.4",
  "notify",
  "regex",
  "serde",
  "serde_json",
  "thiserror 2.0.20",
  "tokio",
+ "tokio-util",
  "toml 0.9.12+spec-1.1.0",
  "tracing",
  "ts-rs",

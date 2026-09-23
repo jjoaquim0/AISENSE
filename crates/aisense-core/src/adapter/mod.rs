@@ -8,6 +8,7 @@ mod model;
 mod watch;
 
 pub use catalog::{AdapterCatalog, Builtin, BUILTIN_ADAPTERS};
+pub(crate) use detect::which_in_path;
 pub use detect::{
     detect_runtime, resolve_command, which, RuntimeInfo, RuntimeOverview, RuntimeRegistry,
     RuntimeStatus, AGENT_COMMAND_PLACEHOLDER, DETECT_TIMEOUT, SHELL_PLACEHOLDER,

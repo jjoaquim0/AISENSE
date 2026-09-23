@@ -87,6 +87,11 @@ pub fn which(program: &str) -> Option<PathBuf> {
     )
 }
 
+/// Como [`which`], mas num `PATH` dado (o que o agente vai receber, não o do app).
+pub(crate) fn which_in_path(program: &str, path: &OsString) -> Option<PathBuf> {
+    which_in(program, Some(path.clone()), std::env::var_os("PATHEXT"))
+}
+
 fn which_in(program: &str, path: Option<OsString>, pathext: Option<OsString>) -> Option<PathBuf> {
     let candidate = Path::new(program);
     let extensions = executable_extensions(candidate, pathext);

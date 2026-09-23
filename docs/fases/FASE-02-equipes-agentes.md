@@ -60,11 +60,23 @@ Depende de F02-04.
 > Junto: `crates/aisense-app/capabilities/default.json` — sem ele o Tauri 2 nega `listen` e nenhum
 > evento do core (inclusive `pty:data`) chegaria ao front.
 
-### [ ] F02-06 — Supervisor de agentes
+### [x] F02-06 — Supervisor de agentes
 `AgentSupervisor`: `start`/`stop`/`restart`, montagem do ambiente (variáveis do AISENSE + PATH dos
 sidecars), registro de `sessions`, política de reinício com backoff exponencial, `CancellationToken`.
 **Aceite:** matar o processo externamente dispara a política de reinício corretamente; `never` não
 reinicia. Depende de F02-04, F01-01.
+> Feito: `aisense-core/src/supervisor/` (o core passa a depender de `aisense-pty`, como a regra
+> `app → core → {pty, store, ipc}` permite). `launch.rs` monta comando/args/cwd/env como função
+> pura; `backoff.rs` dobra de 1 s a 60 s e zera depois de 60 s estável; `token.rs` gera o
+> `AISENSE_TOKEN` com 32 bytes do SO. Porta nova `SessionRepository` (SQLite + memória, mesmo
+> contrato, retenção de 200 por agente). Testes com processos reais cobrem o aceite: kill externo
+> reinicia em `on-crash`, `never` não reinicia, `exit 0` é respeitado, `stop` cancela reinício
+> agendado. No app: `agent_start/stop/restart/state` e evento `agent:state`; fechar a janela
+> cancela os reinícios **antes** de matar os processos.
+> Até o detector de estado (Fase 03), processo vivo = `idle`. O bootstrap (skills, `BOOT.md`,
+> flag de system prompt) e o registro no barramento (passos 2–4, 7–8 do fluxo 1) são das Fases
+> 04 e 05. A validação do token pelo barramento e a tabela `agent_tokens` são da Fase 05.
+> Bug corrigido no caminho: o PTY não funcionava no Windows (ver ESTADO, 2026-09-23).
 
 ### [x] F02-07 — Adaptadores embutidos
 TOMLs de `claude`, `codex`, `opencode`, `gemini`, `shell` e `custom`, com regex de estado iniciais.

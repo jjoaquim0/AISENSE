@@ -4,9 +4,12 @@
 use std::collections::BTreeMap;
 use std::sync::{Mutex, MutexGuard};
 
-use super::{AgentRepository, RepoError, RepoResult, TeamFilter, TeamRepository};
+use super::{
+    AgentRepository, RepoError, RepoResult, SessionRecord, SessionRepository, TeamFilter,
+    TeamRepository, SESSIONS_KEPT_PER_AGENT,
+};
 use crate::agent::{Agent, Handle};
-use crate::ids::{AgentId, TeamId};
+use crate::ids::{AgentId, SessionId, TeamId};
 use crate::team::Team;
 use crate::time::Millis;
 
@@ -14,6 +17,8 @@ use crate::time::Millis;
 struct Inner {
     teams: BTreeMap<String, Team>,
     agents: BTreeMap<String, Agent>,
+    /// Em ordem de início.
+    sessions: Vec<SessionRecord>,
 }
 
 #[derive(Default)]
@@ -95,6 +100,14 @@ impl TeamRepository for InMemoryStore {
             return Err(RepoError::TeamNotFound(id.clone()));
         }
         inner.agents.retain(|_, a| a.team_id != *id);
+        let agents = &inner.agents;
+        let alive: Vec<SessionRecord> = inner
+            .sessions
+            .iter()
+            .filter(|s| agents.contains_key(s.agent_id.as_str()))
+            .cloned()
+            .collect();
+        inner.sessions = alive;
         Ok(())
     }
 }
@@ -167,10 +180,70 @@ impl AgentRepository for InMemoryStore {
     }
 
     async fn delete_agent(&self, id: &AgentId) -> RepoResult<()> {
-        match self.lock().agents.remove(id.as_str()) {
-            Some(_) => Ok(()),
+        let mut inner = self.lock();
+        match inner.agents.remove(id.as_str()) {
+            Some(_) => {
+                inner.sessions.retain(|s| s.agent_id != *id);
+                Ok(())
+            }
             None => Err(RepoError::AgentNotFound(id.clone())),
         }
+    }
+}
+
+impl SessionRepository for InMemoryStore {
+    async fn start_session(&self, session: &SessionRecord) -> RepoResult<()> {
+        let mut inner = self.lock();
+        if !inner.agents.contains_key(session.agent_id.as_str()) {
+            return Err(RepoError::AgentNotFound(session.agent_id.clone()));
+        }
+        if inner.sessions.iter().any(|s| s.id == session.id) {
+            return Err(RepoError::AlreadyExists(session.id.to_string()));
+        }
+        inner.sessions.push(session.clone());
+        let of_agent = inner
+            .sessions
+            .iter()
+            .filter(|s| s.agent_id == session.agent_id)
+            .count();
+        let mut excess = of_agent.saturating_sub(SESSIONS_KEPT_PER_AGENT);
+        inner.sessions.retain(|s| {
+            if excess > 0 && s.agent_id == session.agent_id {
+                excess -= 1;
+                return false;
+            }
+            true
+        });
+        Ok(())
+    }
+
+    async fn end_session(
+        &self,
+        id: &SessionId,
+        ended_at: Millis,
+        exit_code: Option<i32>,
+    ) -> RepoResult<()> {
+        if let Some(session) = self.lock().sessions.iter_mut().find(|s| s.id == *id) {
+            session.ended_at = Some(ended_at);
+            session.exit_code = exit_code;
+        }
+        Ok(())
+    }
+
+    async fn list_sessions(
+        &self,
+        agent_id: &AgentId,
+        limit: usize,
+    ) -> RepoResult<Vec<SessionRecord>> {
+        Ok(self
+            .lock()
+            .sessions
+            .iter()
+            .rev()
+            .filter(|s| s.agent_id == *agent_id)
+            .take(limit)
+            .cloned()
+            .collect())
     }
 }
 

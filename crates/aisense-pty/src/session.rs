@@ -111,6 +111,7 @@ pub struct PtySession {
     /// depois da última linha, sem depender de tempo.
     reader_done: watch::Receiver<bool>,
     running: Arc<AtomicBool>,
+    pid: Option<u32>,
 }
 
 impl std::fmt::Debug for PtySession {
@@ -164,6 +165,7 @@ impl PtySession {
         drop(pair.slave);
 
         let killer = child.clone_killer();
+        let pid = child.process_id();
         let reader = pair
             .master
             .try_clone_reader()
@@ -228,6 +230,7 @@ impl PtySession {
             exit: exit_rx,
             reader_done: reader_rx,
             running,
+            pid,
         })
     }
 
@@ -291,6 +294,11 @@ impl PtySession {
 
     pub fn is_running(&self) -> bool {
         self.running.load(Ordering::SeqCst)
+    }
+
+    /// PID do processo, quando o sistema informa. Vai para a tabela `sessions`.
+    pub fn pid(&self) -> Option<u32> {
+        self.pid
     }
 
     pub fn exit_code(&self) -> Option<i32> {

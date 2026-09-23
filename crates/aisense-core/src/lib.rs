@@ -10,6 +10,7 @@ mod command_error;
 mod ids;
 mod paths;
 pub mod repo;
+pub mod supervisor;
 pub mod team;
 mod time;
 mod validation;

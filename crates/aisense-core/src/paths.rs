@@ -50,6 +50,19 @@ impl DataDir {
     pub fn logs(&self) -> PathBuf {
         self.0.join("logs")
     }
+
+    /// Endereço do barramento (`docs/02`): socket Unix em `run/`, named pipe no Windows.
+    pub fn socket(&self) -> String {
+        if cfg!(windows) {
+            r"\\.\pipe\aisense".to_owned()
+        } else {
+            self.0
+                .join("run")
+                .join("aisense.sock")
+                .display()
+                .to_string()
+        }
+    }
 }
 
 #[cfg(test)]

@@ -10,7 +10,7 @@ pub use error::RepoError;
 pub use memory::InMemoryStore;
 
 use crate::agent::{Agent, Handle};
-use crate::ids::{AgentId, TeamId};
+use crate::ids::{AgentId, SessionId, TeamId};
 use crate::team::Team;
 use crate::time::Millis;
 
@@ -53,4 +53,39 @@ pub trait AgentRepository: Send + Sync {
     fn list_agents(&self, team_id: &TeamId) -> impl Future<Output = RepoResult<Vec<Agent>>> + Send;
     fn update_agent(&self, agent: &Agent) -> impl Future<Output = RepoResult<()>> + Send;
     fn delete_agent(&self, id: &AgentId) -> impl Future<Output = RepoResult<()>> + Send;
+}
+
+/// Quantas execuções guardar por agente (`docs/04`, retenção de `sessions`).
+pub const SESSIONS_KEPT_PER_AGENT: usize = 200;
+
+/// Uma execução de PTY de um agente (tabela `sessions`). O buffer vivo não fica aqui.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SessionRecord {
+    pub id: SessionId,
+    pub agent_id: AgentId,
+    pub pid: Option<u32>,
+    pub started_at: Millis,
+    pub ended_at: Option<Millis>,
+    pub exit_code: Option<i32>,
+    pub log_path: String,
+}
+
+pub trait SessionRepository: Send + Sync {
+    /// Registra o início e poda o histórico do agente para
+    /// [`SESSIONS_KEPT_PER_AGENT`]. Falha com `AgentNotFound` se o agente não existe.
+    fn start_session(&self, session: &SessionRecord)
+        -> impl Future<Output = RepoResult<()>> + Send;
+    /// Marca o fim. Sessão desconhecida (já podada) não é erro.
+    fn end_session(
+        &self,
+        id: &SessionId,
+        ended_at: Millis,
+        exit_code: Option<i32>,
+    ) -> impl Future<Output = RepoResult<()>> + Send;
+    /// Mais recente primeiro.
+    fn list_sessions(
+        &self,
+        agent_id: &AgentId,
+        limit: usize,
+    ) -> impl Future<Output = RepoResult<Vec<SessionRecord>>> + Send;
 }
