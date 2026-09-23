@@ -9,4 +9,9 @@ export type StartOutcome = { workdir: Workdir,
 /**
  * Skills que o agente levou e as que ficaram de fora, com o porquê (F04-03).
  */
-skills: SkillPlan, };
+skills: SkillPlan, 
+/**
+ * Outras ressalvas do boot, prontas para a UI (materialização que falhou, skill
+ * nativa que já existia e não é nossa — F04-04).
+ */
+notes: Array<string>, };

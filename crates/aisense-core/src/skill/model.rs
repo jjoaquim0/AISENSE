@@ -23,6 +23,11 @@ pub struct Skill {
     /// O Markdown depois do frontmatter.
     pub body: String,
     pub source: SkillSource,
+    /// O `SKILL.md` inteiro, como veio do disco: é o que a materialização copia (F04-04).
+    /// Fica fora da serialização — a UI não precisa dele e ele pode ter 256 KB.
+    #[serde(skip)]
+    #[ts(skip)]
+    pub raw: String,
 }
 
 impl Skill {

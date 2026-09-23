@@ -53,7 +53,7 @@ prefix    = "[AISENSE] "
 max_chars = 4000                # acima disso, grava em arquivo e injeta só o caminho
 
 [skills]
-# Onde este runtime espera encontrar skills nativamente (além de .aisense/skills/)
+# Onde este runtime espera encontrar skills nativamente (além de .aisense/agents/<handle>/skills/)
 dir         = ".claude/skills"
 format      = "claude-skill"
 settings_file = ".claude/settings.json"   # usado para instalar o hook de inbox

@@ -82,10 +82,12 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
   const launched = (agentId: string, outcome: StartOutcome) => {
     const branch = outcome.workdir.bench?.branch;
     setBranches((b) => ({ ...b, [agentId]: branch ?? '' }));
-    // Ressalvas do start: bancada que não deu e skills que ficaram de fora (F04-03).
+    // Ressalvas do start: bancada que não deu, skills que ficaram de fora (F04-03) e o
+    // que a materialização não conseguiu escrever (F04-04).
     const notes = [
       outcome.workdir.warning,
       ...outcome.skills.ignored.map((ignored) => ignored.message),
+      ...outcome.notes,
     ].filter((note): note is string => Boolean(note));
     if (notes.length > 0) setNotice({ text: `@${handleOf(agentId)}: ${notes.join(' · ')}` });
   };

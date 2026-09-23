@@ -33,7 +33,9 @@ use crate::project::{load_project, ProjectLookup};
 use crate::repo::{
     AgentRepository, RepoError, SessionRecord, SessionRepository, SkillRepository, TeamRepository,
 };
-use crate::skill::{resolve_agent_skills, SkillLibrary, SkillPlan};
+use crate::skill::{
+    materialize, resolve_agent_skills, MaterializeRequest, SkillLibrary, SkillPlan,
+};
 use crate::state::{Detection, StateConfidence, StateDetector};
 use crate::time::now_ms;
 
@@ -60,6 +62,9 @@ pub struct StartOutcome {
     pub workdir: Workdir,
     /// Skills que o agente levou e as que ficaram de fora, com o porquê (F04-03).
     pub skills: SkillPlan,
+    /// Outras ressalvas do boot, prontas para a UI (materialização que falhou, skill
+    /// nativa que já existia e não é nossa — F04-04).
+    pub notes: Vec<String>,
 }
 
 /// Uma ressalva sobre um agente que subiu (sem git, setup que falhou...).
@@ -351,6 +356,12 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
             tracing::warn!(agent = %agent_id, %warning, "diretório de trabalho com ressalva");
         }
 
+        // Materializa as skills e a identidade no diretório de trabalho (F04-04). Sem
+        // isso o agente sobe sem as skills, mas sobe: vira ressalva, não erro.
+        let notes = self
+            .materialize(&team, &agent, &adapter, &workdir, &skills.active)
+            .await;
+
         let token = generate_token()?;
         let plan = build_launch(
             &agent,
@@ -459,7 +470,45 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
         Ok(StartOutcome {
             workdir,
             skills: skills.plan(),
+            notes,
         })
+    }
+
+    async fn materialize(
+        &self,
+        team: &crate::team::Team,
+        agent: &crate::agent::Agent,
+        adapter: &crate::adapter::Adapter,
+        workdir: &Workdir,
+        skills: &[crate::skill::Skill],
+    ) -> Vec<String> {
+        let (team, agent, adapter) = (team.clone(), agent.clone(), adapter.clone());
+        let (path, skills) = (PathBuf::from(&workdir.path), skills.to_vec());
+        let agent_id = agent.id.clone();
+        let done = tokio::task::spawn_blocking(move || {
+            materialize(&MaterializeRequest {
+                workdir: &path,
+                agent: &agent,
+                team: &team,
+                adapter: &adapter,
+                skills: &skills,
+                now: now_ms(),
+            })
+        })
+        .await;
+        match done {
+            Ok(Ok(done)) => done.warnings,
+            Ok(Err(error)) => {
+                tracing::warn!(agent = %agent_id, %error, "skills não materializadas");
+                vec![format!(
+                    "as skills não foram copiadas para o diretório de trabalho: {error}"
+                )]
+            }
+            Err(error) => {
+                tracing::warn!(agent = %agent_id, %error, "materialização interrompida");
+                vec!["as skills não foram copiadas para o diretório de trabalho".into()]
+            }
+        }
     }
 
     async fn prepare_workdir(
