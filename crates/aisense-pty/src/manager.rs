@@ -122,6 +122,11 @@ impl PtyManager {
         self.with(agent_id, |managed| managed.session.snapshot())
     }
 
+    /// Esvazia o histórico retido: a próxima reidratação começa da tela limpa.
+    pub fn clear(&self, agent_id: &str) -> Result<(), PtyError> {
+        self.with(agent_id, |managed| managed.session.clear())
+    }
+
     /// Liga ou desliga a emissão de eventos deste agente. Painel fora da tela não
     /// gera evento nenhum — o histórico continua no ring buffer.
     pub fn set_visible(&self, agent_id: &str, visible: bool) -> Result<(), PtyError> {
@@ -360,6 +365,20 @@ mod tests {
             );
             tokio::time::sleep(Duration::from_millis(10)).await;
         }
+    }
+
+    #[tokio::test]
+    async fn limpar_esquece_o_historico_retido() {
+        let manager = PtyManager::new();
+        let sink = Arc::new(Recorder::default());
+        manager
+            .spawn("agt", echo_then_exit("antes", 0), sink.clone())
+            .unwrap();
+        wait_until(|| !sink.exits().is_empty()).await;
+        assert!(!manager.snapshot("agt").unwrap().is_empty());
+        manager.clear("agt").unwrap();
+        assert!(manager.snapshot("agt").unwrap().is_empty());
+        assert!(manager.clear("nobody").is_err());
     }
 
     #[tokio::test]

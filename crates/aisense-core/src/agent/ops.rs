@@ -3,7 +3,8 @@
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-use super::{Agent, AgentDraft};
+use super::model::AGENT_NAME_MAX;
+use super::{Agent, AgentDraft, HANDLE_MAX_LEN};
 use crate::ids::{AgentId, TeamId};
 use crate::repo::{AgentRepository, RepoError, TeamRepository};
 use crate::time::Millis;
@@ -49,6 +50,47 @@ pub async fn create_agent<S: TeamRepository + AgentRepository>(
     let agent = Agent::create(team_id.clone(), draft, &siblings, now)?;
     store.create_agent(&agent).await?;
     Ok(agent)
+}
+
+/// "Duplicar" do menu `⋮` (`docs/09`, T4.1): mesma configuração, handle livre
+/// (`backend` → `backend-2`, `backend-3`...), nome com "(cópia)" e a próxima cor livre
+/// da equipe, para as duas não se confundirem na tela.
+pub async fn duplicate_agent<S: TeamRepository + AgentRepository>(
+    store: &S,
+    agent_id: &AgentId,
+    now: Millis,
+) -> Result<Agent, AgentOpError> {
+    let original = store
+        .get_agent(agent_id)
+        .await?
+        .ok_or_else(|| RepoError::AgentNotFound(agent_id.clone()))?;
+    let siblings = store.list_agents(&original.team_id).await?;
+    let mut draft = original.to_draft();
+    draft.handle = free_handle(original.handle.as_str(), &siblings);
+    draft.name = copy_name(&original.name);
+    draft.color = None;
+    create_agent(store, &original.team_id, &draft, now).await
+}
+
+fn free_handle(base: &str, siblings: &[Agent]) -> String {
+    let taken = |h: &str| siblings.iter().any(|a| a.handle.as_str() == h);
+    (2u32..)
+        .map(|n| {
+            let suffix = format!("-{n}");
+            // Cabe em 32 caracteres cortando a base, nunca o sufixo.
+            let keep = HANDLE_MAX_LEN.saturating_sub(suffix.len());
+            let base: String = base.chars().take(keep).collect();
+            format!("{}{suffix}", base.trim_end_matches('-'))
+        })
+        .find(|h| !taken(h))
+        .unwrap_or_else(|| base.to_owned())
+}
+
+fn copy_name(name: &str) -> String {
+    const SUFFIX: &str = " (cópia)";
+    let keep = AGENT_NAME_MAX.saturating_sub(SUFFIX.chars().count());
+    let base: String = name.chars().take(keep).collect();
+    format!("{}{SUFFIX}", base.trim_end())
 }
 
 /// `running` diz se o agente está com processo vivo agora; decide o aviso de reinício.
@@ -188,5 +230,44 @@ mod tests {
             .await
             .unwrap_err();
         assert_eq!(error.code(), "team_not_found");
+    }
+
+    #[tokio::test]
+    async fn duplicate_copies_the_setup_with_a_free_handle_and_color() {
+        let store = InMemoryStore::new();
+        let t = team(&store).await;
+        let mut d = draft("backend");
+        d.role = "Cuida da API".into();
+        d.args = vec!["--verbose".into()];
+        let original = create_agent(&store, &t.id, &d, 1).await.unwrap();
+
+        let copy = duplicate_agent(&store, &original.id, 2).await.unwrap();
+        assert_eq!(copy.handle.as_str(), "backend-2");
+        assert_eq!(copy.name, "BACKEND (cópia)");
+        assert_eq!(
+            (copy.role.as_str(), copy.args.clone()),
+            ("Cuida da API", d.args.clone())
+        );
+        assert_ne!(
+            copy.color, original.color,
+            "a copy must be told apart on screen"
+        );
+        assert_ne!(copy.id, original.id);
+
+        let third = duplicate_agent(&store, &original.id, 3).await.unwrap();
+        assert_eq!(third.handle.as_str(), "backend-3");
+    }
+
+    #[tokio::test]
+    async fn duplicate_keeps_long_handles_and_names_within_limits() {
+        let store = InMemoryStore::new();
+        let t = team(&store).await;
+        let mut d = draft(&"a".repeat(32));
+        d.name = "N".repeat(64);
+        let original = create_agent(&store, &t.id, &d, 1).await.unwrap();
+        let copy = duplicate_agent(&store, &original.id, 2).await.unwrap();
+        assert_eq!(copy.handle.as_str(), format!("{}-2", "a".repeat(30)));
+        assert_eq!(copy.name.chars().count(), 64);
+        assert!(copy.name.ends_with(" (cópia)"));
     }
 }

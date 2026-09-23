@@ -29,19 +29,22 @@ export function DropdownMenuItem({
   children,
   onSelect,
   danger = false,
+  disabled = false,
   shortcut,
 }: {
   children: ReactNode;
   onSelect?: () => void;
   danger?: boolean;
+  disabled?: boolean;
   shortcut?: string;
 }) {
   return (
     <Radix.Item
       onSelect={onSelect}
+      disabled={disabled}
       className={cn(
         'flex cursor-default items-center justify-between gap-4 rounded-md px-2 py-1.5 text-body outline-none',
-        'data-[highlighted]:bg-hover',
+        'data-[highlighted]:bg-hover data-[disabled]:opacity-50',
         danger ? 'text-failed' : 'text-primary',
       )}
     >

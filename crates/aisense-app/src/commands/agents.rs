@@ -3,7 +3,8 @@
 use std::sync::Arc;
 
 use aisense_core::agent::{
-    create_agent, update_agent, Agent, AgentDraft, AgentOpError, AgentState, AgentUpdate, Handle,
+    create_agent, duplicate_agent, update_agent, Agent, AgentDraft, AgentOpError, AgentState,
+    AgentUpdate, Handle,
 };
 use aisense_core::repo::{AgentRepository, RepoError};
 use aisense_core::state::StateConfidence;
@@ -155,6 +156,17 @@ pub async fn agent_delete(
     // Para e remove a bancada; com trabalho não commitado nela, recusa (`docs/16`).
     supervisor.retire(&agent_id).await.map_err(command_error)?;
     store.delete_agent(&agent_id).await.map_err(repo_error)
+}
+
+/// "Duplicar" do menu do painel: mesma configuração, handle e cor livres.
+#[tauri::command]
+pub async fn agent_duplicate(
+    store: State<'_, Store>,
+    agent_id: AgentId,
+) -> Result<Agent, CommandError> {
+    duplicate_agent(&*store, &agent_id, now_ms())
+        .await
+        .map_err(op_error)
 }
 
 /// Handle sugerido a partir do nome ("Revisão de Código" → `revisao-de-codigo`).

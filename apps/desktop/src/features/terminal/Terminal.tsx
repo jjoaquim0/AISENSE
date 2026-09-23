@@ -21,10 +21,18 @@ interface TerminalProps {
   /** Painel fora da tela não recebe eventos; o histórico fica no core. */
   visible?: boolean;
   onExit?: (code: number) => void;
+  /** Cada mudança limpa a tela e o histórico retido no core ("Limpar" do painel). */
+  clearSignal?: number;
   className?: string;
 }
 
-export function Terminal({ agentId, visible = true, onExit, className }: TerminalProps) {
+export function Terminal({
+  agentId,
+  visible = true,
+  onExit,
+  clearSignal,
+  className,
+}: TerminalProps) {
   const host = useRef<HTMLDivElement>(null);
   const term = useRef<Xterm | null>(null);
   const fit = useRef<FitAddon | null>(null);
@@ -146,6 +154,14 @@ export function Terminal({ agentId, visible = true, onExit, className }: Termina
   useEffect(() => {
     if (term.current) term.current.options.theme = readTerminalTheme(theme);
   }, [theme]);
+
+  // ── Limpar: tela do xterm e histórico do core juntos, senão a próxima reidratação
+  //    traria de volta o que o usuário acabou de apagar ──
+  useEffect(() => {
+    if (!clearSignal) return;
+    term.current?.clear();
+    void terminalApi.clear(agentId).catch(reportError);
+  }, [agentId, clearSignal]);
 
   // ── Visibilidade: painel escondido não gera evento algum ──
   useEffect(() => {

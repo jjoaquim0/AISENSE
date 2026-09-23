@@ -28,10 +28,17 @@ esperada; `awaiting_input` sempre tem prioridade.
 > não gravações reais. Calibrar com sessões de verdade (claude, codex, opencode, gemini) fica para
 > quem tiver os runtimes instalados; o risco já está em `ESTADO.md`.
 
-### [ ] F03-02 — Painel de agente
+### [x] F03-02 — Painel de agente
 `AgentPane`: cabeçalho (handle, runtime, estado, badge, menu `⋮`), borda de 3px na cor do agente,
 terminal, estado vazio quando parado, indicador de foco.
 **Aceite:** o menu `⋮` cobre reiniciar, parar, limpar, duplicar e configurar. Depende de F03-01, F01-05.
+> Feito: `features/team-room/components/AgentPane.tsx` e `paneMenu.ts` (itens com posição fixa;
+> o que não se aplica fica desabilitado — teste cobre os 6 estados). "Duplicar" é
+> `duplicate_agent` no core (handle `-2`, `-3`..., "(cópia)", próxima cor livre); "Limpar"
+> esvazia a tela e o ring buffer (`pty_clear`), mantendo o log em disco. `StatusDot` ganhou as
+> formas do doc 08 e o "?" de confiança baixa. Conferido por screenshot nos dois temas
+> (`#/dev`, com o painel parado). **Fora:** "Abrir no terminal do SO", que o doc 09 lista no
+> menu mas o aceite não pede — fica para a Fase 08.
 
 ### [ ] F03-03 — Vista Grid
 Layouts `1/2/3/4/6/9` + livre, com dnd-kit para arrastar e redimensionar. Persistir layout por
