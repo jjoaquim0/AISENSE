@@ -83,6 +83,7 @@ fn main() {
             commands::teams::team_template_plan,
             commands::teams::team_create,
             commands::teams::team_set_archived,
+            commands::teams::team_set_layout,
             commands::teams::team_delete,
             commands::teams::team_start,
             commands::project::project_lookup,

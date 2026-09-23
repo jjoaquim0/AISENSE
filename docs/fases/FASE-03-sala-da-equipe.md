@@ -40,10 +40,23 @@ terminal, estado vazio quando parado, indicador de foco.
 > (`#/dev`, com o painel parado). **Fora:** "Abrir no terminal do SO", que o doc 09 lista no
 > menu mas o aceite não pede — fica para a Fase 08.
 
-### [ ] F03-03 — Vista Grid
+### [x] F03-03 — Vista Grid
 Layouts `1/2/3/4/6/9` + livre, com dnd-kit para arrastar e redimensionar. Persistir layout por
 equipe em `teams.layout`.
 **Aceite:** com 9 painéis o app mantém ≥55 fps ao arrastar. Depende de F03-02.
+> Feito: `features/team-room/{gridLayout.ts, components/GridView.tsx, PresetPicker.tsx,
+> hooks/useGridLayout.ts}` e o comando `team_set_layout` (objeto JSON, até 64 KB, sem mexer em
+> `updated_at`). Presets arrastam com dnd-kit (teclado incluso); o modo livre arrasta e
+> redimensiona numa grade de 24×24 mexendo só no DOM até soltar, e o último painel mexido fica
+> por cima. Painéis que não cabem no preset aparecem em "Fora da grade" com um clique para mostrar.
+> **Medição** (bancada `#/dev/grid`, 9 xterm reais, Chromium headless **sem GPU**): com os
+> terminais parados, arrastar fica em 60 fps nos presets e no modo livre; o único recorte abaixo
+> de 55 é a primeira meia-segunda, e um controle sem arraste mostra a mesma queda — é da
+> medição. Com os 9 terminais despejando saída, o ambiente sem GPU fica em ~3–10 fps **parado**,
+> e arrastar não piora. Ou seja: o arraste não custa quadros, mas os 55 fps com 9 terminais
+> ativos só podem ser confirmados numa máquina com GPU (`pnpm dev` → `#/dev/grid`).
+> A bancada pegou dois defeitos do modo livre, corrigidos: painel solto sobre outro ficava
+> escondido atrás, e o painel perdia a largura ao soltar (estilo apagado em vez de restaurado).
 
 ### [ ] F03-04 — Vista Foco
 Um terminal grande + tira de miniaturas com as últimas 4 linhas renderizadas fora do xterm

@@ -16,6 +16,9 @@ import { AgentFormDialog } from '@/features/agents/AgentFormDialog';
 import { agentsApi, onAgentState } from '@/features/agents/api';
 import { ProjectCommandsDialog } from '@/features/project/ProjectCommandsDialog';
 import { AgentPane } from '@/features/team-room/components/AgentPane';
+import { GridView } from '@/features/team-room/components/GridView';
+import { PresetPicker } from '@/features/team-room/components/PresetPicker';
+import { useGridLayout } from '@/features/team-room/hooks/useGridLayout';
 import type { PaneAction } from '@/features/team-room/paneMenu';
 import { cn } from '@/lib/cn';
 import type { Agent } from '@/types/generated/Agent';
@@ -43,6 +46,11 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
   const [problem, setProblem] = useState<string | null>(null);
   const [commandsOpen, setCommandsOpen] = useState(false);
   const [confidence, setConfidence] = useState<Record<string, StateConfidence>>({});
+  const [grid, setGrid] = useGridLayout(
+    team,
+    agents.map((a) => a.id),
+    setProblem,
+  );
 
   const stateOf = useCallback(
     (id: string): AgentState => summary.agents.find((a) => a.id === id)?.state ?? 'stopped',
@@ -124,8 +132,6 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
     }
   };
 
-  const selected = agents.find((a) => a.id === selectedId) ?? null;
-
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex items-center gap-3 border-b border-subtle px-4 py-2.5">
@@ -143,6 +149,7 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
             <Folder size={11} /> <span className="font-mono">{team.workdir}</span>
           </p>
         </div>
+        <PresetPicker value={grid.preset} onChange={(preset) => setGrid({ ...grid, preset })} />
         <Button onClick={() => setCommandsOpen(true)}>
           <FileCode size={13} /> Comandos
         </Button>
@@ -267,23 +274,36 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
           })}
         </ul>
 
-        <section aria-label="Terminal do agente" className="flex min-w-0 flex-1 flex-col p-2">
-          {selected ? (
-            <AgentPane
-              agent={selected}
-              state={stateOf(selected.id)}
-              confidence={confidence[selected.id]}
-              branch={branches[selected.id]}
-              focused
-              clearSignal={clears[selected.id]}
-              onAction={(action) => paneAction(selected, action)}
-              className="flex-1"
+        <section aria-label="Terminais da equipe" className="flex min-w-0 flex-1 flex-col p-2">
+          {agents.length > 0 ? (
+            <GridView
+              layout={grid}
+              onChange={setGrid}
+              labelOf={(id) => `@${handleOf(id)}`}
+              renderPane={(id, drag) => {
+                const agent = agents.find((a) => a.id === id);
+                if (!agent) return null;
+                return (
+                  <AgentPane
+                    agent={agent}
+                    state={stateOf(agent.id)}
+                    confidence={confidence[agent.id]}
+                    branch={branches[agent.id]}
+                    focused={agent.id === selectedId}
+                    clearSignal={clears[agent.id]}
+                    dragHandle={drag}
+                    onFocus={() => setSelectedId(agent.id)}
+                    onAction={(action) => paneAction(agent, action)}
+                    className="min-w-0 flex-1"
+                  />
+                );
+              }}
             />
           ) : (
             <EmptyState
               icon={<SquareTerminal size={22} />}
-              title="Nenhum agente selecionado"
-              description="Escolha um agente à esquerda para ver o terminal dele."
+              title="Nenhum agente ainda"
+              description="Crie um agente em “Novo agente” para ver o terminal dele aqui."
             />
           )}
         </section>

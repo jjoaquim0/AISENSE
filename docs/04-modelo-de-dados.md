@@ -168,6 +168,23 @@ CREATE TABLE agent_tokens (
 );
 ```
 
+## `teams.layout`
+
+JSON da interface, gravado por `team_set_layout` (objeto, até 64 KB). Cada vista guarda a sua chave
+e preserva as outras:
+
+```jsonc
+{
+  "grid": {
+    "preset": "4",                 // "1" | "2" | "3" | "4" | "6" | "9" | "free"
+    "order": ["agt_…", "agt_…"],   // nos presets, só os N primeiros aparecem
+    "free": { "agt_…": { "x": 0, "y": 0, "w": 8, "h": 8, "z": 3 } }  // grade 24×24
+  }
+}
+```
+
+Layout salvo inválido nunca quebra a tela: a vista cai para o padrão.
+
 ## Invariantes
 
 | # | Invariante | Garantido por |

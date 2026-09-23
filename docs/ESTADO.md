@@ -23,7 +23,7 @@ runtime e, depois, o supervisor que sobe os agentes.
 | 00 — Fundação | 🟨 Em andamento | 6 feitas, 3 parciais de 9 |
 | 01 — Terminal Core | 🟨 Em andamento | 4 feitas, 4 parciais de 8 |
 | 02 — Equipes e Agentes | 🟨 Código completo | 11 de 11 feitas — falta a demonstração na janela |
-| 03 — Sala da Equipe | 🟨 Em andamento | 2 feitas de 9 |
+| 03 — Sala da Equipe | 🟨 Em andamento | 3 feitas de 9 |
 | 04 — Sistema de Skills | ⬜ Não iniciada | 0/9 |
 | 05 — Barramento | ⬜ Não iniciada | 0/13 |
 | 06 — Quadro Kanban | ⬜ Não iniciada | 0/11 |
@@ -43,6 +43,7 @@ pendente e não bloqueia nada da Fase 03.
 | Tarefa | Situação |
 |---|---|
 | F03-01 Detector de estado | ✅ `StateDetector` (tela via `vt100`, regras do `docs/05`), tarefa por sessão no supervisor, `agent:state` com `confidence` |
+| F03-03 Vista Grid | ✅ presets 1/2/3/4/6/9 + livre, arrastar/redimensionar, layout salvo por equipe; 60 fps arrastando (terminais parados, sem GPU) — 9 terminais ativos a 55 fps só verificável com GPU |
 | F03-02 Painel de agente | ✅ `AgentPane` com borda na cor do agente, estado com forma + texto, menu `⋮` (reiniciar, parar/iniciar, limpar, duplicar, configurar) |
 
 O agente agora fica em `starting` até o detector ler a primeira tela — antes, processo vivo era
@@ -229,3 +230,4 @@ Bugs encontrados pelos próprios testes, todos corrigidos na origem:
 | 2026-09-23 | Claude | F02-10: bancadas (git worktree por agente), integradas ao supervisor e às exclusões. Fase 02 com as 11 tarefas feitas |
 | 2026-09-23 | Claude | CI vermelho no Windows desde a F02-08 diagnosticado e corrigido (PR #5). Início da Fase 03 a pedido do usuário; F03-01 (detector de estado) concluída |
 | 2026-09-23 | Claude | Causa real do CI vermelho no Windows: ConPTY fechado cedo demais perdia as últimas linhas; corrigido. F03-02 (painel de agente com menu ⋮, duplicar e limpar) |
+| 2026-09-23 | Claude | F03-03 (vista Grid com dnd-kit, modo livre, layout por equipe) e bancada de desempenho `#/dev/grid` |
