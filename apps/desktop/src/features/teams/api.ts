@@ -1,9 +1,11 @@
 import { invoke } from '@tauri-apps/api/core';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type { AgentDraft } from '@/types/generated/AgentDraft';
 import type { PlannedAgent } from '@/types/generated/PlannedAgent';
 import type { Team } from '@/types/generated/Team';
 import type { TeamDraft } from '@/types/generated/TeamDraft';
 import type { TeamId } from '@/types/generated/TeamId';
+import type { TeamProgress } from '@/types/generated/TeamProgress';
 import type { TeamStartReport } from '@/types/generated/TeamStartReport';
 import type { TeamSummary } from '@/types/generated/TeamSummary';
 import type { TeamTemplate } from '@/types/generated/TeamTemplate';
@@ -24,9 +26,18 @@ export const teamsApi = {
   /** Estado da Sala da Equipe (vista, ordem e posição dos painéis). */
   setLayout: (teamId: TeamId, layout: Record<string, unknown>): Promise<void> =>
     invoke('team_set_layout', { teamId, layout }),
-  /** Quem não subiu (com o motivo) e quem subiu com ressalva. */
+  /** ▶ Os `autostart`, escalonados. Quem não subiu (com o motivo) e quem subiu com ressalva. */
   start: (teamId: TeamId): Promise<TeamStartReport> => invoke('team_start', { teamId }),
+  /** ⏸ Para todos e espera saírem. */
+  stop: (teamId: TeamId): Promise<void> => invoke('team_stop', { teamId }),
+  /** ⟳ Quem estava rodando volta, escalonado. */
+  restart: (teamId: TeamId): Promise<TeamStartReport> => invoke('team_restart', { teamId }),
 };
+
+/** Avanço de ▶ ⏸ ⟳ de qualquer equipe (`team:progress`). */
+export function onTeamProgress(handler: (progress: TeamProgress) => void): Promise<UnlistenFn> {
+  return listen<TeamProgress>('team:progress', ({ payload }) => handler(payload));
+}
 
 /** Mensagem legível de um `CommandError` (ou de qualquer coisa que o `invoke` rejeite). */
 export function errorMessage(error: unknown): string {

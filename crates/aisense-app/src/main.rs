@@ -88,6 +88,8 @@ fn main() {
             commands::teams::team_set_layout,
             commands::teams::team_delete,
             commands::teams::team_start,
+            commands::teams::team_stop,
+            commands::teams::team_restart,
             commands::project::project_lookup,
             commands::project::project_accept,
         ])

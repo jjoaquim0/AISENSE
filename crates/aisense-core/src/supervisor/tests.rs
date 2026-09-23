@@ -421,3 +421,154 @@ async fn the_detector_drives_the_state_of_a_real_process() {
         ]
     );
 }
+
+// ───────────────────── controles da equipe (F03-06) ─────────────────────
+
+impl Harness {
+    /// Uma equipe com `autostart` agentes que sobem sozinhos e `manual` que não.
+    async fn squad(&self, autostart: usize, manual: usize) -> (TeamId, Vec<AgentId>) {
+        let team = Team::create(
+            &TeamDraft {
+                name: "Squad".into(),
+                workdir: std::env::temp_dir().display().to_string(),
+                ..TeamDraft::default()
+            },
+            1,
+        )
+        .unwrap();
+        self.store.create_team(&team).await.unwrap();
+        let mut ids = Vec::new();
+        for i in 0..autostart + manual {
+            let existing = self.store.list_agents(&team.id).await.unwrap();
+            let agent = Agent::create(
+                team.id.clone(),
+                &AgentDraft {
+                    handle: format!("agente-{i}"),
+                    name: format!("Agente {i}"),
+                    adapter_id: "custom".into(),
+                    args: long_running(),
+                    autostart: i < autostart,
+                    restart_policy: RestartPolicy::Never,
+                    ..AgentDraft::default()
+                },
+                &existing,
+                1,
+            )
+            .unwrap();
+            self.store.create_agent(&agent).await.unwrap();
+            ids.push(agent.id);
+        }
+        (team.id, ids)
+    }
+}
+
+/// Grava o progresso com o instante de cada evento.
+#[derive(Default)]
+struct ProgressLog(Mutex<Vec<(Instant, TeamProgress)>>);
+
+impl ProgressLog {
+    fn push(&self, p: TeamProgress) {
+        self.0.lock().unwrap().push((Instant::now(), p));
+    }
+    fn events(&self) -> Vec<(Instant, TeamProgress)> {
+        self.0.lock().unwrap().clone()
+    }
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn starting_a_team_of_six_is_staggered_and_never_blocks_the_runtime() {
+    let h = harness();
+    let (team, ids) = h.squad(6, 1).await;
+    let log = ProgressLog::default();
+
+    // Um "front" fictício no mesmo runtime de uma thread só: se o start da equipe
+    // travasse, este contador pararia.
+    let ticks = Arc::new(std::sync::atomic::AtomicU32::new(0));
+    let counter = Arc::clone(&ticks);
+    let ticker = tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+            counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        }
+    });
+
+    let stagger = Duration::from_millis(100);
+    let started = Instant::now();
+    let report = h
+        .supervisor
+        .start_team(&team, stagger, &|p| log.push(p))
+        .await
+        .unwrap();
+    let elapsed = started.elapsed();
+    ticker.abort();
+
+    assert!(report.failures.is_empty(), "{:?}", report.failures);
+    for id in &ids[..6] {
+        assert!(h.supervisor.state(id).is_running(), "autostart agents run");
+    }
+    assert!(
+        !h.supervisor.state(&ids[6]).is_running(),
+        "manual agent stays put"
+    );
+
+    // Ordem da equipe, um por vez, com o intervalo entre eles.
+    let events = log.events();
+    let per_agent: Vec<_> = events
+        .iter()
+        .filter(|(_, p)| p.agent_id.is_some())
+        .collect();
+    let order: Vec<AgentId> = per_agent
+        .iter()
+        .filter_map(|(_, p)| p.agent_id.clone())
+        .collect();
+    assert_eq!(order, ids[..6]);
+    for pair in per_agent.windows(2) {
+        assert!(pair[1].0 - pair[0].0 >= stagger, "agents must be staggered");
+    }
+    let last = &events.last().unwrap().1;
+    assert!(last.finished && last.done == 6 && last.total == 6);
+
+    let ticked = u128::from(ticks.load(std::sync::atomic::Ordering::Relaxed));
+    let expected = elapsed.as_millis() / 10;
+    assert!(
+        ticked * 2 >= expected,
+        "the runtime kept running while the team started ({ticked} ticks in {elapsed:?})"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn stop_all_then_restart_all() {
+    let h = harness();
+    let (team, ids) = h.squad(3, 1).await;
+    h.supervisor
+        .start_team(&team, Duration::ZERO, &|_| {})
+        .await
+        .unwrap();
+    // O manual sobe à mão: "parar tudo" também o para.
+    h.supervisor.start(&ids[3]).await.unwrap();
+
+    h.supervisor.stop_team(&team, &|_| {}).await.unwrap();
+    for id in &ids {
+        assert!(!h.supervisor.state(id).is_running());
+    }
+
+    // Reiniciar sem ninguém rodando é iniciar a equipe: só os `autostart`.
+    h.supervisor
+        .restart_team(&team, Duration::ZERO, &|_| {})
+        .await
+        .unwrap();
+    assert!(h.supervisor.state(&ids[0]).is_running());
+    assert!(!h.supervisor.state(&ids[3]).is_running());
+
+    // Com gente rodando, reinicia exatamente quem estava de pé: sessão nova para cada.
+    let before = h.sessions(&ids[0]).await.len();
+    let log = ProgressLog::default();
+    h.supervisor
+        .restart_team(&team, Duration::ZERO, &|p| log.push(p))
+        .await
+        .unwrap();
+    assert_eq!(h.sessions(&ids[0]).await.len(), before + 1);
+    assert!(h.supervisor.state(&ids[0]).is_running());
+    assert!(!h.supervisor.state(&ids[3]).is_running());
+    assert!(log.events().iter().all(|(_, p)| p.op == TeamOp::Restart));
+}
