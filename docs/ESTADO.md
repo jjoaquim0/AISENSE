@@ -6,15 +6,34 @@
 
 **Última atualização:** 2026-09-23
 **Fase atual:** `FASE 03 — Sala da Equipe` (em andamento; demonstração da 02 pendente na janela)
-**Branch de desenvolvimento:** `main` (o usuário pediu commits direto na main)
+**Fluxo de trabalho atual:** um PR por tarefa, a partir de um branch `claude/...`, com o CI verde
+nos 3 SOs antes do merge (o usuário mergeia). Commits com o ID da tarefa no título.
 
 ---
 
 ## Situação em uma frase
 
-Fundação, terminal (PTY + xterm) e o domínio persistido de equipes e agentes estão em código e
-testados; falta conferência visual da janela. O trabalho corrente é a Fase 02: adaptadores de
-runtime e, depois, o supervisor que sobe os agentes.
+Fundação, terminal, equipes/agentes persistidos e **6 das 9 tarefas da Sala da Equipe** estão em
+código, testados e com CI verde nos 3 SOs. Próximo: **F03-07 (sidebar de agentes)**, depois F03-08
+(teclado) e F03-09 (inspetor), que fecham a Fase 03.
+
+## Para quem chega agora (retomada)
+
+1. Leia `AGENTS.md` e este arquivo inteiro; depois `docs/fases/FASE-03-sala-da-equipe.md` — cada
+   tarefa feita tem uma nota `> Feito:` dizendo onde está o código e o que ficou de fora.
+2. Próxima tarefa: **F03-07**. Ponto de partida: a lista de agentes à esquerda em
+   `apps/desktop/src/features/teams/TeamView.tsx` (vira o componente da sidebar); estado ao vivo já
+   chega por `agent:state` (com `confidence`); a ordem dos agentes é `grid.order` em
+   `features/team-room/hooks/useTeamLayout.ts` — reordenar na sidebar deve mexer nela.
+3. Onde as coisas moram na Fase 03: `aisense-core/src/state/` (detector), `supervisor/team.rs`
+   (▶ ⏸ ⟳), `apps/desktop/src/features/team-room/` (painel, grid, foco, controles, layout).
+4. Verificação que se espera antes de cada PR: `pnpm lint`, `pnpm typecheck`, `pnpm test`,
+   `pnpm build` e `cargo clippy -p aisense-app --all-targets -- -D warnings` (no Linux precisa das
+   libs de GUI, ver `AGENTS.md`). UI nova: screenshot em `#/dev` nos dois temas (Chromium headless
+   funciona aqui); desempenho da grade: `#/dev/grid`.
+5. **Pendências que só uma máquina com tela resolve:** demonstração da Fase 02 na janela;
+   conferência visual das Fases 00/01; 55 fps com 9 terminais ativos (`#/dev/grid` com GPU);
+   barra de progresso e confirmação dos controles da equipe na janela real.
 
 ## Progresso por fase
 
@@ -43,11 +62,14 @@ pendente e não bloqueia nada da Fase 03.
 | Tarefa | Situação |
 |---|---|
 | F03-01 Detector de estado | ✅ `StateDetector` (tela via `vt100`, regras do `docs/05`), tarefa por sessão no supervisor, `agent:state` com `confidence` |
-| F03-06 Controles da equipe | ✅ ▶ escalonado (300 ms), ⏸ e ⟳ com confirmação e progresso ao vivo (`team:progress`) |
-| F03-05 Visibilidade | ✅ agentes nascem invisíveis; só o painel na tela (e com a janela em primeiro plano) recebe `pty:data`; reidratação ordenada ao voltar |
-| F03-04 Vista Foco | ✅ terminal grande + miniaturas de texto (sem xterm) vindas da tela do detector, a 2 fps; vista salva por equipe |
-| F03-03 Vista Grid | ✅ presets 1/2/3/4/6/9 + livre, arrastar/redimensionar, layout salvo por equipe; 60 fps arrastando (terminais parados, sem GPU) — 9 terminais ativos a 55 fps só verificável com GPU |
 | F03-02 Painel de agente | ✅ `AgentPane` com borda na cor do agente, estado com forma + texto, menu `⋮` (reiniciar, parar/iniciar, limpar, duplicar, configurar) |
+| F03-03 Vista Grid | ✅ presets 1/2/3/4/6/9 + livre, arrastar/redimensionar, layout salvo por equipe; 60 fps arrastando (terminais parados, sem GPU) — 9 terminais ativos a 55 fps só verificável com GPU |
+| F03-04 Vista Foco | ✅ terminal grande + miniaturas de texto (sem xterm) vindas da tela do detector, a 2 fps; vista salva por equipe |
+| F03-05 Visibilidade | ✅ agentes nascem invisíveis; só o painel na tela (e com a janela em primeiro plano) recebe `pty:data`; reidratação ordenada ao voltar |
+| F03-06 Controles da equipe | ✅ ▶ escalonado (300 ms), ⏸ e ⟳ com confirmação e progresso ao vivo (`team:progress`) |
+| F03-07 Sidebar de agentes | ⬜ **próxima** |
+| F03-08 Navegação por teclado | ⬜ |
+| F03-09 Inspetor do agente | ⬜ |
 
 O agente agora fica em `starting` até o detector ler a primeira tela — antes, processo vivo era
 `idle` na hora. Transcrições dos testes são sintéticas; ver ressalva no documento da fase.
@@ -237,3 +259,4 @@ Bugs encontrados pelos próprios testes, todos corrigidos na origem:
 | 2026-09-23 | Claude | F03-04 (vista Foco com miniaturas leves) e correção do preset inicial da Grid |
 | 2026-09-23 | Claude | F03-05 (só o painel visível recebe saída ao vivo; agentes nascem invisíveis) |
 | 2026-09-23 | Claude | F03-06 (iniciar/parar/reiniciar a equipe com progresso, sem travar a interface) |
+| 2026-09-23 | Claude | Retomada documentada no topo deste arquivo para continuar em outra sessão; próxima tarefa F03-07 |
