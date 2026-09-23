@@ -399,6 +399,17 @@ mod tests {
     use super::*;
     use crate::ring::DEFAULT_MAX_BYTES;
 
+    /// Espera a leitura do PTY chegar ao EOF: só aí toda a saída está no ring e no
+    /// log. A morte do processo não basta — no Windows o ConPTY ainda entrega saída
+    /// depois dela, e um `sleep` fixo perdia a última linha no runner do CI.
+    async fn wait_reader_done(session: &PtySession) {
+        let mut done = session.reader_done();
+        tokio::time::timeout(Duration::from_secs(10), done.wait_for(|d| *d))
+            .await
+            .expect("a leitura do PTY não terminou em 10 s")
+            .expect("o sinal de fim de leitura foi descartado");
+    }
+
     use crate::test_support::*;
 
     /// Procura uma linha exata na saída.
@@ -581,7 +592,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(session.wait().await, 0);
-        tokio::time::sleep(Duration::from_millis(200)).await;
+        wait_reader_done(&session).await;
 
         let transcript = std::fs::read_to_string(&path).unwrap();
         assert!(
@@ -607,8 +618,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(session.wait().await, 0);
-        // Dá um instante para a thread de leitura drenar o que sobrou no buffer do PTY.
-        tokio::time::sleep(Duration::from_millis(200)).await;
+        wait_reader_done(&session).await;
 
         let snapshot = session.snapshot();
         assert!(
