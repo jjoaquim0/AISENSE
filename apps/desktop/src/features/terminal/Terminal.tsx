@@ -10,15 +10,20 @@ import { onPtyData, onPtyExit } from '@/lib/events';
 import { useTheme } from '@/lib/theme';
 import { terminalApi } from './api';
 import { decodeChunk } from './decode';
+import { HydrationGate } from './hydration';
 import { TerminalSearch } from './TerminalSearch';
 import { readTerminalTheme } from './theme';
+import { useOnScreen } from './useOnScreen';
 
 /** Debounce do redimensionamento: `fit()` a cada pixel arrastado é caro. */
 const RESIZE_DEBOUNCE_MS = 50;
 
 interface TerminalProps {
   agentId: string;
-  /** Painel fora da tela não recebe eventos; o histórico fica no core. */
+  /**
+   * `false` força o painel a não receber eventos mesmo montado. Fora da tela ou com
+   * a janela em segundo plano ele já não recebe; o histórico fica no core.
+   */
   visible?: boolean;
   onExit?: (code: number) => void;
   /** Cada mudança limpa a tela e o histórico retido no core ("Limpar" do painel). */
@@ -37,6 +42,7 @@ export function Terminal({
   const term = useRef<Xterm | null>(null);
   const fit = useRef<FitAddon | null>(null);
   const search = useRef<SearchAddon | null>(null);
+  const gate = useRef<HydrationGate | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const { theme } = useTheme();
   // O efeito de montagem lê o tema uma vez; colocá-lo nas dependências recriaria o
@@ -95,17 +101,12 @@ export function Terminal({
     fitAddon.fit();
     void terminalApi.resize(agentId, xterm.rows, xterm.cols).catch(reportError);
 
-    // Reidrata de uma vez só: escrever linha a linha um histórico de 10.000 linhas
-    // congela a interface por segundos.
-    void terminalApi
-      .snapshot(agentId)
-      .then((base64) => {
-        if (base64) xterm.write(decodeChunk(base64));
-      })
-      .catch(reportError);
-
+    // A saída ao vivo passa pelo portão: durante uma reidratação ela espera o
+    // histórico ser escrito, para não aparecer acima dele.
+    const hydration = new HydrationGate((data) => xterm.write(data));
+    gate.current = hydration;
     const stopData = onPtyData(agentId, ({ dataBase64 }) => {
-      xterm.write(decodeChunk(dataBase64));
+      hydration.push(decodeChunk(dataBase64));
     });
     const stopExit = onPtyExit(agentId, ({ code }) => {
       xterm.write(`\r\n\u001b[2m— processo encerrado (código ${code}) —\u001b[0m\r\n`);
@@ -120,6 +121,8 @@ export function Terminal({
       stopData();
       stopExit();
       typed.dispose();
+      hydration.cancel();
+      gate.current = null;
       xterm.dispose();
       term.current = null;
       fit.current = null;
@@ -163,10 +166,30 @@ export function Terminal({
     void terminalApi.clear(agentId).catch(reportError);
   }, [agentId, clearSignal]);
 
-  // ── Visibilidade: painel escondido não gera evento algum ──
+  // ── Visibilidade (F03-05): só o painel que está de fato na tela recebe eventos.
+  //    Ao aparecer, pede ao core para ligar a emissão e reidrata com o histórico de
+  //    uma vez só (escrever linha a linha 10.000 linhas congela a interface). Ao
+  //    sumir — ou desmontar, ao trocar de vista —, desliga. ──
+  const onScreen = useOnScreen(host);
+  const shown = visible && onScreen;
   useEffect(() => {
-    void terminalApi.setVisible(agentId, visible).catch(reportError);
-  }, [agentId, visible]);
+    const xterm = term.current;
+    const hydration = gate.current;
+    if (!shown || !xterm || !hydration) return;
+    xterm.reset();
+    const generation = hydration.begin();
+    terminalApi
+      .show(agentId)
+      .then((base64) => hydration.finish(generation, base64 ? decodeChunk(base64) : null))
+      .catch((error: unknown) => {
+        hydration.finish(generation, null);
+        reportError(error);
+      });
+    return () => {
+      hydration.cancel();
+      void terminalApi.setVisible(agentId, false).catch(reportError);
+    };
+  }, [agentId, shown]);
 
   return (
     <div className={cn('relative size-full bg-terminal', className)}>

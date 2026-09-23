@@ -66,6 +66,7 @@ fn main() {
             commands::pty::pty_kill,
             commands::pty::pty_snapshot,
             commands::pty::pty_clear,
+            commands::pty::pty_show,
             commands::pty::pty_set_visible,
             commands::pty::pty_is_running,
             commands::runtimes::runtimes_overview,

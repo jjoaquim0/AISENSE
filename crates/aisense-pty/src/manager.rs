@@ -66,6 +66,18 @@ impl PtyManager {
         self.spawn_with_ring(agent_id, spec, RingBuffer::default(), sink)
     }
 
+    /// Como `spawn`, mas a sessão nasce **invisível**: nenhum evento até um painel
+    /// pedir `show`. É o caminho dos agentes (F03-05) — com nove agentes e um painel
+    /// na tela, os outros oito não podem inundar a interface de eventos.
+    pub fn spawn_hidden(
+        &self,
+        agent_id: impl Into<String>,
+        spec: PtySpawn,
+        sink: Arc<dyn OutputSink>,
+    ) -> Result<(), PtyError> {
+        self.start(agent_id.into(), spec, RingBuffer::default(), sink, false)
+    }
+
     pub fn spawn_with_ring(
         &self,
         agent_id: impl Into<String>,
@@ -73,8 +85,17 @@ impl PtyManager {
         ring: RingBuffer,
         sink: Arc<dyn OutputSink>,
     ) -> Result<(), PtyError> {
-        let agent_id = agent_id.into();
+        self.start(agent_id.into(), spec, ring, sink, true)
+    }
 
+    fn start(
+        &self,
+        agent_id: String,
+        spec: PtySpawn,
+        ring: RingBuffer,
+        sink: Arc<dyn OutputSink>,
+        visible: bool,
+    ) -> Result<(), PtyError> {
         {
             let sessions = self.sessions.read().map_err(|_| PtyError::Closed)?;
             if sessions
@@ -86,7 +107,9 @@ impl PtyManager {
         }
 
         let session = Arc::new(PtySession::spawn_with_ring(spec, ring)?);
-        let batcher = Arc::new(Mutex::new(Batcher::with_default_window()));
+        let mut batcher = Batcher::with_default_window();
+        batcher.set_visible(visible);
+        let batcher = Arc::new(Mutex::new(batcher));
 
         // Receptor criado dentro do `spawn`, antes da thread de leitura começar.
         // Inscrever-se aqui seria tarde demais: um `echo` rápido já teria enviado a
@@ -120,6 +143,20 @@ impl PtyManager {
     /// Histórico retido, para reidratar o terminal quando o painel volta a aparecer.
     pub fn snapshot(&self, agent_id: &str) -> Result<Vec<u8>, PtyError> {
         self.with(agent_id, |managed| managed.session.snapshot())
+    }
+
+    /// Um painel apareceu: liga a emissão e devolve o histórico para reidratar.
+    ///
+    /// Os dois passos acontecem com o lote travado, então nada do que chegar depois
+    /// do snapshot se perde. O contrário não é garantido: um chunk que já estava no
+    /// ring, mas ainda não tinha passado pelo lote, pode aparecer duas vezes — mesma
+    /// janela, de milissegundos, que o painel já tinha ao montar.
+    pub fn show(&self, agent_id: &str) -> Result<Vec<u8>, PtyError> {
+        self.with(agent_id, |managed| {
+            let mut batcher = managed.batcher.lock().map_err(|_| PtyError::Closed)?;
+            batcher.set_visible(true);
+            Ok(managed.session.snapshot())
+        })?
     }
 
     /// Esvazia o histórico retido: a próxima reidratação começa da tela limpa.
@@ -365,6 +402,38 @@ mod tests {
             );
             tokio::time::sleep(Duration::from_millis(10)).await;
         }
+    }
+
+    #[tokio::test]
+    async fn com_nove_agentes_so_o_painel_visivel_emite() {
+        // Aceite da F03-05: nove agentes produzindo saída, um painel na tela.
+        let manager = PtyManager::new();
+        let recorder = Arc::new(Recorder::default());
+        for i in 0..9 {
+            manager
+                .spawn_hidden(format!("agt_{i}"), many_lines(300), recorder.clone())
+                .unwrap();
+        }
+        let history = manager.show("agt_4").unwrap();
+        wait_until(|| recorder.exits().len() == 9).await;
+
+        let emitters: std::collections::BTreeSet<String> = recorder
+            .chunks
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(id, _)| id.clone())
+            .collect();
+        assert!(
+            emitters.iter().all(|id| id == "agt_4"),
+            "só o painel visível emite: {emitters:?}"
+        );
+        // Os invisíveis continuam guardando tudo para quando aparecerem.
+        let hidden = String::from_utf8_lossy(&manager.snapshot("agt_7").unwrap()).into_owned();
+        assert!(hidden.contains("linha 300"), "{hidden:?}");
+        // O que já tinha saído antes do `show` veio no histórico; o resto, em eventos.
+        let shown = String::from_utf8_lossy(&history).into_owned() + &recorder.text();
+        assert!(shown.contains("linha 300"));
     }
 
     #[tokio::test]
