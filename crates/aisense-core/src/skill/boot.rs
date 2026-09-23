@@ -70,7 +70,9 @@ pub fn compose_boot(
     }
     if omitted > 0 {
         base.push_str(&OMITTED.replace("<handle>", agent.handle.as_str()));
-        base.push_str(&format!("> {omitted} skill(s) resumida(s) apenas nos arquivos.\n"));
+        base.push_str(&format!(
+            "> {omitted} skill(s) resumida(s) apenas nos arquivos.\n"
+        ));
     }
     BootDocument {
         markdown: base,
@@ -121,8 +123,16 @@ fn render_base(
         limit(workdir, 240),
     );
     let mut others: Vec<&Agent> = colleagues.iter().filter(|a| a.id != agent.id).collect();
-    others.sort_by(|a, b| a.position.cmp(&b.position).then_with(|| a.handle.cmp(&b.handle)));
-    let visible = if compact { others.len().min(24) } else { others.len() };
+    others.sort_by(|a, b| {
+        a.position
+            .cmp(&b.position)
+            .then_with(|| a.handle.cmp(&b.handle))
+    });
+    let visible = if compact {
+        others.len().min(24)
+    } else {
+        others.len()
+    };
     for colleague in others.iter().take(visible) {
         let role = limit(&colleague.role, 80)
             .replace('\r', " ")
@@ -134,7 +144,10 @@ fn render_base(
         ));
     }
     if others.len() > visible {
-        result.push_str(&format!("\nMais {} colega(s): consulte `aisense agents`.\n", others.len() - visible));
+        result.push_str(&format!(
+            "\nMais {} colega(s): consulte `aisense agents`.\n",
+            others.len() - visible
+        ));
     }
     result.push_str("\n## Como falar com a equipe\n");
     result.push_str(teamwork);
@@ -143,10 +156,7 @@ fn render_base(
 }
 
 fn skill_section(handle: &str, skill: &Skill, compact: bool) -> String {
-    let path = format!(
-        ".aisense/agents/{handle}/skills/{}/SKILL.md",
-        skill.name
-    );
+    let path = format!(".aisense/agents/{handle}/skills/{}/SKILL.md", skill.name);
     let mut section = format!("\n### {} (v{})\n", skill.name, skill.version);
     if !compact && skill.inject == SkillInject::Bootstrap {
         section.push_str(skill.body.trim());
@@ -167,7 +177,9 @@ fn skill_section(handle: &str, skill: &Skill, compact: bool) -> String {
 fn first_section(body: &str) -> &str {
     let mut headings = body.match_indices("\n## ");
     let _ = headings.next();
-    headings.next().map_or(body.trim(), |(at, _)| body[..at].trim())
+    headings
+        .next()
+        .map_or(body.trim(), |(at, _)| body[..at].trim())
 }
 
 fn clip(text: &str, max: usize) -> String {

@@ -63,7 +63,7 @@ fn io_err(path: &Path) -> impl FnOnce(io::Error) -> MaterializeError + '_ {
     }
 }
 
-/// O que foi escrito, para o compositor do `BOOT.md` (F04-05) e para a UI.
+/// O que foi escrito, para a injeção no boot (F04-06) e para a UI.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Materialized {
     /// `<workdir>/.aisense/agents/<handle>/`.
@@ -554,7 +554,7 @@ mod tests {
         run(&f, &revisor, &[]);
         assert_eq!(
             files(&f.dir.path().join(".aisense/agents")),
-            ["critico/agent.json"]
+            ["critico/BOOT.md", "critico/agent.json"]
         );
         // O dono antigo da skill nativa era o mesmo agente: ela sai também.
         assert!(!f.dir.path().join(".claude/skills/alfa").exists());

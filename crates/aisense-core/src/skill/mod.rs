@@ -3,8 +3,8 @@
 //! Formato compatível com as skills do Claude Code (ADR 0005): um diretório com um
 //! `SKILL.md` — frontmatter YAML + Markdown.
 
-mod catalog;
 mod boot;
+mod catalog;
 mod library;
 mod materialize;
 mod model;
@@ -12,8 +12,8 @@ mod parse;
 mod resolve;
 mod watch;
 
-pub use catalog::{BuiltinSkill, SkillCatalog, BUILTIN_SKILLS, SKILL_FILE};
 pub use boot::{compose_boot, BootDocument, BOOT_FILE, BOOT_MAX_CHARS};
+pub use catalog::{BuiltinSkill, SkillCatalog, BUILTIN_SKILLS, SKILL_FILE};
 pub use library::{SkillEntry, SkillLibrary, SkillLibraryView};
 pub use materialize::{
     materialize, AgentCard, MaterializeError, MaterializeRequest, Materialized, AISENSE_DIR,

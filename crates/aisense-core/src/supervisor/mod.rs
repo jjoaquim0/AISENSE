@@ -360,7 +360,14 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
         // Materializa skills, identidade e BOOT.md no diretório de trabalho
         // (F04-04/05). Falha de disco vira ressalva, não impede o start.
         let notes = self
-            .materialize(&team, &agent, &colleagues, &adapter, &workdir, &skills.active)
+            .materialize(
+                &team,
+                &agent,
+                &colleagues,
+                &adapter,
+                &workdir,
+                &skills.active,
+            )
             .await;
 
         let token = generate_token()?;
@@ -484,8 +491,12 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
         workdir: &Workdir,
         skills: &[crate::skill::Skill],
     ) -> Vec<String> {
-        let (team, agent, colleagues, adapter) =
-            (team.clone(), agent.clone(), colleagues.to_vec(), adapter.clone());
+        let (team, agent, colleagues, adapter) = (
+            team.clone(),
+            agent.clone(),
+            colleagues.to_vec(),
+            adapter.clone(),
+        );
         let (path, skills) = (PathBuf::from(&workdir.path), skills.to_vec());
         let agent_id = agent.id.clone();
         let done = tokio::task::spawn_blocking(move || {
