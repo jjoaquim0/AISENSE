@@ -1,6 +1,7 @@
 import { AlertTriangle, ChevronDown, ChevronUp, Plus, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { IconButton } from '@/components/ui';
+import { useNav } from '@/features/shell/nav';
 import { skillsApi } from '@/features/skills/api';
 import {
   addSkill,
@@ -29,6 +30,7 @@ interface SkillsTabProps {
  */
 export function SkillsTab({ agent, running }: SkillsTabProps) {
   const { library, problem: libraryProblem } = useSkillLibrary();
+  const openLibrary = useNav((s) => s.go);
   const [assigned, setAssigned] = useState<AgentSkill[] | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [changed, setChanged] = useState(false);
@@ -128,11 +130,19 @@ export function SkillsTab({ agent, running }: SkillsTabProps) {
       </section>
 
       <section aria-label="Adicionar skill">
-        <h4 className="pb-1 text-caption tracking-[0.02em] text-muted uppercase">Biblioteca</h4>
+        <div className="flex items-baseline justify-between pb-1">
+          <h4 className="text-caption tracking-[0.02em] text-muted uppercase">Biblioteca</h4>
+          <button
+            type="button"
+            onClick={() => openLibrary('skills')}
+            className="text-caption text-accent hover:underline"
+          >
+            Abrir biblioteca
+          </button>
+        </div>
         {library && toAdd.length === 0 && (
           <p className="text-caption text-muted">
-            Nada para adicionar. Crie skills em{' '}
-            <span className="font-mono">~/.aisense/skills/</span>.
+            Nada para adicionar. Crie uma skill na biblioteca.
           </p>
         )}
         <ul className="flex flex-col gap-1">

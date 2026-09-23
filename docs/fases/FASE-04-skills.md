@@ -118,11 +118,30 @@ Escrever `trabalho-em-equipe`, `coordenador`, `revisor-rigoroso`, `implementador
 **Aceite:** `trabalho-em-equipe` entra em todos os agentes automaticamente e não aparece na lista
 de atribuição. Depende de F04-01.
 
-### [ ] F04-08 — Biblioteca e editor de skills (T7)
+### [~] F04-08 — Biblioteca e editor de skills (T7)
 Grid da biblioteca, editor Markdown com preview e validação ao vivo, contador de caracteres,
 import/export, aviso de "N agentes precisam reiniciar", botão "testar em agente descartável".
 **Aceite:** editar uma skill em uso mostra o aviso com a lista exata de agentes afetados.
 Depende de F04-02.
+> Parcial. Feito: core em `aisense-core/src/skill/editor.rs` — `check_skill` (validação ao
+> vivo: erros do parser com `caminho:linha`, `name` repetido, `targets` inexistente, renomear na
+> edição, avisos de orçamento a 80% e acima de 12.000), `save_skill` (atômico, só dentro de
+> `~/.aisense/skills/`), `duplicate_source`, `delete_skill`, `import_skill`/`export_skill` de
+> **pasta** (com arquivos de apoio) e `skill_users` (quem usa, ligada ou não, rodando ou não).
+> Comandos `skill_check`, `skill_open`, `skill_open_file`, `skill_save`, `skill_duplicate`,
+> `skill_delete`, `skill_import`, `skill_export`, `skill_users`; salvar recarrega a biblioteca na
+> hora, sem esperar o observador. UI: `features/skills/SkillLibraryScreen.tsx` (grade Embutidas /
+> Suas / fora do disco / não carregaram com "Consertar", busca sem acento, Importar, Nova skill,
+> Duplicar, Exportar, Excluir com aviso de quem usa), aberta pelo trilho esquerdo e pelo link da
+> aba Skills do inspetor; `SkillEditor.tsx` em tela cheia (Markdown à esquerda, preview com
+> `react-markdown` + `remark-gfm` à direita, frontmatter como o app entendeu, contador
+> `N / 12.000`, `⌘S`, barra com "N agentes precisam reiniciar: @x (Equipe)" e botão de reiniciar).
+> Aceite como teste no front (`__tests__/editor.test.tsx`: editar uma skill em uso lista
+> exatamente quem está ligado e rodando) e no core (`skill_users`). Screenshots nos dois temas
+> com o core simulado. **Falta:** (1) botão "testar em agente descartável" — precisa de um
+> agente temporário que o domínio ainda não tem (flag de descarte e limpeza ao parar);
+> (2) import/export em `.zip` (hoje só pasta; pede a crate `zip`). A tela de skills é carregada
+> sob demanda para o Markdown não pesar no bundle inicial.
 
 ### [ ] F04-09 — Notas da equipe
 Armazenamento em `<workdir>/.aisense/notes/`, leitura, `append` atômico (`O_APPEND`) e `write` com

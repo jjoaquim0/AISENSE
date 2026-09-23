@@ -208,6 +208,18 @@ aisense task done tsk_01J8XYZ
 - Botão **Testar em agente descartável**: sobe um agente temporário com só essa skill.
 - Import/export: diretório ou `.zip`.
 
+Regras do editor (F04-08, `aisense-core/src/skill/editor.rs`):
+
+- Só escreve dentro de `~/.aisense/skills/`; caminho vindo da UI que aponte para fora é recusado.
+  A gravação é atômica (temporário + rename), para o hot-reload nunca ler meio arquivo.
+- **Embutidas são só leitura.** "Duplicar para editar" abre uma cópia `<nome>-copia` como skill nova.
+- **O `name` não muda na edição**: as atribuições casam a skill por ele. Para outro nome, duplique.
+- `targets` com runtime que o catálogo de adaptadores não conhece impede salvar; nome igual ao de
+  uma embutida só avisa (a do usuário vence).
+- Excluir apaga a pasta; as atribuições ficam, marcadas como "fora do disco" (F04-02).
+- "Precisam reiniciar" = agentes com a skill **ligada** e processo vivo; os parados só pegam a
+  mudança no próximo início. A barra do editor lista cada um e oferece reiniciá-los.
+
 ## Precedência quando há conflito
 
 Ordem de composição no `BOOT.md` (do mais genérico ao mais específico — o último tem a última palavra):
