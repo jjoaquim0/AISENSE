@@ -5,4 +5,4 @@ import type { CardView } from "./CardView";
 import type { Column } from "./Column";
 import type { TeamId } from "./TeamId";
 
-export type BoardView = { teamId: TeamId, teamName: string, board: Board, columns: Array<Column>, cards: Array<CardView>, agents: Array<AgentTag>, now: bigint, };
+export type BoardView = { teamId: TeamId, teamName: string, board: Board, columns: Array<Column>, cards: Array<CardView>, agents: Array<AgentTag>, now: number, };

@@ -15,4 +15,4 @@ action: string,
 /**
  * O diff: `{"campo": [antes, depois]}` ou o detalhe da ação.
  */
-detail: Record<string, unknown>, createdAt: bigint, };
+detail: Record<string, unknown>, createdAt: number, };

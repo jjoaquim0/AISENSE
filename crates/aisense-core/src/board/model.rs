@@ -91,6 +91,7 @@ pub struct Board {
     pub id: BoardId,
     pub team_id: TeamId,
     pub automations: Vec<Automation>,
+    #[ts(type = "number")]
     pub created_at: Millis,
 }
 
@@ -235,6 +236,7 @@ pub struct Card {
     /// `None` = você ou o sistema.
     pub created_by: Option<AgentId>,
     pub parent_id: Option<CardId>,
+    #[ts(type = "number")]
     pub position: i64,
     pub priority: CardPriority,
     pub labels: Vec<String>,
@@ -242,13 +244,19 @@ pub struct Card {
     pub links: Vec<CardLink>,
     pub block_reason: Option<String>,
     /// Trava otimista: toda gravação sobe um. `claim` só vale sobre a versão lida.
+    #[ts(type = "number")]
     pub version: i64,
+    #[ts(type = "number | null")]
     pub archived_at: Option<Millis>,
     pub approved_by: Option<AgentId>,
+    #[ts(type = "number | null")]
     pub approved_at: Option<Millis>,
     /// Desde quando está na coluna atual (`card_stale`, "há 18min").
+    #[ts(type = "number")]
     pub column_since: Millis,
+    #[ts(type = "number")]
     pub created_at: Millis,
+    #[ts(type = "number")]
     pub updated_at: Millis,
 }
 
@@ -270,6 +278,7 @@ pub struct Comment {
     pub card_id: CardId,
     pub author: Actor,
     pub body: String,
+    #[ts(type = "number")]
     pub created_at: Millis,
 }
 
@@ -287,6 +296,7 @@ pub struct Activity {
     /// O diff: `{"campo": [antes, depois]}` ou o detalhe da ação.
     #[ts(type = "Record<string, unknown>")]
     pub detail: serde_json::Value,
+    #[ts(type = "number")]
     pub created_at: Millis,
 }
 

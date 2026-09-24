@@ -3,4 +3,4 @@ import type { Actor } from "./Actor";
 import type { CardId } from "./CardId";
 import type { CommentId } from "./CommentId";
 
-export type Comment = { id: CommentId, cardId: CardId, author: Actor, body: string, createdAt: bigint, };
+export type Comment = { id: CommentId, cardId: CardId, author: Actor, body: string, createdAt: number, };

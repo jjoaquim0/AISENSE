@@ -301,7 +301,8 @@ e a barra inferior mostra quantos agentes usam e quais precisarão reiniciar.
 
 ## T8 — Quadro Kanban ⭐
 
-Uma tela por equipe. **Especificação completa em [13 — Quadro Kanban](13-quadro-kanban.md)** —
+Uma tela por equipe — é a quarta vista da Sala da Equipe (Grade · Foco · Mensagens · **Quadro**,
+alternadas por `⌘G`). **Especificação completa em [13 — Quadro Kanban](13-quadro-kanban.md)** —
 aqui fica só o resumo visual.
 
 ```
@@ -325,6 +326,13 @@ aqui fica só o resumo visual.
 - Detalhe do cartão: Markdown, checklist, thread de comentários com agentes, dependências
   navegáveis, links de PR/commit e histórico imutável.
 - Tudo alimentado igualmente pela UI e por `aisense task ...` / ferramentas MCP.
+- Na interface os ícones são os do Lucide (seta para cima, elo, caixa marcada, balão, alerta),
+  com o mesmo significado dos símbolos acima.
+- Arrastar para a coluna de bloqueio pede o motivo antes de mover; arrastar para coluna cheia
+  mostra o erro do core (o mesmo da CLI) e o cartão volta.
+- Editores de colunas e de automações (formulário, com o TOML gerado à vista); remover coluna
+  com cartões pede o destino deles. Revisão: "Aprovar" e "Rejeitar" (motivo obrigatório) no
+  detalhe do cartão em coluna de revisão.
 
 ---
 

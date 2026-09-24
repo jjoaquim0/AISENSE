@@ -15,12 +15,12 @@ body: string, assignee: AgentId | null,
 /**
  * `None` = você ou o sistema.
  */
-createdBy: AgentId | null, parentId: CardId | null, position: bigint, priority: CardPriority, labels: Array<string>, checklist: Array<ChecklistItem>, links: Array<CardLink>, blockReason: string | null, 
+createdBy: AgentId | null, parentId: CardId | null, position: number, priority: CardPriority, labels: Array<string>, checklist: Array<ChecklistItem>, links: Array<CardLink>, blockReason: string | null, 
 /**
  * Trava otimista: toda gravação sobe um. `claim` só vale sobre a versão lida.
  */
-version: bigint, archivedAt: bigint | null, approvedBy: AgentId | null, approvedAt: bigint | null, 
+version: number, archivedAt: number | null, approvedBy: AgentId | null, approvedAt: number | null, 
 /**
  * Desde quando está na coluna atual (`card_stale`, "há 18min").
  */
-columnSince: bigint, createdAt: bigint, updatedAt: bigint, };
+columnSince: number, createdAt: number, updatedAt: number, };

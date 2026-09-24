@@ -38,7 +38,10 @@ import type { TeamSummary } from '@/types/generated/TeamSummary';
 import { describeStartReport, errorMessage } from './api';
 import { useTeams } from './store';
 
-// Sob demanda: o editor de notas traz o preview de Markdown.
+// Sob demanda: o quadro e o editor de notas trazem o preview de Markdown.
+const BoardScreen = lazy(() =>
+  import('@/features/board/BoardScreen').then((m) => ({ default: m.BoardScreen })),
+);
 const NotesPanel = lazy(() =>
   import('@/features/notes/NotesPanel').then((m) => ({ default: m.NotesPanel })),
 );
@@ -317,7 +320,11 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
 
       <div className="flex min-h-0 flex-1">
         <section aria-label="Terminais da equipe" className="flex min-w-0 flex-1 flex-col p-2">
-          {view === 'timeline' ? (
+          {view === 'board' ? (
+            <Suspense fallback={null}>
+              <BoardScreen teamId={team.id} />
+            </Suspense>
+          ) : view === 'timeline' ? (
             <TimelineView teamId={team.id} agents={agents} />
           ) : agents.length > 0 && view === 'focus' ? (
             <FocusView

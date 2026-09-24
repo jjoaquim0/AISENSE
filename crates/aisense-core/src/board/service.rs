@@ -78,6 +78,7 @@ pub struct BoardView {
     pub columns: Vec<Column>,
     pub cards: Vec<CardView>,
     pub agents: AgentHandles,
+    #[ts(type = "number")]
     pub now: Millis,
 }
 
@@ -127,6 +128,7 @@ pub struct BoardEvent {
     pub actor: Actor,
     /// Agentes a quem a mudança diz respeito (responsável antes e depois, criador).
     pub involved: Vec<AgentId>,
+    #[ts(type = "number")]
     pub at: Millis,
 }
 

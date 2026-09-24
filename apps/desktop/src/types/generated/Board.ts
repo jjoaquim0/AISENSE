@@ -3,4 +3,4 @@ import type { Automation } from "./Automation";
 import type { BoardId } from "./BoardId";
 import type { TeamId } from "./TeamId";
 
-export type Board = { id: BoardId, teamId: TeamId, automations: Array<Automation>, createdAt: bigint, };
+export type Board = { id: BoardId, teamId: TeamId, automations: Array<Automation>, createdAt: number, };

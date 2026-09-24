@@ -11,4 +11,4 @@ export type BoardEvent = { teamId: TeamId, cardId: CardId | null, action: string
 /**
  * Agentes a quem a mudança diz respeito (responsável antes e depois, criador).
  */
-involved: Array<AgentId>, at: bigint, };
+involved: Array<AgentId>, at: number, };

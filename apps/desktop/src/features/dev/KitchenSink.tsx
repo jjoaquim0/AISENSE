@@ -21,9 +21,11 @@ import {
   TabsTrigger,
   Tooltip,
 } from '@/components/ui';
+import { CardTile } from '@/features/board/BoardScreen';
 import { AgentPane } from '@/features/team-room/components/AgentPane';
 import { MiniPreview } from '@/features/team-room/components/MiniPreview';
 import type { Agent } from '@/types/generated/Agent';
+import type { CardView } from '@/types/generated/CardView';
 
 /**
  * Amostra do design system (F00-03 e F00-06). Só existe em desenvolvimento:
@@ -131,6 +133,19 @@ export function KitchenSink() {
             onAction={() => {}}
             className="h-56"
           />
+        </div>
+      </Section>
+
+      <Section title="Cartões do quadro">
+        <div className="grid grid-cols-3 gap-2">
+          <CardTile
+            card={SAMPLE_CARDS[0]}
+            color={undefined}
+            highlighted={false}
+            onOpen={() => {}}
+          />
+          <CardTile card={SAMPLE_CARDS[1]} color="indigo" highlighted onOpen={() => {}} />
+          <CardTile card={SAMPLE_CARDS[2]} color="amber" highlighted={false} onOpen={() => {}} />
         </div>
       </Section>
 
@@ -308,3 +323,57 @@ const SAMPLE_AGENT: Agent = {
   createdAt: 0,
   updatedAt: 0,
 };
+
+const SAMPLE_CARD: CardView = {
+  id: 'tsk_01J8X0000000000000007K2',
+  teamId: 'tem_1',
+  columnId: 'col_todo',
+  columnSlug: 'todo',
+  title: 'Migrar /users para OAuth',
+  body: '',
+  assignee: null,
+  assigneeHandle: null,
+  createdBy: null,
+  parentId: null,
+  position: 0,
+  priority: 'high',
+  labels: ['backend'],
+  checklist: [],
+  links: [],
+  blockReason: null,
+  version: 1,
+  archivedAt: null,
+  approvedBy: null,
+  approvedAt: null,
+  columnSince: 0,
+  createdAt: 0,
+  updatedAt: 0,
+  blockedBy: ['tsk_01J8X0000000000000007K1'],
+  comments: 0,
+};
+
+const SAMPLE_CARDS: [CardView, CardView, CardView] = [
+  SAMPLE_CARD,
+  {
+    ...SAMPLE_CARD,
+    title: 'Middleware de refresh token',
+    priority: 'normal',
+    assigneeHandle: 'backend',
+    blockedBy: [],
+    checklist: [
+      { text: 'teste', done: true },
+      { text: 'implementar', done: true },
+      { text: 'doc', done: false },
+      { text: 'revisão', done: false },
+    ],
+    comments: 3,
+  },
+  {
+    ...SAMPLE_CARD,
+    title: 'Remover legacy_id',
+    priority: 'urgent',
+    assigneeHandle: 'arquiteto',
+    blockedBy: [],
+    blockReason: 'aguarda decisão do @arquiteto sobre legacy_id',
+  },
+];

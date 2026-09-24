@@ -1,4 +1,4 @@
-import { LayoutGrid, MessagesSquare, SquareSplitVertical } from 'lucide-react';
+import { KanbanSquare, LayoutGrid, MessagesSquare, SquareSplitVertical } from 'lucide-react';
 import { formatShortcut } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import { ROOM_VIEWS, type RoomView } from '../roomView';
@@ -7,9 +7,10 @@ const VIEWS: Record<RoomView, { label: string; icon: typeof LayoutGrid }> = {
   grid: { label: 'Grade', icon: LayoutGrid },
   focus: { label: 'Foco', icon: SquareSplitVertical },
   timeline: { label: 'Mensagens', icon: MessagesSquare },
+  board: { label: 'Quadro', icon: KanbanSquare },
 };
 
-/** Seletor de vista da Sala da Equipe (Grade · Foco · Linha do tempo; Fluxo vem na fase 7). */
+/** Seletor de vista da Sala da Equipe (Grade · Foco · Linha do tempo · Quadro; Fluxo vem na fase 7). */
 export function ViewPicker({
   value,
   onChange,
