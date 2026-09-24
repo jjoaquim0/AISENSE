@@ -5,4 +5,9 @@ export type AdvancedSettings = {
 /**
  * Vale na próxima subida (`AISENSE_LOG` ainda vence).
  */
-logLevel: LogLevel, };
+logLevel: LogLevel, 
+/**
+ * Procurar versão nova ao abrir o app (F09-03). É a única requisição de rede que o
+ * AISENSE faz (`docs/11`, Privacidade); desligar a elimina.
+ */
+checkUpdates: boolean, };

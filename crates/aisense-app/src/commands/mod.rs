@@ -18,9 +18,36 @@ pub mod runtimes;
 pub mod settings;
 pub mod skills;
 pub mod teams;
+pub mod updates;
+
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use aisense_core::{AppInfo, CommandError};
 use aisense_pty::PtyError;
+use tauri::{AppHandle, Manager};
+
+/// Para tudo o que o app pôs de pé: guarda quem estava rodando (para "religar ao abrir"),
+/// para os agentes, o barramento e os terminais. Roda uma vez só: depois de parar, a
+/// lista de quem rodava estaria vazia e apagaria a verdadeira.
+pub fn shutdown(app: &AppHandle) {
+    static DONE: AtomicBool = AtomicBool::new(false);
+    if DONE.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    // Antes de matar: senão a política de reinício traria os agentes de volta.
+    if let Some(supervisor) = app.try_state::<agents::Supervisor>() {
+        if let Some(settings) = app.try_state::<settings::Settings>() {
+            settings::remember_running(&settings, &supervisor);
+        }
+        supervisor.shutdown();
+    }
+    if let Some(bus) = app.try_state::<bus::BusShutdown>() {
+        bus.0.cancel();
+    }
+    if let Some(manager) = app.try_state::<pty::Manager>() {
+        manager.shutdown();
+    }
+}
 
 #[tauri::command]
 pub fn app_info() -> AppInfo {

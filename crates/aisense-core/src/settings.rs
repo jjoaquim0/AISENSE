@@ -185,12 +185,24 @@ impl LogLevel {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase", default)]
 #[ts(export, export_to = "../../../apps/desktop/src/types/generated/")]
 pub struct AdvancedSettings {
     /// Vale na próxima subida (`AISENSE_LOG` ainda vence).
     pub log_level: LogLevel,
+    /// Procurar versão nova ao abrir o app (F09-03). É a única requisição de rede que o
+    /// AISENSE faz (`docs/11`, Privacidade); desligar a elimina.
+    pub check_updates: bool,
+}
+
+impl Default for AdvancedSettings {
+    fn default() -> Self {
+        Self {
+            log_level: LogLevel::default(),
+            check_updates: true,
+        }
+    }
 }
 
 /// Um segredo de runtime: a variável de ambiente que o agente recebe. O valor mora no
@@ -553,12 +565,16 @@ mod tests {
         let path = dir.path().join("settings.json");
         fs::write(
             &path,
-            r#"{"onboardingDone": true, "futureField": 1, "bus": {"retentionDays": 30}}"#,
+            r#"{"onboardingDone": true, "futureField": 1, "bus": {"retentionDays": 30},
+                "advanced": {"logLevel": "debug"}}"#,
         )
         .unwrap();
         let loaded = SettingsFile::new(&path).load();
         assert!(loaded.warning.is_none());
         assert!(loaded.settings.onboarding_done);
+        // Quem vem da 0.1.0 (sem o campo) passa a receber atualizações.
+        assert_eq!(loaded.settings.advanced.log_level, LogLevel::Debug);
+        assert!(loaded.settings.advanced.check_updates);
         assert_eq!(loaded.settings.bus.retention_days, 30);
         assert_eq!(loaded.settings.bus.ask_default_secs, 300);
         assert_eq!(loaded.settings.bus.guards, GuardConfig::default());

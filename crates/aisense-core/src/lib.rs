@@ -27,6 +27,7 @@ pub mod team;
 mod time;
 mod toml_pos;
 pub mod transcript;
+pub mod updates;
 mod validation;
 
 pub use app_info::AppInfo;

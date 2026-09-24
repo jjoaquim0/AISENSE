@@ -81,12 +81,12 @@ fn main() {
     tracing::info!(version = aisense_core::VERSION, "AISENSE iniciando");
 
     let manager: commands::pty::Manager = std::sync::Arc::new(aisense_pty::PtyManager::new());
-    let shutdown_manager = std::sync::Arc::clone(&manager);
     let setup_manager = std::sync::Arc::clone(&manager);
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(move |app| {
             let data = aisense_core::DataDir::resolve()
                 .ok_or("could not find the user's home directory; set AISENSE_HOME")?;
@@ -165,6 +165,7 @@ fn main() {
         .manage(manager)
         .manage(commands::notify::Viewing::default())
         .manage(commands::settings::DiagnosticsDraft::default())
+        .manage(commands::updates::PendingUpdate::default())
         .invoke_handler(tauri::generate_handler![
             commands::app_info,
             commands::pty::pty_spawn,
@@ -191,6 +192,8 @@ fn main() {
             commands::settings::diagnostics_file_name,
             commands::settings::diagnostics_save,
             commands::notify::ui_viewing,
+            commands::updates::update_check,
+            commands::updates::update_install,
             commands::agents::agent_start,
             commands::agents::agent_stop,
             commands::agents::agent_restart,
@@ -275,21 +278,11 @@ fn main() {
                 "página"
             );
         })
-        .on_window_event(move |window, event| {
+        .on_window_event(|window, event| {
             // Fechar a janela precisa matar os processos dos agentes; senão eles
             // continuam vivos sem dono, consumindo CPU e segurando arquivos.
             if matches!(event, tauri::WindowEvent::Destroyed) {
-                // Antes de matar: senão a política de reinício traria os agentes de volta.
-                if let Some(supervisor) = window.try_state::<commands::agents::Supervisor>() {
-                    if let Some(settings) = window.try_state::<commands::settings::Settings>() {
-                        commands::settings::remember_running(&settings, &supervisor);
-                    }
-                    supervisor.shutdown();
-                }
-                if let Some(bus) = window.try_state::<commands::bus::BusShutdown>() {
-                    bus.0.cancel();
-                }
-                shutdown_manager.shutdown();
+                commands::shutdown(window.app_handle());
             }
         })
         .run(tauri::generate_context!())

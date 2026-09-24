@@ -80,10 +80,33 @@ mensagem de sistema.
 Auto-update assinado (Tauri updater) com chave mantida fora do repositório.
 Verificação de assinatura obrigatória. Usuário pode desligar.
 
+Como funciona (F09-03, `commands/updates.rs`):
+
+- A chave **pública** entra na config do app no build de release (segredo
+  `AISENSE_UPDATER_PUBKEY`); a privada só existe nos segredos do GitHub (`docs/distribuicao.md`).
+  Build sem a chave (o de desenvolvimento) não faz requisição nenhuma e diz isso na tela.
+- Canal estável: `releases/latest/download/latest.json` no GitHub, só HTTPS. Pre-releases (tag com
+  hífen) ficam fora do `/latest`.
+- O pacote baixado tem a assinatura minisign conferida contra a chave compilada **antes** de
+  instalar; assinatura inválida para tudo sem mexer na instalação. Nada é instalado sem o clique em
+  "Instalar e reiniciar".
+- Antes de instalar, o app guarda quem estava rodando, para os agentes e o barramento
+  (`commands::shutdown`, o mesmo do fechar da janela) — no Windows o instalador fecha o app.
+- **Desligar** (Configurações → Avançado → "Procurar atualizações ao abrir") elimina a única
+  requisição de rede do app; "Procurar agora" continua disponível.
+- O `latest.json` em si não é assinado: quem controlasse a resposta HTTPS poderia anunciar uma
+  versão nova apontando para o pacote (legitimamente assinado) de uma **antiga**. Por isso
+  `requireSignedVersion` está ligado: a assinatura que o bundler gera traz `version:<v>` no
+  comentário confiável (conferido no `.sig` do `.deb`), e o plugin recusa o pacote cuja versão
+  assinada não é a anunciada.
+- A chave pública mora em `plugins.updater.pubkey`, gravada no build de release por
+  `scripts/release-config.mjs` a partir do segredo; o `tauri.conf.json` versionado a deixa vazia.
+
 ## Privacidade
 
 - Nenhuma telemetria por padrão (ver D5 em [ESTADO.md](ESTADO.md)).
-- Nenhuma requisição de rede feita pelo AISENSE além da checagem de atualização (desligável).
+- Nenhuma requisição de rede feita pelo AISENSE além da checagem de atualização (desligável em
+  Configurações → Avançado).
 - O que a CLI de IA faz com a rede é responsabilidade dela; o app apenas a hospeda.
 - "Exportar diagnóstico" gera um `.zip` com logs **redigidos** (tokens e caminhos de home mascarados)
   e mostra o conteúdo antes de salvar. Como funciona (F09-05, `aisense-core::diagnostics`): o

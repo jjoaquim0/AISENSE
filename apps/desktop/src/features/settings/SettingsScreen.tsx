@@ -6,6 +6,7 @@ import { runtimesApi } from '@/features/runtimes/api';
 import { RuntimeList } from '@/features/runtimes/RuntimeList';
 import { useNav } from '@/features/shell/nav';
 import { errorMessage } from '@/features/teams/api';
+import { useUpdates } from '@/features/updates/store';
 import { cn } from '@/lib/cn';
 import { recordCombo, SHORTCUT_CATALOG } from '@/lib/shortcuts';
 import type { Adapter } from '@/types/generated/Adapter';
@@ -675,6 +676,14 @@ function AdvancedSection({ view, update }: { view: SettingsView; update: Update 
           Para mudar o diretório, defina a variável de ambiente AISENSE_HOME antes de abrir o app.
         </p>
       </Group>
+      <UpdatesGroup
+        enabled={view.settings.advanced.checkUpdates}
+        onEnabled={(on) =>
+          update((d) => {
+            d.advanced.checkUpdates = on;
+          })
+        }
+      />
       <Group title="Diagnóstico">
         <div className="flex flex-col gap-1">
           <label htmlFor={logId} className="text-label text-secondary">
@@ -736,6 +745,68 @@ function AdvancedSection({ view, update }: { view: SettingsView; update: Update 
         onSaved={(text) => setMessage({ tone: 'ok', text })}
       />
     </>
+  );
+}
+
+/** Auto-update (F09-03): ligar/desligar e procurar agora. A instalação é pela faixa. */
+function UpdatesGroup({
+  enabled,
+  onEnabled,
+}: {
+  enabled: boolean;
+  onEnabled: (on: boolean) => void;
+}) {
+  const phase = useUpdates((s) => s.phase);
+  const check = useUpdates((s) => s.check);
+  const install = useUpdates((s) => s.install);
+  const status =
+    phase.kind === 'checking'
+      ? 'Procurando…'
+      : phase.kind === 'current'
+        ? 'Você está na versão mais nova.'
+        : phase.kind === 'available'
+          ? `A versão ${phase.update.version} está disponível.`
+          : phase.kind === 'installing'
+            ? `Instalando a versão ${phase.update.version}…`
+            : phase.kind === 'error'
+              ? phase.message
+              : null;
+  return (
+    <Group
+      title="Atualizações"
+      description="As versões novas vêm do canal estável, com a assinatura conferida antes de instalar."
+    >
+      <Toggle
+        label="Procurar atualizações ao abrir o app"
+        hint="É a única conexão de rede que o AISENSE faz. Nada é instalado sem você pedir."
+        checked={enabled}
+        onChange={onEnabled}
+      />
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          onClick={() => void check()}
+          disabled={phase.kind === 'checking' || phase.kind === 'installing'}
+        >
+          Procurar agora
+        </Button>
+        {phase.kind === 'available' && (
+          <Button variant="primary" onClick={() => void install()}>
+            Instalar e reiniciar
+          </Button>
+        )}
+        {status && (
+          <span
+            role={phase.kind === 'error' ? 'alert' : 'status'}
+            className={cn(
+              'text-caption',
+              phase.kind === 'error' ? 'text-failed' : 'text-secondary',
+            )}
+          >
+            {status}
+          </span>
+        )}
+      </div>
+    </Group>
   );
 }
 

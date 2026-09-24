@@ -87,6 +87,14 @@ for (const scheme of ['light', 'dark'] as const) {
       expect(await audit(page)).toEqual([]);
     });
 
+    test('faixa de atualização', async ({ page }) => {
+      await openApp(page, { onboardingDone: true, update: { version: '0.2.0', notes: 'x' } });
+      await expect(page.getByRole('button', { name: 'Instalar e reiniciar' })).toBeVisible({
+        timeout: 10_000,
+      });
+      expect(await audit(page)).toEqual([]);
+    });
+
     test('biblioteca de skills', async ({ page }) => {
       await openApp(page, { onboardingDone: true });
       await page.getByRole('button', { name: 'Biblioteca de skills' }).click();

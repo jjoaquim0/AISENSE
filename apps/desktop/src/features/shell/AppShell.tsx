@@ -6,6 +6,7 @@ import { CommandPalette } from '@/features/palette/CommandPalette';
 import type { PaletteAction } from '@/features/palette/paletteStore';
 import { usePalette } from '@/features/palette/paletteStore';
 import { useTeams } from '@/features/teams/store';
+import { UpdateBanner, useUpdateCheckOnStart } from '@/features/updates/UpdateBanner';
 import { isDark, useTheme } from '@/lib/theme';
 import { useShortcuts } from '@/lib/useShortcuts';
 import { type Screen, useNav } from './nav';
@@ -59,6 +60,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     [toggleSidebar, toggleInspector, toggleTheme, setPaletteOpen, go],
   );
   useShortcuts(shortcuts);
+  useUpdateCheckOnStart();
 
   // Ações que valem em qualquer tela (T10); a tela aberta acrescenta as dela.
   const globalActions = useMemo<PaletteAction[]>(
@@ -138,6 +140,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         inspectorSqueezed={teamScreen && inspectorVisible && !fit.inspector}
         showInspectorToggle={teamScreen}
       />
+      <UpdateBanner />
       <div className="flex min-h-0 flex-1">
         <TeamRail />
         {fit.sidebar && teamScreen && (
