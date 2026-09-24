@@ -5,6 +5,7 @@ import { FlowBench } from '@/features/dev/FlowBench';
 import { GridBench } from '@/features/dev/GridBench';
 import { KitchenSink } from '@/features/dev/KitchenSink';
 import { Onboarding } from '@/features/onboarding/Onboarding';
+import { useSessionRestore } from '@/features/session/useSessionRestore';
 import { useSettings } from '@/features/settings/store';
 import { AppShell } from '@/features/shell/AppShell';
 import { useNav } from '@/features/shell/nav';
@@ -27,6 +28,7 @@ export function App() {
   useEffect(() => {
     if (isDesktop()) void loadSettings();
   }, [loadSettings]);
+  useSessionRestore();
   // Amostra do design system, só em desenvolvimento (F00-03 / F00-06).
   if (import.meta.env.DEV && window.location.hash.startsWith('#/dev/grid')) {
     return <GridBench />;

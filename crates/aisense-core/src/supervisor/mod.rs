@@ -958,6 +958,18 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
 
     /// O painel do agente mudou de tamanho: a tela do detector precisa acompanhar,
     /// senão uma TUI desenhada para outra largura vira texto quebrado.
+    /// Agentes com processo de pé agora (para religar na próxima subida, F08-06).
+    pub fn running_agents(&self) -> Vec<AgentId> {
+        let mut ids: Vec<AgentId> = self
+            .agents()
+            .iter()
+            .filter(|(_, entry)| entry.state.is_running())
+            .map(|(id, _)| id.clone())
+            .collect();
+        ids.sort();
+        ids
+    }
+
     /// Passa as regras de estado do catálogo atual para as sessões vivas. Chamado quando
     /// o catálogo recarrega (hot-reload ou modo calibração): o `idle_regex` novo vale
     /// sem reiniciar agente nenhum (F08-05). Devolve quantas sessões foram atualizadas.

@@ -30,7 +30,7 @@ import { PresetPicker } from '@/features/team-room/components/PresetPicker';
 import { TeamControls } from '@/features/team-room/components/TeamControls';
 import { ViewPicker } from '@/features/team-room/components/ViewPicker';
 import { useLiveStates } from '@/features/team-room/hooks/useLiveStates';
-import { useTeamLayout } from '@/features/team-room/hooks/useTeamLayout';
+import { readFocused, useTeamLayout } from '@/features/team-room/hooks/useTeamLayout';
 import type { PaneAction } from '@/features/team-room/paneMenu';
 import { roomShortcuts } from '@/features/team-room/shortcuts';
 import { isRunning } from '@/features/team-room/sidebar';
@@ -63,18 +63,32 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
   const { team } = summary;
   const { selectTeam, load } = useTeams();
   const [agents, setAgents] = useState<Agent[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Reabrir a equipe volta para o agente que estava em foco (F08-06).
+  const [selectedId, setSelectedId] = useState<string | null>(() => readFocused(team.layout));
   const [form, setForm] = useState<{ open: boolean; agent?: Agent }>({ open: false });
   const [deleting, setDeleting] = useState<Agent | null>(null);
   const [notice, setNotice] = useState<{ text: string; restart?: Agent } | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [commandsOpen, setCommandsOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
-  const { grid, setGrid, view, setView, flowPositions, setFlowPositions } = useTeamLayout(
+  const {
+    grid,
+    setGrid,
+    view,
+    setView,
+    flowPositions,
+    setFlowPositions,
+    setFocused,
+    initialTimeline,
+    setTimelineScroll,
+  } = useTeamLayout(
     team,
     agents.map((a) => a.id),
     setProblem,
   );
+  useEffect(() => {
+    if (selectedId) setFocused(selectedId);
+  }, [selectedId, setFocused]);
 
   const { stateOf, confidenceOf, eventsOf } = useLiveStates(summary.agents);
   const { pendingOf } = useUnread(team.id, agents);
@@ -477,7 +491,12 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
               <BoardScreen teamId={team.id} />
             </Suspense>
           ) : view === 'timeline' ? (
-            <TimelineView teamId={team.id} agents={agents} />
+            <TimelineView
+              teamId={team.id}
+              agents={agents}
+              initialScroll={initialTimeline}
+              onScrollChange={setTimelineScroll}
+            />
           ) : agents.length > 0 && view === 'focus' ? (
             <FocusView
               order={grid.order}

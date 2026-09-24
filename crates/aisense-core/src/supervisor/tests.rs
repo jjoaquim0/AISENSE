@@ -642,6 +642,19 @@ async fn secrets_reach_the_agent_environment() {
     assert!(lines.contains(&format!("id={id}")), "{lines}");
 }
 
+/// F08-06: quem está de pé é o que o app religa na próxima subida.
+#[tokio::test(flavor = "multi_thread")]
+async fn running_agents_lists_only_live_processes() {
+    let h = harness();
+    let id = h.agent(long_running(), RestartPolicy::Never).await;
+    assert!(h.supervisor.running_agents().is_empty());
+    h.supervisor.start(&id).await.unwrap();
+    assert_eq!(h.supervisor.running_agents(), vec![id.clone()]);
+    h.supervisor.stop(&id).unwrap();
+    h.wait_for("parado", |h| h.supervisor.running_agents().is_empty())
+        .await;
+}
+
 // ───────────────────── controles da equipe (F03-06) ─────────────────────
 
 impl Harness {

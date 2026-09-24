@@ -27,3 +27,7 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 *.log
+
+# Playwright (E2E do front)
+/apps/desktop/test-results/
+/apps/desktop/playwright-report/

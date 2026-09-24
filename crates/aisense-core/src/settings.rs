@@ -81,6 +81,8 @@ pub struct SessionSettings {
     pub relaunch_agents: bool,
     /// Equipe aberta por último (mantida pelo app, não pelo formulário).
     pub last_team: Option<TeamId>,
+    /// Agentes que estavam rodando quando o app fechou (mantido pelo app).
+    pub running_agents: Vec<crate::ids::AgentId>,
 }
 
 impl Default for SessionSettings {
@@ -89,6 +91,7 @@ impl Default for SessionSettings {
             restore_last_team: true,
             relaunch_agents: false,
             last_team: None,
+            running_agents: Vec::new(),
         }
     }
 }

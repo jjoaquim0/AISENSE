@@ -76,6 +76,7 @@ fn main() {
                 &registry,
                 &pty_for_push,
             );
+            commands::settings::relaunch(&settings, &supervisor);
             app.manage(bus);
             app.manage(settings);
             app.manage(board);
@@ -199,6 +200,9 @@ fn main() {
             if matches!(event, tauri::WindowEvent::Destroyed) {
                 // Antes de matar: senão a política de reinício traria os agentes de volta.
                 if let Some(supervisor) = window.try_state::<commands::agents::Supervisor>() {
+                    if let Some(settings) = window.try_state::<commands::settings::Settings>() {
+                        commands::settings::remember_running(&settings, &supervisor);
+                    }
                     supervisor.shutdown();
                 }
                 if let Some(bus) = window.try_state::<commands::bus::BusShutdown>() {

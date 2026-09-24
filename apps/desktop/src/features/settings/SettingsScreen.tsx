@@ -148,9 +148,8 @@ function Section({ id, view, update }: { id: SectionId; view: SettingsView; upda
           />
           <Toggle
             label="Religar os agentes"
-            hint="Os agentes com início automático da equipe reaberta sobem sozinhos."
+            hint="Quem estava rodando quando o app fechou sobe de novo, em qualquer equipe."
             checked={s.session.relaunchAgents}
-            disabled={!s.session.restoreLastTeam}
             onChange={(v) =>
               update((d) => {
                 d.session.relaunchAgents = v;

@@ -62,6 +62,35 @@ impl SettingsHub {
     }
 }
 
+/// Fechando o app: guarda quem estava rodando, para a opção "religar os agentes".
+pub fn remember_running(settings: &SettingsHub, supervisor: &Supervisor) {
+    let running = supervisor.running_agents();
+    if let Err(error) = settings.update(|s| s.session.running_agents = running) {
+        tracing::warn!(message = %error.message, "agentes rodando não gravados");
+    }
+}
+
+/// Subida: religa quem estava rodando, se o usuário pediu, escalonado como o ▶ da equipe.
+/// Agente que sumiu ou não sobe fica no log — a UI mostra o estado de cada um.
+pub fn relaunch(settings: &SettingsHub, supervisor: &Supervisor) {
+    let prefs = settings.get();
+    if !prefs.session.relaunch_agents || prefs.session.running_agents.is_empty() {
+        return;
+    }
+    let (supervisor, ids) = (supervisor.clone(), prefs.session.running_agents);
+    tauri::async_runtime::spawn(async move {
+        for (i, id) in ids.iter().enumerate() {
+            if i > 0 {
+                tokio::time::sleep(aisense_core::supervisor::TEAM_START_STAGGER).await;
+            }
+            match supervisor.start(id).await {
+                Ok(_) => tracing::info!(agent = %id, "agente religado"),
+                Err(error) => tracing::warn!(agent = %id, %error, "agente não religado"),
+            }
+        }
+    });
+}
+
 /// Keychain do SO (Keychain no macOS, Credential Manager no Windows, Secret Service no
 /// Linux) pelo crate `keyring`.
 struct Keychain;
@@ -144,9 +173,11 @@ pub fn settings_save(
     let saved = settings.update(|current| {
         let secrets = std::mem::take(&mut current.secrets);
         let last_team = current.session.last_team.take();
+        let running = std::mem::take(&mut current.session.running_agents);
         *current = next;
         current.secrets = secrets;
         current.session.last_team = last_team;
+        current.session.running_agents = running;
     })?;
     apply(&app, &saved);
     Ok(saved)

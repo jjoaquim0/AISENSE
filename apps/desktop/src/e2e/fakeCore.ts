@@ -16,6 +16,7 @@ import type { AgentDraft } from '@/types/generated/AgentDraft';
 import type { AgentState } from '@/types/generated/AgentState';
 import type { AppSettings } from '@/types/generated/AppSettings';
 import type { Calibration } from '@/types/generated/Calibration';
+import type { MessageView } from '@/types/generated/MessageView';
 import type { PlannedAgent } from '@/types/generated/PlannedAgent';
 import type { RuntimeInfo } from '@/types/generated/RuntimeInfo';
 import type { StateRules } from '@/types/generated/StateRules';
@@ -30,7 +31,16 @@ export interface FakeSeed {
   /** Equipe já criada, com estes handles (runtime `shell`). */
   team?: { name: string; handles: string[]; running?: boolean };
   settings?: Partial<AppSettings>;
+  /** Mensagens na linha do tempo da equipe semeada. */
+  messages?: number;
+  /**
+   * Guarda o estado no `localStorage` e o recupera no próximo carregamento: um reload da
+   * página faz o papel de fechar e reabrir o app (F08-06). Agentes voltam parados.
+   */
+  persist?: boolean;
 }
+
+const STORE_KEY = 'aisense.fake-core';
 
 export interface FakeHandle {
   emit: (event: string, payload: unknown) => Promise<void>;
@@ -65,7 +75,7 @@ function defaultSettings(): AppSettings {
       terminalFontSize: 13,
       terminalFontFamily: '',
     },
-    session: { restoreLastTeam: true, relaunchAgents: false, lastTeam: null },
+    session: { restoreLastTeam: true, relaunchAgents: false, lastTeam: null, runningAgents: [] },
     notifications: { enabled: true, awaitingInput: true, failed: true, mutedUntil: null },
     bus: {
       guards: { perAgentPerMinute: 30, maxReplyDepth: 12, maxIdentical: 3, teamPerHour: 500 },
@@ -277,7 +287,26 @@ export function installFakeCore(): void {
           })),
       }));
 
-  if (seed.team) {
+  const saveState = () => {
+    if (!seed.persist) return;
+    localStorage.setItem(STORE_KEY, JSON.stringify({ settings, teams, agents, seq }));
+  };
+  const savedState = seed.persist ? localStorage.getItem(STORE_KEY) : null;
+  if (savedState) {
+    const parsed = JSON.parse(savedState) as {
+      settings: AppSettings;
+      teams: Team[];
+      agents: Agent[];
+      seq: number;
+    };
+    settings = parsed.settings;
+    teams.push(...parsed.teams);
+    agents.push(...parsed.agents);
+    seq = parsed.seq;
+    for (const a of agents) states.set(a.id, 'stopped');
+  }
+
+  if (seed.team && !savedState) {
     const team = createTeam(
       {
         name: seed.team.name,
@@ -295,6 +324,19 @@ export function installFakeCore(): void {
       }
     }
   }
+
+  const messages: MessageView[] = Array.from({ length: seed.messages ?? 0 }, (_, i) => ({
+    id: `msg_${String(i).padStart(6, '0')}`,
+    kind: 'message',
+    from: i % 2 ? '@frontend' : '@backend',
+    to: i % 2 ? '@backend' : '@frontend',
+    subject: null,
+    body: `Mensagem ${i + 1}: ${'detalhe do trabalho '.repeat((i % 4) + 1)}`,
+    replyTo: null,
+    meta: { priority: 'normal', attachments: [] },
+    createdAt: 1_700_000_000_000 + i * 60_000,
+    receipts: { recipients: 1, delivered: 1, read: 1, failed: 0 },
+  }));
 
   const calibrate = (rules: StateRules, screen: string): Calibration => {
     const lines = screen
@@ -465,7 +507,11 @@ export function installFakeCore(): void {
     pty_clear: () => null,
     pty_snapshot: () => '',
     skills_library: () => ({ skills: [], problems: [] }),
-    bus_timeline: () => [],
+    // Mais nova primeiro, antes do cursor (como o core).
+    bus_timeline: ({ before, limit }) => {
+      const end = before ? messages.findIndex((m) => m.id === before) : messages.length;
+      return messages.slice(Math.max(0, end - limit), end).reverse();
+    },
     bus_unread: () => [],
     bus_paused: () => false,
     channels_list: () => [],
@@ -485,7 +531,11 @@ export function installFakeCore(): void {
     (cmd, args) => {
       handle.calls.push({ cmd, args });
       const run = handlers[cmd];
-      if (run) return run(args ?? {});
+      if (run) {
+        const result = run(args ?? {});
+        saveState();
+        return result;
+      }
       if (!cmd.startsWith('plugin:')) handle.unknown.push(cmd);
       return null;
     },

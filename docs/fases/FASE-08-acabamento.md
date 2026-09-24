@@ -67,10 +67,22 @@ calibração de estado e o gerenciamento de segredos via keychain.
 > adaptador tem `mcp_config`, F05-09) e o editor de TOML dentro do app (os adaptadores são
 > editados na pasta, com hot-reload).
 
-### [ ] F08-06 — Persistência de sessão
+### [x] F08-06 — Persistência de sessão
 Restaurar equipe aberta, vista, layout, painel focado e tamanhos ao reabrir o app.
 Opção "religar agentes ao abrir".
 **Aceite:** fechar com 6 agentes e reabrir restaura tudo, inclusive o scroll da timeline.
+
+> Feito: a equipe aberta vai para `settings.session.lastTeam` a cada troca e é reaberta na subida
+> (`features/session/useSessionRestore.ts`; apagada ou arquivada, não). Vista, grade e posições do
+> Fluxo já estavam em `teams.layout`; agora também o **agente em foco** (`focused`) e a **rolagem
+> da linha do tempo** (`timeline: { anchor, delta }` — a mensagem no topo da tela e quanto dela já
+> passou, ou nada quando se está no fim acompanhando as novas; a âncora sobrevive a mensagens
+> novas chegando). Larguras de sidebar e inspetor continuam no `usePanels`. **Religar agentes:** ao
+> fechar a janela o app grava quem estava de pé (`AgentSupervisor::running_agents` →
+> `session.runningAgents`); na subida, com a opção ligada, sobe cada um escalonado como o ▶ da
+> equipe. Aceite coberto por `e2e/session.spec.ts` (6 agentes, 400 mensagens, reload no lugar de
+> fechar o app, 5 execuções seguidas sem falha) — com o core falso: a gravação do layout pelo
+> core real é a mesma de antes (`team_set_layout`).
 
 ### [ ] F08-07 — Notificações do sistema
 Notificação do SO quando um agente entra em `awaiting_input` ou `failed` com o app em segundo plano;
