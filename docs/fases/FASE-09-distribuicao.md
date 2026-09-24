@@ -140,6 +140,25 @@ importar, mostrar o `SKILL.md` (e a lista de arquivos da pasta) com o resultado 
 importar com confirmação. Fecha também o que falta da F04-08 nesse ponto.
 **Aceite:** importar uma pasta mostra o conteúdo antes; cancelar não grava nada.
 
+### [x] F09-10 — Identidade visual
+Pedido do usuário (2026-09-24): incorporar o Manual de Marca do aisense v1.0 ao app.
+**Aceite:** logo, cores e fontes do manual no app, no ícone e no instalador, nos dois temas, sem
+perder o contraste AA.
+
+> Feito: [08 — Design System](../08-design-system.md#identidade-visual-manual-de-marca-v10) tem o
+> mapa manual → app. Neutros Tinta/Grafite/Cinza/Névoa/Papel e o verde como acento (`--accent`
+> para preenchimento, `--emphasis` para linha e texto — o verde vivo tem ~1,6:1 sobre o Papel);
+> fontes Bricolage Grotesque (títulos) e Plus Jakarta Sans (interface) no lugar da Inter, empacotadas
+> (`@fontsource-variable/*`, OFL); símbolo Elo e escrita em `components/brand/Logo.tsx`, na barra
+> de título e no onboarding; ícone do app, favicon e os SVGs de `assets/logo/` gerados a partir do
+> desenho do manual (os arquivos `logo/*.svg` citados nele não vinham no pacote). Nome em
+> minúsculas nos textos de interface, na janela e na bandeja. Teste novo: a inicial branca do
+> avatar sobre cada cor de agente — achou três abaixo de 4,5:1 no claro (já era assim antes) e as
+> cores de agente do tema claro escureceram um pouco. 237 testes do front e 33 E2E (axe nos dois
+> temas) verdes; screenshots em `docs/screenshots/identidade/`. Ficou de fora de propósito: o
+> prefixo `[AISENSE]` digitado nos terminais dos agentes, a pasta `%APPDATA%\AISENSE`, o
+> `productName` do instalador e a documentação em prosa — mudar esses é decisão à parte.
+
 ## Critérios de saída
 - [ ] Instaladores assinados para macOS, Windows e Linux
 - [ ] Auto-update funcionando de ponta a ponta

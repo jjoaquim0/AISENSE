@@ -40,13 +40,13 @@ export function UpdateBanner() {
       role="status"
       className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-subtle bg-surface px-4 py-1.5 text-body"
     >
-      <Download size={14} aria-hidden className="shrink-0 text-accent" />
+      <Download size={14} aria-hidden className="shrink-0 text-emphasis" />
       <span className="mr-auto text-primary">
         {phase.kind === 'installing'
-          ? `Instalando o AISENSE ${update.version}${phase.percent === null ? '…' : ` — ${phase.percent}%`}. O app reinicia sozinho ao terminar.`
+          ? `Instalando o aisense ${update.version}${phase.percent === null ? '…' : ` — ${phase.percent}%`}. O app reinicia sozinho ao terminar.`
           : phase.kind === 'error'
             ? `A atualização para ${update.version} falhou: ${phase.message}`
-            : `AISENSE ${update.version} disponível (você tem a ${update.currentVersion}).`}
+            : `aisense ${update.version} disponível (você tem a ${update.currentVersion}).`}
       </span>
       {phase.kind !== 'installing' && (
         <>
@@ -69,7 +69,7 @@ export function UpdateBanner() {
         open={notesOpen}
         onOpenChange={setNotesOpen}
         size="lg"
-        title={`Novidades do AISENSE ${update.version}`}
+        title={`Novidades do aisense ${update.version}`}
         description="Os agentes rodando são parados antes de reiniciar; com “religar os agentes” ligado, eles voltam sozinhos."
       >
         <pre className="max-h-96 overflow-auto font-sans text-body break-words whitespace-pre-wrap text-secondary">

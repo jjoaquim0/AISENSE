@@ -1,5 +1,6 @@
 @import 'tailwindcss';
-@import '@fontsource-variable/inter';
+@import '@fontsource-variable/bricolage-grotesque';
+@import '@fontsource-variable/plus-jakarta-sans';
 @import '@fontsource/jetbrains-mono/400.css';
 @import '@fontsource/jetbrains-mono/500.css';
 @import './tokens.css';
@@ -22,6 +23,7 @@
 
   --color-accent: var(--accent);
   --color-accent-fg: var(--accent-fg);
+  --color-emphasis: var(--emphasis);
   --color-ring: var(--ring);
 
   --color-idle: var(--state-idle);
@@ -30,6 +32,7 @@
   --color-failed: var(--state-failed);
   --color-stopped: var(--state-stopped);
 
+  --font-display: var(--font-display);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
 
@@ -40,22 +43,27 @@
 }
 
 /* Escala tipográfica de docs/08-design-system.md */
+/* Títulos em Bricolage Grotesque, peso 600–700 e espaçamento negativo (manual de marca). */
 @utility text-display {
-  font-size: 28px;
+  font-family: var(--font-display);
+  font-size: 30px;
   line-height: 34px;
-  font-weight: 600;
-  letter-spacing: -0.011em;
+  font-weight: 700;
+  letter-spacing: -0.035em;
 }
 @utility text-title {
-  font-size: 20px;
+  font-family: var(--font-display);
+  font-size: 21px;
   line-height: 28px;
-  font-weight: 600;
-  letter-spacing: -0.011em;
+  font-weight: 650;
+  letter-spacing: -0.03em;
 }
 @utility text-heading {
-  font-size: 15px;
+  font-family: var(--font-display);
+  font-size: 15.5px;
   line-height: 22px;
-  font-weight: 600;
+  font-weight: 650;
+  letter-spacing: -0.015em;
 }
 @utility text-body {
   font-size: 13.5px;
@@ -102,7 +110,7 @@ body,
 /* Controles nativos na cor de acento do tema, não no azul do navegador (F08-09). */
 input[type='checkbox'],
 input[type='radio'] {
-  accent-color: var(--accent);
+  accent-color: var(--emphasis);
 }
 
 body {

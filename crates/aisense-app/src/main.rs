@@ -29,18 +29,18 @@ fn store_failure_message(error: &aisense_store::StoreError, database: &Path) -> 
         StoreError::MigrationRolledBack { backup, .. } => format!(
             "A atualização do banco de dados desta versão falhou e ele foi restaurado do backup. \
              Nenhum dado foi perdido.\n\nBackup: {}\n\nEsta versão não consegue usar o banco. \
-             Volte para a versão anterior do AISENSE e relate o problema com o log abaixo.\n\n{error}",
+             Volte para a versão anterior do aisense e relate o problema com o log abaixo.\n\n{error}",
             backup.display()
         ),
         StoreError::RestoreFailed { backup, .. } => format!(
             "A atualização do banco de dados falhou e não foi possível restaurar o backup \
              automaticamente. Seus dados estão intactos no backup.\n\nPara recuperar, com o \
-             AISENSE fechado, copie\n{}\npara\n{}\n\n{error}",
+             aisense fechado, copie\n{}\npara\n{}\n\n{error}",
             backup.display(),
             database.display()
         ),
         _ => format!(
-            "O AISENSE não conseguiu abrir o banco de dados em {}.\n\n{error}",
+            "O aisense não conseguiu abrir o banco de dados em {}.\n\n{error}",
             database.display()
         ),
     }
@@ -101,7 +101,7 @@ fn main() {
                     let handle = app.handle().clone();
                     app.dialog()
                         .message(store_failure_message(&error, &data.database()))
-                        .title("AISENSE não pôde abrir os seus dados")
+                        .title("aisense não pôde abrir os seus dados")
                         .kind(MessageDialogKind::Error)
                         .show(move |_| handle.exit(1));
                     return Ok(());

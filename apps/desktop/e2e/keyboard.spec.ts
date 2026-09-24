@@ -42,7 +42,7 @@ async function leaveTerminal(page: Page): Promise<void> {
 
 test('F1 pelo teclado: onboarding até a equipe rodando', async ({ page }) => {
   await openApp(page);
-  await expect(page.getByText('Bem-vindo ao AISENSE')).toBeVisible();
+  await expect(page.getByText('Bem-vindo ao aisense')).toBeVisible();
   await expect(page.getByText('Claude Code')).toBeVisible();
   // "Continuar" já nasce com o foco.
   await page.keyboard.press('Enter');

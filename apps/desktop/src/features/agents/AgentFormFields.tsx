@@ -163,7 +163,7 @@ export function AgentFormFields({
           rows={3}
           {...register('role')}
           placeholder="Implementa e mantém a API. Avisa o @frontend quando um contrato muda."
-          className="rounded-md border border-strong bg-surface px-2.5 py-1.5 text-body text-primary placeholder:text-muted focus:border-accent"
+          className="rounded-md border border-strong bg-surface px-2.5 py-1.5 text-body text-primary placeholder:text-muted focus:border-emphasis"
         />
         <p className="text-caption text-muted">Vai no prompt inicial do agente.</p>
       </div>
@@ -420,7 +420,7 @@ function TextBlock({
         aria-invalid={error ? true : undefined}
         className={cn(
           'rounded-md border bg-surface px-2.5 py-1.5 font-mono text-label text-primary',
-          error ? 'border-failed' : 'border-strong focus:border-accent',
+          error ? 'border-failed' : 'border-strong focus:border-emphasis',
         )}
       />
       <p className={cn('text-caption', error ? 'text-failed' : 'text-muted')}>{error ?? hint}</p>

@@ -5,36 +5,60 @@
 > Warp (terminal como cidadão de primeira classe), Zed (tipografia).
 > Princípio central: **a interface é o palco, o terminal é o ator.** O cromo nunca compete com o conteúdo.
 
+## Identidade visual (manual de marca v1.0)
+
+A marca vem do **Manual de Marca do aisense** (v1.0, 2026). O que ele define e onde mora no app:
+
+| Elemento | Regra do manual | No app |
+|---|---|---|
+| Símbolo **Elo** | Três nós ligados — uma equipe e um "A" aberto. Os nós de baixo são as pessoas e as contas; o nó verde no topo é a IA que coordena o time. O verde aparece **só** nesse ponto | `components/brand/Logo.tsx` (`Elo`), traço em `currentColor`, nó em `--logo-node` |
+| Escrita | Sempre em minúsculas, Bricolage Grotesque 650, espaçamento −4%; o ponto do "i" é o nó verde | `Wordmark` (usa "ı" sem pingo + ponto em `--logo-node`) |
+| Logo completo | Horizontal é a principal; mínimo de 88px de largura; símbolo sozinho com mínimo de 16px; área livre em volta ≥ diâmetro do nó verde | `Logo` na barra de título (18px ≈ 95px de largura) e no passo 1 do onboarding |
+| Ícone de app | Fundo Tinta, símbolo branco, caixa do símbolo em 56% do lado | `assets/logo/aisense-icone-app.svg` → `crates/aisense-app/icons/` (`tauri icon`) |
+| Não faça | Distorcer, girar, trocar as cores, sombra, caixa alta, outra fonte, nó verde sobre fundo verde | — |
+
+Arquivos em `assets/logo/`: `aisense-simbolo.svg` (fundo claro), `aisense-simbolo-branco.svg`
+(fundo escuro), `aisense-simbolo-mono.svg` (uma cor), `aisense-icone-app.svg` e `favicon.svg`
+(também em `apps/desktop/public/`). O nome do produto em texto de interface é **aisense**, em
+minúsculas; `AISENSE_*` continuam sendo os nomes das variáveis de ambiente.
+
+**Proporção de cor:** numa tela, cerca de 85% é Tinta e Papel e no máximo 5% é verde. O verde vai
+no botão principal, num status "ativo" ou num destaque — nunca como fundo de área grande.
+
 ## Tipografia
 
-| Papel | Fonte | Por quê |
-|---|---|---|
-| Interface | **Inter Variable** | Altura-x generosa, excelente em 12–14px, variável (um arquivo, todos os pesos) |
-| Terminal / código | **JetBrains Mono** | Desenhada para leitura longa de código, ligaduras opcionais, ótima distinção `0/O`, `1/l/I` |
-| Números tabulares | Inter com `font-variant-numeric: tabular-nums` | Métricas não "dançam" ao atualizar |
+Três fontes, papéis claros (manual de marca):
 
-Fontes são **empacotadas no app** (WOFF2 subset latino), nunca carregadas de CDN — o app precisa
-funcionar offline e sem vazar requisição nenhuma.
+| Papel | Fonte | Uso |
+|---|---|---|
+| Títulos e escrita do logo | **Bricolage Grotesque Variable** | `text-display`, `text-title`, `text-heading`; peso 650–700, espaçamento −1,5% a −3,5% |
+| Interface | **Plus Jakarta Sans Variable** | Textos, botões, rótulos; peso 400–600 |
+| Terminal, código e rótulos técnicos | **JetBrains Mono** | Terminal, IDs e handles de agentes, caminhos, números técnicos |
+| Números tabulares | Plus Jakarta Sans com `font-variant-numeric: tabular-nums` | Métricas não "dançam" ao atualizar |
+
+Fontes são **empacotadas no app** (`@fontsource-variable/*`, WOFF2, licença OFL), nunca carregadas
+de CDN — o app precisa funcionar offline e sem vazar requisição nenhuma.
 
 ```css
---font-sans: "Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
---font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Consolas, monospace;
+--font-display: "Bricolage Grotesque Variable", "Plus Jakarta Sans Variable", system-ui, sans-serif;
+--font-sans:    "Plus Jakarta Sans Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+--font-mono:    "JetBrains Mono", ui-monospace, "SF Mono", Consolas, monospace;
 ```
 
 ### Escala tipográfica
 
-| Token | Tamanho / Entrelinha | Peso | Uso |
-|---|---|---|---|
-| `text-display` | 28 / 34 px | 600 | Título de tela vazia, onboarding |
-| `text-title` | 20 / 28 px | 600 | Nome da equipe no cabeçalho |
-| `text-heading` | 15 / 22 px | 600 | Títulos de seção, nome do agente no painel |
-| `text-body` | 13,5 / 20 px | 400 | Texto padrão da interface |
-| `text-label` | 12 / 16 px | 500 | Rótulos de campo, abas |
-| `text-caption` | 11 / 14 px | 500 | Metadados, timestamps, contadores |
-| `text-mono` | 13 / 20 px | 400 | Terminal (ajustável pelo usuário: 11–18px) |
+O manual pede corpo de 15–18px para o site; o app é uma ferramenta densa (até 9 terminais na
+tela) e mantém a escala abaixo.
 
-Letter-spacing: `-0.011em` em `display`/`title` (Inter fica mais compacta e elegante em tamanhos grandes),
-`0` no resto, `0.02em` em `caption` maiúsculo.
+| Token | Tamanho / Entrelinha | Fonte e peso | Uso |
+|---|---|---|---|
+| `text-display` | 30 / 34 px | Bricolage 700, −3,5% | Título de tela vazia, onboarding |
+| `text-title` | 21 / 28 px | Bricolage 650, −3% | Nome da equipe no cabeçalho |
+| `text-heading` | 15,5 / 22 px | Bricolage 650, −1,5% | Títulos de seção, nome do agente no painel |
+| `text-body` | 13,5 / 20 px | Jakarta 400 | Texto padrão da interface |
+| `text-label` | 12 / 16 px | Jakarta 500 | Rótulos de campo, abas |
+| `text-caption` | 11 / 14 px | Jakarta 500 | Metadados, timestamps, contadores |
+| `text-mono` | 13 / 20 px | JetBrains Mono 400 | Terminal (ajustável pelo usuário: 10–24px) |
 
 ## Cor
 
@@ -43,19 +67,31 @@ igualmente claro em qualquer matiz. Isso é o que permite a paleta de agentes fi
 
 ### Tokens primitivos (não use direto em componente)
 
+As cores do manual, convertidas para OKLCH:
+
+| Manual | Hex | Token |
+|---|---|---|
+| Tinta | `#0C0F0D` | `--gray-950` — texto principal no claro, fundo no escuro |
+| Grafite | `#1A1F1C` | `--gray-850` — cards e painéis no escuro |
+| Cinza | `#5B615D` | entre `--gray-500` e `--gray-600` — texto secundário |
+| Névoa | `#D9DCD8` | `--gray-200` — bordas e divisões suaves |
+| Papel | `#F5F6F4` | `--gray-50` — fundo claro |
+| Verde aisense | `#2EE68A` | `--brand-green` — acento: nó do logo, botão principal, status ativo |
+| Verde texto | `#087A42` | `--brand-green-text` — links e texto verde sobre fundo claro |
+
 ```css
-/* Neutros — leve viés azulado (chroma 0.008–0.02) para não parecer cinza morto */
---gray-0:  oklch(0.99 0.002 265);   --gray-50:  oklch(0.97 0.004 265);
---gray-100:oklch(0.94 0.006 265);   --gray-200: oklch(0.89 0.008 265);
---gray-300:oklch(0.80 0.010 265);   --gray-400: oklch(0.66 0.012 265);
---gray-500:oklch(0.54 0.014 265);   --gray-600: oklch(0.44 0.014 265);
---gray-700:oklch(0.33 0.014 265);   --gray-800: oklch(0.25 0.014 265);
---gray-850:oklch(0.21 0.014 265);   --gray-900: oklch(0.17 0.014 265);
---gray-950:oklch(0.13 0.012 265);
+/* Neutros — viés verde bem leve (matiz 157), o mesmo da Tinta e do Grafite */
+--gray-0:  oklch(0.997 0.001 157);  --gray-50:  oklch(0.972 0.003 128);  /* Papel */
+--gray-100:oklch(0.94 0.005 150);   --gray-200: oklch(0.891 0.006 138);  /* Névoa */
+--gray-300:oklch(0.80 0.008 157);   --gray-400: oklch(0.66 0.010 157);
+--gray-500:oklch(0.54 0.010 157);   --gray-600: oklch(0.47 0.010 157);
+--gray-700:oklch(0.362 0.008 160);  --gray-800: oklch(0.29 0.009 159);
+--gray-850:oklch(0.233 0.009 159);  /* Grafite */
+--gray-900:oklch(0.198 0.008 157);  --gray-950: oklch(0.164 0.006 156);  /* Tinta */
 
 /* Marca */
---brand-400: oklch(0.72 0.16 285);  --brand-500: oklch(0.63 0.19 285);
---brand-600: oklch(0.55 0.20 285);  --brand-700: oklch(0.47 0.18 285);
+--brand-green:      oklch(0.817 0.191 155);  /* #2EE68A */
+--brand-green-text: oklch(0.509 0.127 154);  /* #087A42 */
 
 /* Semânticas de estado */
 --green-500: oklch(0.70 0.17 150);  /* ocioso / sucesso */
@@ -71,17 +107,23 @@ igualmente claro em qualquer matiz. Isso é o que permite a paleta de agentes fi
 | `--bg-base` | `gray-50` | `gray-950` | Fundo da janela |
 | `--bg-surface` | `gray-0` | `gray-900` | Cards, painéis, sidebar |
 | `--bg-raised` | `gray-0` | `gray-850` | Popover, modal, dropdown |
-| `--bg-terminal` | `oklch(0.99 0 0)` | `oklch(0.15 0.010 265)` | Fundo do xterm |
+| `--bg-terminal` | `oklch(0.992 0.001 157)` | `oklch(0.15 0.006 157)` | Fundo do xterm |
 | `--bg-hover` | `gray-100` | `gray-800` | Hover de item de lista |
 | `--bg-active` | `gray-200` | `gray-700` | Item selecionado |
-| `--fg-primary` | `gray-900` | `gray-50` | Texto principal |
+| `--fg-primary` | `gray-950` (Tinta) | `gray-50` | Texto principal |
 | `--fg-secondary` | `gray-600` | `gray-300` | Texto de apoio |
 | `--fg-muted` | `gray-500` | `gray-400` | Metadados, placeholder |
 | `--border-subtle` | `gray-200` | `gray-800` | Divisórias |
 | `--border-strong` | `gray-400` | `gray-500` | Contorno de input (3:1, WCAG 1.4.11) |
-| `--accent` | `brand-600` | `brand-400` | Ação primária |
-| `--accent-fg` | `gray-0` | `gray-950` | Texto sobre accent |
-| `--ring` | `brand-500` | `brand-400` | Anel de foco |
+| `--accent` | `brand-green` | `brand-green` | Preenchimento do botão principal, badge de destaque |
+| `--accent-fg` | `gray-950` | `gray-950` | Texto sobre accent (Tinta sobre o verde) |
+| `--emphasis` | `brand-green-text` | `brand-green` | Verde em linha e texto: link, aba ativa, borda de foco, barra de progresso, checkbox |
+| `--ring` | `brand-green-text` | `brand-green` | Anel de foco |
+| `--logo-node` | `brand-green` | `brand-green` | Nó do símbolo e ponto do "i" |
+| `--on-agent` | `gray-0` | `gray-950` | Texto sobre a cor de um agente (avatar) |
+
+O verde aisense não tem contraste como texto ou linha fina sobre fundo claro (≈1,6:1 sobre o
+Papel): por isso `--accent` (preenchimento) e `--emphasis` (linha e texto) são tokens separados.
 
 **Contraste:** todo par texto/fundo é validado em AA (4.5:1 para corpo, 3:1 para ≥18px e para
 elementos de interface não textuais — indicadores de estado, anel de foco e contorno de campo,
@@ -105,7 +147,8 @@ na borda do painel, na bolha da linha do tempo, no nó do canvas e no avatar. Oi
 --agent-teal:   oklch(0.65 0.18 180);   --agent-fuchsia:oklch(0.65 0.18 320);
 ```
 
-No tema claro, sobe `L` para `0.52` (contraste com fundo claro). Atribuição automática em ordem ao
+No tema claro, `L` desce para `0.50` (`0.555` no âmbar), o que dá contraste com o fundo claro e
+4,5:1 para a inicial branca do avatar — o teste cobre os dois. Atribuição automática em ordem ao
 criar agentes, com troca manual. As cores são distinguíveis em deuteranopia e protanopia — validado
 com simulador; mesmo assim, **cor nunca é o único sinal**: estado sempre tem ícone e texto junto.
 
@@ -114,7 +157,7 @@ com simulador; mesmo assim, **cor nunca é o único sinal**: estado sempre tem �
 O xterm recebe um tema derivado dos mesmos tokens, com as 16 cores ANSI ajustadas para contraste
 legível nos dois temas (a paleta padrão do xterm tem azul ilegível em fundo escuro — corrigir).
 Tabela completa em `apps/desktop/src/features/terminal/theme.ts`. O usuário pode escolher entre
-`AISENSE Dark`, `AISENSE Light` e importar temas no formato do Windows Terminal / iTerm2.
+`aisense Dark`, `aisense Light` e importar temas no formato do Windows Terminal / iTerm2.
 
 ## Alternância de tema
 

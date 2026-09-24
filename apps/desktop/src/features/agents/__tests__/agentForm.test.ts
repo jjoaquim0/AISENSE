@@ -39,7 +39,7 @@ describe('validação do formulário de agente (T5)', () => {
   });
 
   it('não deixa sobrescrever variáveis do AISENSE', () => {
-    expect(errorsFor({ ...valid, envText: 'AISENSE_TOKEN=x' }).envText).toMatch(/AISENSE/);
+    expect(errorsFor({ ...valid, envText: 'AISENSE_TOKEN=x' }).envText).toMatch(/aisense/);
   });
 });
 

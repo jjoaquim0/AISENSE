@@ -64,7 +64,7 @@ export function TeamControls({ teamId, running, handleOf, onReport, onError }: T
           </span>
           <span className="h-1 overflow-hidden rounded-full bg-hover">
             <span
-              className="block h-full rounded-full bg-accent transition-[width] duration-200"
+              className="block h-full rounded-full bg-emphasis transition-[width] duration-200"
               style={{ width: `${progressRatio(progress) * 100}%` }}
             />
           </span>

@@ -17,7 +17,7 @@ export function TabsTrigger({ value, children }: { value: string; children: Reac
       className={cn(
         'relative -mb-px border-b-2 border-transparent px-2 py-1.5 text-label text-secondary',
         'transition-colors duration-100 hover:text-primary',
-        'data-[state=active]:border-accent data-[state=active]:text-primary',
+        'data-[state=active]:border-emphasis data-[state=active]:text-primary',
       )}
     >
       {children}

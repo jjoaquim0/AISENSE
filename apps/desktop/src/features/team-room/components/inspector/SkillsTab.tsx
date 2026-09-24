@@ -135,7 +135,7 @@ export function SkillsTab({ agent, running }: SkillsTabProps) {
           <button
             type="button"
             onClick={() => openLibrary('skills')}
-            className="text-caption text-accent hover:underline"
+            className="text-caption text-emphasis hover:underline"
           >
             Abrir biblioteca
           </button>

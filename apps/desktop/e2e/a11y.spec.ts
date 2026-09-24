@@ -28,7 +28,7 @@ for (const scheme of ['light', 'dark'] as const) {
 
     test('onboarding', async ({ page }) => {
       await openApp(page);
-      await expect(page.getByText('Bem-vindo ao AISENSE')).toBeVisible();
+      await expect(page.getByText('Bem-vindo ao aisense')).toBeVisible();
       await expect(page.getByText('Claude Code')).toBeVisible();
       expect(await audit(page)).toEqual([]);
       await page.getByRole('button', { name: 'Continuar →' }).click();

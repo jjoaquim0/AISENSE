@@ -119,7 +119,7 @@ export function TeamsHome() {
             <button
               type="button"
               onClick={() => setWizardOpen(true)}
-              className="flex h-full min-h-40 w-full flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-strong text-secondary transition-colors duration-100 hover:border-accent hover:text-accent"
+              className="flex h-full min-h-40 w-full flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-strong text-secondary transition-colors duration-100 hover:border-emphasis hover:text-emphasis"
             >
               <Plus size={18} />
               <span className="text-body">Nova equipe</span>

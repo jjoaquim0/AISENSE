@@ -18,24 +18,24 @@ test('versão nova aparece numa faixa com novidades e progresso da instalação'
     onboardingDone: true,
     update: { version: '0.2.0', notes: '## Novidades\n\n- Quadro mais rápido' },
   });
-  const banner = page.getByRole('status').filter({ hasText: 'AISENSE 0.2.0 disponível' });
+  const banner = page.getByRole('status').filter({ hasText: 'aisense 0.2.0 disponível' });
   await expect(banner).toContainText('você tem a 0.1.0', { timeout: 10_000 });
 
   await banner.getByRole('button', { name: 'Novidades' }).click();
-  const notes = page.getByRole('dialog', { name: 'Novidades do AISENSE 0.2.0' });
+  const notes = page.getByRole('dialog', { name: 'Novidades do aisense 0.2.0' });
   await expect(notes).toContainText('Quadro mais rápido');
   await page.keyboard.press('Escape');
 
   await banner.getByRole('button', { name: 'Instalar e reiniciar' }).click();
   await expect(
-    page.getByRole('status').filter({ hasText: 'Instalando o AISENSE 0.2.0 — 50%' }),
+    page.getByRole('status').filter({ hasText: 'Instalando o aisense 0.2.0 — 50%' }),
   ).toBeVisible();
   expect(await unknownCommands(page)).toEqual([]);
 });
 
 test('"Depois" esconde a faixa sem perder a atualização nas Configurações', async ({ page }) => {
   await openApp(page, { onboardingDone: true, update: { version: '0.2.0' } });
-  const banner = page.getByRole('status').filter({ hasText: 'AISENSE 0.2.0 disponível' });
+  const banner = page.getByRole('status').filter({ hasText: 'aisense 0.2.0 disponível' });
   await banner.getByRole('button', { name: 'Depois' }).click({ timeout: 10_000 });
   await expect(banner).toBeHidden();
   await page.getByRole('button', { name: 'Configurações' }).click();

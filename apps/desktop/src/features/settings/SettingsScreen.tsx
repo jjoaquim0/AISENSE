@@ -217,7 +217,7 @@ function AppearanceSection({ settings, update }: { settings: AppSettings; update
         label="Fonte do terminal"
         value={a.terminalFontFamily}
         placeholder="JetBrains Mono (padrão)"
-        hint="Uma fonte monoespaçada instalada no sistema. Vazio usa a do AISENSE."
+        hint="Uma fonte monoespaçada instalada no sistema. Vazio usa a do aisense."
         onCommit={(v) =>
           update((d) => {
             d.appearance.terminalFontFamily = v;
@@ -491,7 +491,7 @@ function ShortcutsSection({ settings, update }: { settings: AppSettings; update:
                     className="rounded-md px-1.5 py-0.5 hover:bg-hover"
                   >
                     {recording === s.combo ? (
-                      <span className="text-caption text-accent">Pressione…</span>
+                      <span className="text-caption text-emphasis">Pressione…</span>
                     ) : (
                       <Kbd>{formatShortcut(effective(s.combo))}</Kbd>
                     )}
@@ -778,7 +778,7 @@ function UpdatesGroup({
     >
       <Toggle
         label="Procurar atualizações ao abrir o app"
-        hint="É a única conexão de rede que o AISENSE faz. Nada é instalado sem você pedir."
+        hint="É a única conexão de rede que o aisense faz. Nada é instalado sem você pedir."
         checked={enabled}
         onChange={onEnabled}
       />

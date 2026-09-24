@@ -13,9 +13,9 @@ import { parseOklch, toHex } from '@/styles/color';
  */
 const FALLBACK = {
   dark: {
-    background: '#1a1b21',
-    foreground: '#e9e9ee',
-    accent: '#a78bfa',
+    background: '#141816',
+    foreground: '#eef0ed',
+    accent: '#2ee68a',
     selection: '#3a3a45',
     black: '#45454f',
     red: '#ff6b6b',
@@ -35,9 +35,9 @@ const FALLBACK = {
     brightWhite: '#fbfbfd',
   },
   light: {
-    background: '#fcfcfd',
-    foreground: '#2a2a33',
-    accent: '#6d3fe0',
+    background: '#fcfdfc',
+    foreground: '#0c0f0d',
+    accent: '#087a42',
     selection: '#d9d9e0',
     black: '#2a2a33',
     red: '#c0342e',
@@ -72,7 +72,7 @@ export function readTerminalTheme(theme: Theme): ITheme {
   return {
     background,
     foreground: read(isDark(theme) ? '--ansi-white' : '--ansi-black', fallback.foreground),
-    cursor: read('--accent', fallback.accent),
+    cursor: read('--emphasis', fallback.accent),
     cursorAccent: background,
     selectionBackground: read('--bg-active', fallback.selection),
 

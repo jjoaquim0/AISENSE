@@ -81,7 +81,7 @@ export function App() {
           <EmptyState
             icon={<Users size={22} />}
             title="Abra pelo aplicativo"
-            description="As equipes vivem no core do AISENSE. Rode `pnpm app` para abrir a janela completa; `#/dev` mostra o design system."
+            description="As equipes vivem no core do aisense. Rode `pnpm app` para abrir a janela completa; `#/dev` mostra o design system."
           />
         )}
       </AppShell>

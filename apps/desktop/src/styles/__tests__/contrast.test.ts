@@ -27,6 +27,8 @@ const PAIRS: Array<[string, string, number, string]> = [
   ['--fg-muted', '--bg-base', TEXT_MIN, 'metadados sobre o fundo'],
   ['--fg-muted', '--bg-surface', TEXT_MIN, 'metadados sobre card'],
   ['--accent-fg', '--accent', TEXT_MIN, 'texto do botão primário'],
+  ['--emphasis', '--bg-base', TEXT_MIN, 'link e texto em verde sobre o fundo'],
+  ['--emphasis', '--bg-surface', TEXT_MIN, 'link e texto em verde sobre card'],
   ['--ring', '--bg-base', UI_MIN, 'anel de foco sobre o fundo'],
   ['--ring', '--bg-surface', UI_MIN, 'anel de foco sobre card'],
   ['--border-strong', '--bg-surface', UI_MIN, 'contorno de input'],
@@ -75,6 +77,14 @@ describe.each(THEMES)('contraste no tema %s', (theme) => {
       ratio,
       `${token} sobre --bg-surface no tema ${theme}: ${ratio.toFixed(2)}:1`,
     ).toBeGreaterThanOrEqual(UI_MIN);
+  });
+
+  it.each(AGENT_COLORS)('a inicial no avatar se lê sobre %s', (token) => {
+    const ratio = ratioOf('--on-agent', token);
+    expect(
+      ratio,
+      `--on-agent sobre ${token} no tema ${theme}: ${ratio.toFixed(2)}:1`,
+    ).toBeGreaterThanOrEqual(TEXT_MIN);
   });
 
   it('as cores de agente têm peso visual parecido entre si', () => {

@@ -17,7 +17,7 @@ const components: Components = {
   ol: ({ children }) => (
     <ol className="my-2 list-decimal space-y-0.5 pl-5 text-body">{children}</ol>
   ),
-  a: ({ children }) => <span className="text-accent underline">{children}</span>,
+  a: ({ children }) => <span className="text-emphasis underline">{children}</span>,
   blockquote: ({ children }) => (
     <blockquote className="my-2 border-l-2 border-strong pl-3 text-secondary">
       {children}

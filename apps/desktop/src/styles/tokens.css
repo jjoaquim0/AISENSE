@@ -1,5 +1,5 @@
 /* ───────────────────────────────────────────────────────────────────────────
-   AISENSE — tokens de design
+   aisense — tokens de design (identidade: manual de marca v1.0)
    Fonte da verdade: docs/08-design-system.md
 
    REGRA (AGENTS.md R7): nenhum componente usa cor literal. Só os tokens
@@ -7,26 +7,30 @@
    ─────────────────────────────────────────────────────────────────────────── */
 
 :root {
-  /* ── Primitivos: neutros (viés azulado para não parecer cinza morto) ── */
-  --gray-0: oklch(0.99 0.002 265);
-  --gray-50: oklch(0.97 0.004 265);
-  --gray-100: oklch(0.94 0.006 265);
-  --gray-200: oklch(0.89 0.008 265);
-  --gray-300: oklch(0.8 0.01 265);
-  --gray-400: oklch(0.66 0.012 265);
-  --gray-500: oklch(0.54 0.014 265);
-  --gray-600: oklch(0.44 0.014 265);
-  --gray-700: oklch(0.33 0.014 265);
-  --gray-800: oklch(0.25 0.014 265);
-  --gray-850: oklch(0.21 0.014 265);
-  --gray-900: oklch(0.17 0.014 265);
-  --gray-950: oklch(0.13 0.012 265);
+  /* ── Primitivos: neutros da marca (manual de marca v1.0, "Cores") ──
+     Viés verde bem leve (matiz 157), o mesmo da Tinta e do Grafite. Âncoras do manual:
+     gray-950 = Tinta #0C0F0D, gray-850 = Grafite #1A1F1C, gray-600 ≈ Cinza #5B615D,
+     gray-200 = Névoa #D9DCD8, gray-50 = Papel #F5F6F4. */
+  --gray-0: oklch(0.997 0.001 157);
+  --gray-50: oklch(0.972 0.003 128);
+  --gray-100: oklch(0.94 0.005 150);
+  --gray-200: oklch(0.891 0.006 138);
+  --gray-300: oklch(0.8 0.008 157);
+  --gray-400: oklch(0.66 0.01 157);
+  --gray-500: oklch(0.54 0.01 157);
+  --gray-600: oklch(0.47 0.01 157);
+  --gray-700: oklch(0.362 0.008 160);
+  --gray-800: oklch(0.29 0.009 159);
+  --gray-850: oklch(0.233 0.009 159);
+  --gray-900: oklch(0.198 0.008 157);
+  --gray-950: oklch(0.164 0.006 156);
 
-  /* ── Primitivos: marca ── */
-  --brand-400: oklch(0.72 0.16 285);
-  --brand-500: oklch(0.63 0.19 285);
-  --brand-600: oklch(0.55 0.2 285);
-  --brand-700: oklch(0.47 0.18 285);
+  /* ── Primitivos: marca ──
+     Verde aisense #2EE68A: acento, nó do logo, botão principal, status ativo. Nunca fundo
+     de área grande (no máximo ~5% da tela). Verde texto #087A42: links e texto verde
+     sobre fundo claro, onde o verde aisense não tem contraste. */
+  --brand-green: oklch(0.817 0.191 155);
+  --brand-green-text: oklch(0.509 0.127 154);
 
   /* ── Primitivos: estado ── */
   --green-500: oklch(0.7 0.17 150);
@@ -35,33 +39,40 @@
   --red-500: oklch(0.62 0.21 25);
 
   /* ── Identidade dos agentes (L e C constantes = mesmo peso visual) ── */
-  --agent-violet: oklch(0.52 0.18 285);
-  --agent-cyan: oklch(0.52 0.18 205);
-  --agent-emerald: oklch(0.52 0.18 155);
-  --agent-amber: oklch(0.58 0.16 75);
-  --agent-rose: oklch(0.52 0.18 15);
-  --agent-indigo: oklch(0.52 0.18 265);
-  --agent-teal: oklch(0.52 0.18 180);
-  --agent-fuchsia: oklch(0.52 0.18 320);
+  --agent-violet: oklch(0.5 0.18 285);
+  --agent-cyan: oklch(0.5 0.18 205);
+  --agent-emerald: oklch(0.5 0.18 155);
+  --agent-amber: oklch(0.555 0.16 75);
+  --agent-rose: oklch(0.5 0.18 15);
+  --agent-indigo: oklch(0.5 0.18 265);
+  --agent-teal: oklch(0.5 0.18 180);
+  --agent-fuchsia: oklch(0.5 0.18 320);
 
   /* ── Semânticos: TEMA CLARO (padrão) ── */
   --bg-base: var(--gray-50);
   --bg-surface: var(--gray-0);
   --bg-raised: var(--gray-0);
-  --bg-terminal: oklch(0.99 0 0);
+  --bg-terminal: oklch(0.992 0.001 157);
   --bg-hover: var(--gray-100);
   --bg-active: var(--gray-200);
 
-  --fg-primary: var(--gray-900);
+  --fg-primary: var(--gray-950);
   --fg-secondary: var(--gray-600);
   --fg-muted: var(--gray-500);
 
   --border-subtle: var(--gray-200);
   --border-strong: var(--gray-400);
 
-  --accent: var(--brand-600);
-  --accent-fg: var(--gray-0);
-  --ring: var(--brand-500);
+  /* Preenchimento do botão principal e barras: o verde da marca, com texto em Tinta. */
+  --accent: var(--brand-green);
+  --accent-fg: var(--gray-950);
+  /* Verde em linha e texto (link, aba ativa, borda de foco): no claro, o verde texto. */
+  --emphasis: var(--brand-green-text);
+  --ring: var(--brand-green-text);
+  /* Nó do símbolo Elo e ponto do "i" do logo: sempre o verde da marca, nos dois temas. */
+  --logo-node: var(--brand-green);
+  /* Texto sobre a cor de um agente (avatar, chip). */
+  --on-agent: var(--gray-0);
 
   --state-idle: oklch(0.55 0.15 150);
   --state-busy: oklch(0.52 0.16 240);
@@ -90,8 +101,11 @@
   --ansi-bright-cyan: oklch(0.42 0.11 200);
   --ansi-bright-white: oklch(0.3 0.008 265);
 
-  /* ── Tipografia ── */
-  --font-sans: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* ── Tipografia (manual de marca: três fontes, papéis claros) ──
+     Bricolage Grotesque: títulos e a escrita do logo. Plus Jakarta Sans: textos,
+     interface, botões. JetBrains Mono: rótulos técnicos, IDs de agentes, código, terminal. */
+  --font-display: 'Bricolage Grotesque Variable', 'Plus Jakarta Sans Variable', system-ui, sans-serif;
+  --font-sans: 'Plus Jakarta Sans Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace;
 
   /* ── Raio ── */
@@ -120,7 +134,7 @@
     --bg-base: var(--gray-950);
     --bg-surface: var(--gray-900);
     --bg-raised: var(--gray-850);
-    --bg-terminal: oklch(0.15 0.01 265);
+    --bg-terminal: oklch(0.15 0.006 157);
     --bg-hover: var(--gray-800);
     --bg-active: var(--gray-700);
 
@@ -131,9 +145,11 @@
     --border-subtle: var(--gray-800);
     --border-strong: var(--gray-500);
 
-    --accent: var(--brand-400);
+    --accent: var(--brand-green);
     --accent-fg: var(--gray-950);
-    --ring: var(--brand-400);
+    --emphasis: var(--brand-green);
+    --ring: var(--brand-green);
+    --on-agent: var(--gray-950);
 
     --state-idle: var(--green-500);
     --state-busy: var(--blue-500);
@@ -173,7 +189,7 @@
   --bg-base: var(--gray-950);
   --bg-surface: var(--gray-900);
   --bg-raised: var(--gray-850);
-  --bg-terminal: oklch(0.15 0.01 265);
+  --bg-terminal: oklch(0.15 0.006 157);
   --bg-hover: var(--gray-800);
   --bg-active: var(--gray-700);
 
@@ -184,9 +200,11 @@
   --border-subtle: var(--gray-800);
   --border-strong: var(--gray-500);
 
-  --accent: var(--brand-400);
+  --accent: var(--brand-green);
   --accent-fg: var(--gray-950);
-  --ring: var(--brand-400);
+  --emphasis: var(--brand-green);
+  --ring: var(--brand-green);
+  --on-agent: var(--gray-950);
 
   --state-idle: var(--green-500);
   --state-busy: var(--blue-500);

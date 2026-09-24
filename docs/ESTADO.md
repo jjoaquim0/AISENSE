@@ -113,6 +113,7 @@ Legenda: ⬜ não iniciada · 🟨 em andamento · ✅ concluída · 🟥 bloque
 | F09-02 Assinatura | 🟨 workflow pronto para Apple e Authenticode; faltam os certificados |
 | F09-06 Docs de usuário | 🟨 README e `docs/guia/`; falta alguém de fora seguir só com eles |
 | F09-08 Editor de adaptador | ⬜ pedido do usuário: Novo adaptador, Testar e Instalar integração MCP na interface (`docs/05`) |
+| F09-10 Identidade visual | ✅ manual de marca v1.0 no app: cores, fontes, símbolo Elo, ícone e nome em minúsculas na interface |
 | F09-09 Prévia de skill | ⬜ `docs/11` exige prévia antes de importar skill; o app não tem |
 
 Para continuar: cadastrar os segredos de `docs/distribuicao.md` (no mínimo o par do updater),
@@ -352,6 +353,7 @@ Bugs encontrados pelos próprios testes, todos corrigidos na origem:
 - Atalhos com o terminal focado: só `⌘1..9` fora do macOS, `Esc Esc` para sair → [ADR 0007](adr/0007-atalhos-com-o-terminal-focado.md)
 - Entrega de mensagens **híbrida**: caixa de entrada + injeção opcional no PTY → [ADR 0006](adr/0006-entrega-de-mensagens.md)
 - Front em **React 19 + TypeScript + Tailwind 4 + Radix**, terminal com **xterm.js/WebGL**
+- **Identidade visual do Manual de Marca v1.0** (2026-09-24): Tinta/Papel com verde `#2EE68A` como sinal, Bricolage Grotesque + Plus Jakarta Sans + JetBrains Mono, símbolo Elo → [08](08-design-system.md#identidade-visual-manual-de-marca-v10)
 
 ## Decisões pendentes
 
