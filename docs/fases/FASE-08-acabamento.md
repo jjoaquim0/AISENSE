@@ -11,10 +11,25 @@ previsível, acessível.
 
 ## Tarefas
 
-### [ ] F08-01 — Auditoria de performance
+### [~] F08-01 — Auditoria de performance
 Medir todas as métricas do orçamento de [03 — Stack](../03-stack.md#orçamento-de-performance-metas-verificáveis-na-fase-8)
 com 12 agentes ativos. Perfilar e corrigir o que estourar.
 **Aceite:** todas as métricas dentro da meta, com os números registrados em `docs/ESTADO.md`.
+
+> Parcial. `scripts/perf-audit.py` sobe o **app real** (release empacotado, WebKitGTK) sob Xvfb
+> com um diretório de dados novo, semeia uma equipe e usa "religar os agentes" (F08-06) para
+> subir N agentes sem clique; mede cold start até a Sala na tela (log `tela da equipe`), PSS e CPU
+> por processo. Os números estão em `docs/ESTADO.md` — foram medidos **sem GPU** (Mesa llvmpipe),
+> o pior caso. **Corrigido pelo que a medição achou:** os pontos de estado animados ("iniciando",
+> "trabalhando", "aguardando") repintavam a 60 fps e custavam um núcleo inteiro com 6 agentes;
+> agora animam em passos (4–6 repinturas/s): 88% → 17% de CPU no mesmo cenário. A CSP do pacote
+> bloqueava as fontes que o Vite embute como `data:` (`font-src`), e o terminal media os caracteres
+> com `var(--font-mono)`, que o canvas não resolve — ambos corrigidos (F08-09). **Fora da meta
+> aqui:** RAM (o processo da página do WebKit sozinho passa de 250 MB sem GPU; cada terminal em
+> WebGL por software soma ~15–20 MB) e CPU com 12 agentes escrevendo sem parar (o xterm desenhando
+> 240 linhas/s). **Não medido:** latência tecla→eco, `aisense send`→linha do tempo e reidratação
+> do painel — precisam de instrumentação com o terminal real na tela. Falta medir numa máquina com
+> GPU nos 3 SOs (macOS e Windows usam webviews nativos, sem este custo do WebKitGTK).
 
 ### [x] F08-02 — Auditoria de acessibilidade
 Navegação completa por teclado, ordem de foco, rótulos ARIA, `aria-live` na timeline, contraste,
@@ -159,17 +174,27 @@ Playwright cobrindo os 5 fluxos críticos de [09 — Telas](../09-telas-e-fluxos
 > junte a queda com a entrega das mensagens pendentes depois da volta, e rodar os fluxos contra o
 > app empacotado com o core real (WebDriver do Tauri), que ainda não existe.
 
-### [ ] F08-09 — Polimento visual final
+### [x] F08-09 — Polimento visual final
 Revisão painel a painel nos dois temas: alinhamentos, espaçamentos, pesos tipográficos, transições,
 consistência de ícones. Comparação lado a lado claro/escuro de cada tela.
 **Aceite:** screenshots de todas as telas nos dois temas anexados ao PR, sem inconsistência aberta.
 
+> Feito: `pnpm --filter @aisense/desktop screenshots` gera as 20 telas nos dois temas com o core
+> falso, em `docs/screenshots/fase-08/`. Lista fechada no início da revisão (timebox) e toda
+> resolvida: (1) terminal com letras espaçadas — o xterm media com `var(--font-mono)`, que o canvas
+> não entende, e não remedia quando a fonte chegava; (2) barra da Sala quebrando linha com uma ação
+> sozinha — ações agrupadas e em tamanho `sm`, como o resto da barra; (3) texto do terminal
+> encostado na borda — respiro interno; (4) Configurações e Skills mostrando a sidebar e o inspetor
+> da equipe aberta — essas telas agora ocupam a área toda; (5) radios e checkboxes no azul do
+> navegador — cor de acento do tema; (6) fontes embutidas bloqueadas pela CSP do pacote. As
+> screenshots vêm do Chromium com o core falso, não da janela do Tauri.
+
 ## Critérios de saída
-- [ ] Orçamento de performance cumprido e registrado
-- [ ] Acessibilidade AA em todas as telas
-- [ ] Onboarding leva a uma equipe rodando em <2 min
-- [ ] E2E estável nos 3 SOs
-- [ ] Nenhum estado vazio, de carregamento ou de erro sem tratamento
+- [ ] Orçamento de performance cumprido e registrado — registrado; RAM e CPU com 12 ativos fora da meta sem GPU
+- [x] Acessibilidade AA em todas as telas (axe, dois temas)
+- [ ] Onboarding leva a uma equipe rodando em <2 min — 4 cliques no E2E; falta cronometrar com gente
+- [ ] E2E estável nos 3 SOs — 10 execuções seguidas em Linux; falta o CI dos 3 SOs
+- [x] Nenhum estado vazio, de carregamento ou de erro sem tratamento
 
 ## Riscos
 | Risco | Mitigação |

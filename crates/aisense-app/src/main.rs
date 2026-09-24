@@ -200,6 +200,16 @@ fn main() {
             commands::project::project_lookup,
             commands::project::project_accept,
         ])
+        .on_page_load(|webview, payload| {
+            // Diagnóstico de subida: sem isto, uma página que não carrega no pacote é
+            // uma janela em branco sem nenhuma pista no log.
+            tracing::info!(
+                url = %payload.url(),
+                event = ?payload.event(),
+                window = webview.label(),
+                "página"
+            );
+        })
         .on_window_event(move |window, event| {
             // Fechar a janela precisa matar os processos dos agentes; senão eles
             // continuam vivos sem dono, consumindo CPU e segurando arquivos.

@@ -68,6 +68,20 @@ def rss_mb(pids: list[int]) -> float:
     return total / 1024 / 1024
 
 
+def pss_mb(pids: list[int]) -> float:
+    """PSS: memória compartilhada dividida entre quem a usa. Sem GPU, o WebKit carrega o
+    renderizador por software (LLVM), e o RSS conta essas bibliotecas inteiras."""
+    total = 0
+    for p in pids:
+        try:
+            for line in Path(f"/proc/{p}/smaps_rollup").read_text().splitlines():
+                if line.startswith("Pss:"):
+                    total += int(line.split()[1]) * 1024
+        except OSError:
+            pass
+    return total / 1024 / 1024
+
+
 def cpu_ticks(pids: list[int]) -> int:
     total = 0
     for p in pids:
@@ -79,11 +93,16 @@ def cpu_ticks(pids: list[int]) -> int:
     return total
 
 
-def cpu_percent(root: int, seconds: float) -> float:
+def cpu_percent(root: int, seconds: float) -> dict[str, float]:
+    """CPU de cada processo (100 = um núcleo inteiro)."""
     pids = app_processes(root)
-    before = cpu_ticks(pids)
+    before = {p: cpu_ticks([p]) for p in pids}
     time.sleep(seconds)
-    return (cpu_ticks(pids) - before) / CLK / seconds * 100
+    out: dict[str, float] = {}
+    for p in pids:
+        name = comm(p)
+        out[name] = round(out.get(name, 0) + (cpu_ticks([p]) - before[p]) / CLK / seconds * 100, 2)
+    return out
 
 
 def wait_log(log: Path, pattern: str, timeout: float, start: float) -> float | None:
@@ -106,10 +125,15 @@ def seed(home: Path, agents: int, busy: bool) -> list[str]:
         " VALUES (?, 'Perf', '', ?, 'violet', '{}', ?, ?)",
         (team, str(work), now, now),
     )
-    script = (
-        "while true; do date +%T.%N; sleep 0.05; done"
+    # Ocioso de verdade: o `shell` tem `idle_regex` e o detector marca "ocioso" no prompt.
+    # O `custom` sem regex ficaria 60 s em "iniciando" (com o ponto animado).
+    adapter, args = (
+        ("custom", ["sh", "-c", "while true; do date +%T.%N; sleep 0.05; done"])
         if busy
-        else "printf 'pronto> '; sleep 100000"
+        # PERF_IDLE_STARTING=1 reproduz agentes presos em "iniciando" (ponto animado).
+        else ("custom", ["sh", "-c", "printf 'pronto> '; sleep 100000"])
+        if os.environ.get("PERF_IDLE_STARTING")
+        else ("shell", [])
     )
     ids = []
     for i in range(agents):
@@ -118,8 +142,8 @@ def seed(home: Path, agents: int, busy: bool) -> list[str]:
         db.execute(
             "INSERT INTO agents (id, team_id, handle, name, adapter_id, args, color, autostart,"
             " restart_policy, position, created_at, updated_at)"
-            " VALUES (?, ?, ?, ?, 'custom', ?, 'cyan', 1, 'never', ?, ?, ?)",
-            (aid, team, f"a{i}", f"A{i}", json.dumps(["sh", "-c", script]), i, now, now),
+            " VALUES (?, ?, ?, ?, ?, ?, 'cyan', 1, 'never', ?, ?, ?)",
+            (aid, team, f"a{i}", f"A{i}", adapter, json.dumps(args), i, now, now),
         )
     db.commit()
     db.close()
@@ -200,8 +224,9 @@ def scenario(binary: str, agents: int, busy: bool) -> dict:
             "cold_start_to_team_room_s": round(shown, 2) if shown else None,
             "all_agents_up_s": round(relaunched, 2) if relaunched else None,
             "rss_app_webkit_mb": round(rss_mb(app_processes(pid)), 1),
-            "cpu_app_webkit_percent": round(cpu_percent(pid, 10), 2),
-            "processes": sorted({comm(p) for p in app_processes(pid)}),
+            "pss_app_webkit_mb": round(pss_mb(app_processes(pid)), 1),
+            "pss_by_process_mb": {comm(p): round(pss_mb([p]), 1) for p in app_processes(pid)},
+            "cpu_percent_by_process": cpu_percent(pid, 10),
         }
         stop(launcher)
         return result
@@ -211,12 +236,17 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("binary")
     parser.add_argument("--agents", type=int, default=12)
+    parser.add_argument(
+        "--only", choices=["idle0", "idle6", "busy"], help="roda um cenário só (investigação)"
+    )
     args = parser.parse_args()
-    report = [
-        scenario(args.binary, 0, False),
-        scenario(args.binary, 6, False),
-        scenario(args.binary, args.agents, True),
-    ]
+    scenarios = {
+        "idle0": (0, False),
+        "idle6": (6, False),
+        "busy": (args.agents, True),
+    }
+    chosen = [scenarios[args.only]] if args.only else list(scenarios.values())
+    report = [scenario(args.binary, n, busy) for n, busy in chosen]
     print(json.dumps(report, indent=2, ensure_ascii=False))
     return 0
 

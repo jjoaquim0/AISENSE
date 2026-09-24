@@ -32,3 +32,4 @@ Thumbs.db
 /apps/desktop/test-results/
 /apps/desktop/playwright-report/
 /apps/desktop/dist-e2e/
+__pycache__/
