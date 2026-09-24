@@ -42,9 +42,18 @@ Para entender o projeto pela primeira vez, leia nesta sequência (≈45 min):
 | [08 — Design System](08-design-system.md) | Tokens OKLCH, tipografia, temas, componentes, movimento |
 | [09 — Telas e Fluxos](09-telas-e-fluxos.md) | Cada tela desenhada, incluindo os 4 modos da Sala da Equipe |
 
+### Para quem usa o app
+| Doc | Conteúdo |
+|---|---|
+| [README](../README.md) | Instalação nos 3 SOs e primeiros passos |
+| [Guia — Adaptadores](guia/adaptadores.md) | Ensinar o AISENSE a rodar uma IA nova |
+| [Guia — Skills](guia/skills.md) | Criar, atribuir e compartilhar skills |
+| [Guia — Solução de problemas](guia/problemas.md) | O que fazer quando algo não funciona |
+
 ### Processo
 | Doc | Conteúdo |
 |---|---|
+| [Distribuição](distribuicao.md) | Empacotar, assinar, auto-update e lançar por tag |
 | [10 — Padrões de Código](10-padroes-de-codigo.md) | Convenções Rust/TS, erros, testes, commits, PRs |
 | [12 — Glossário](12-glossario.md) | Vocabulário canônico do projeto |
 | [14 — Ideias: software house](14-ideias-software-house.md) | Backlog priorizado, análise do Maestri, o que não fazer |
