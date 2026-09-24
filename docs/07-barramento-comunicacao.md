@@ -123,8 +123,10 @@ Regras rígidas de segurança:
 1. Só injeta com estado `idle` **e** confiança alta.
 2. **Nunca** injeta com estado `awaiting_input` (a IA está pedindo confirmação ao humano).
 3. Fila FIFO por agente; se chegarem 5 mensagens durante um `busy`, são agrupadas em uma só injeção.
-4. Sanitização obrigatória: remove `\x1b`, `\x07`, `\r` do corpo e limita a `inject.max_chars`;
-   acima disso grava em `.aisense/inbox/<id>.md` e injeta só o caminho.
+4. Sanitização obrigatória: remove todo controle C0/C1 (inclui `\x1b`, `\x07`, `\r`) e o DEL,
+   junta o corpo numa linha só (`\n` vira ` / `) e limita a `inject.max_chars`; acima disso
+   injeta só o aviso "N mensagem(ns) longa(s) de @x — leia com: aisense inbox" (o corpo inteiro
+   continua na caixa; nada é gravado em arquivo).
 5. Throttle: no máximo 1 injeção por agente a cada 3 s.
 6. A UI mostra um chip **"mensagem injetada"** na linha do terminal — nada é invisível.
 

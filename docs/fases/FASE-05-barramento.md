@@ -108,11 +108,24 @@ com mensagem acionável. Depende de F05-05.
 > Aceite: testes de ciclo direto e de três agentes, timeout com dica (exit 2 na CLI) e o
 > caminho completo pergunta → resposta.
 
-### [ ] F05-07 — Entrega em modo `push`
+### [x] F05-07 — Entrega em modo `push`
 Fila por agente, gatilho por `idle` com confiança alta, bloqueio absoluto em `awaiting_input`,
 throttle de 3 s, agrupamento de mensagens acumuladas, sanitização obrigatória.
 **Aceite:** o teste de sanitização com corpus malicioso passa (incluindo `\r`, ESC, OSC);
 nenhuma injeção ocorre com o agente em `awaiting_input`. Depende de F05-05, F03-01.
+> Feito: regras em `aisense-core/src/bus/push.rs` (`PushQueues`, `sanitize`, `compose`,
+> `inject`) e a ligação em `aisense-app/src/commands/push.rs`: o estado do detector (observador
+> do supervisor) e as mensagens novas (hub do barramento) alimentam uma fila por agente em
+> `delivery_mode = push`; só sai com `idle` **e** confiança alta, nunca em `awaiting_input`,
+> uma injeção a cada 3 s (um tick de 500 ms libera quem só esperava o throttle), o que
+> acumulou vai agrupado numa linha, e o `submit` é o do adaptador. Entrega injetada vira
+> `delivered`; falha de escrita deixa na caixa com o erro. Mensagem lida pela caixa sai da
+> fila; agente parado esvazia a fila. A UI mostra o chip "mensagem injetada" no painel
+> (`bus:injected`). Aceite: corpus malicioso (CSI, OSC 52/0 com BEL e ST, `\r`, C1 de 8 bits,
+> backspace, DEL, NUL, Ctrl-C/D) sai sem nenhum controle e com um único `\r`, o do submit; e
+> testes de fila: ocupado, aguardando o humano e ocioso só por silêncio **não** injetam. A
+> ligação no app não tem teste automatizado (o crate do app fica fora da suíte por depender de
+> GUI) — é cola fina sobre as regras testadas.
 
 ### [ ] F05-08 — Entrega em modo `hook`
 Mesclar (nunca sobrescrever) o hook de fim de turno em `.claude/settings.json` para runtimes com
