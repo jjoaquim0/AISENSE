@@ -17,7 +17,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   EmptyState,
+  ErrorNotice,
   IconButton,
+  Skeleton,
   StatusDot,
 } from '@/components/ui';
 import { onAgentState } from '@/features/agents/api';
@@ -89,8 +91,24 @@ export function TeamsHome() {
         </div>
       </header>
 
-      {error && <p className="text-caption text-failed">{error}</p>}
-      {!teams && !error && <p className="text-caption text-muted">Carregando…</p>}
+      {error && (
+        <ErrorNotice
+          title="Não foi possível carregar as equipes"
+          message={error}
+          onRetry={() => void load()}
+        />
+      )}
+      {!teams && !error && (
+        <div
+          role="status"
+          aria-busy="true"
+          aria-label="Carregando equipes"
+          className="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-3"
+        >
+          <Skeleton className="h-40 rounded-xl" />
+          <Skeleton className="h-40 rounded-xl" />
+        </div>
+      )}
 
       {teams && (
         <ul className="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-3">

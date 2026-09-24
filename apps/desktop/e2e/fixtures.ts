@@ -18,3 +18,10 @@ export function unknownCommands(page: Page): Promise<string[]> {
     () => (window as unknown as { __fake: { unknown: string[] } }).__fake.unknown,
   );
 }
+
+/** O comando volta a responder (ver `FakeSeed.failing`). */
+export function heal(page: Page, cmd: string): Promise<void> {
+  return page.evaluate((c) => {
+    (window as unknown as { __fake: { heal: (cmd: string) => void } }).__fake.heal(c);
+  }, cmd);
+}

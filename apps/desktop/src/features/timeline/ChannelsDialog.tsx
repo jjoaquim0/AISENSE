@@ -92,7 +92,9 @@ export function ChannelsDialog({
       <div className="grid grid-cols-[1fr_1.2fr] gap-4">
         <ul className="flex flex-col gap-1" aria-label="Canais da equipe">
           {channels.length === 0 && (
-            <li className="text-caption text-muted">Nenhum canal ainda.</li>
+            <li className="text-caption text-muted">
+              Nenhum canal ainda. Crie ao lado, ou mande para #nome e ele nasce.
+            </li>
           )}
           {channels.map((info) => (
             <li key={info.channel.id} className="flex items-center gap-1">

@@ -38,6 +38,11 @@ export interface FakeSeed {
    * página faz o papel de fechar e reabrir o app (F08-06). Agentes voltam parados.
    */
   persist?: boolean;
+  /**
+   * Comandos que falham com um `CommandError` até o teste chamar `__fake.heal(cmd)`. Falhar
+   * só uma vez não serve: em dev o StrictMode roda cada efeito duas vezes.
+   */
+  failing?: string[];
 }
 
 const STORE_KEY = 'aisense.fake-core';
@@ -51,6 +56,8 @@ export interface FakeHandle {
   calls: { cmd: string; args: unknown }[];
   settings: () => AppSettings;
   notifications: { title: string; body: string }[];
+  /** Para de falhar `cmd` (ver `FakeSeed.failing`). */
+  heal: (cmd: string) => void;
 }
 
 declare global {
@@ -199,7 +206,9 @@ export function installFakeCore(): void {
     calls: [],
     settings: () => settings,
     notifications: [],
+    heal: (cmd) => failing.delete(cmd),
   };
+  const failing = new Set(seed.failing ?? []);
   window.__fake = handle;
 
   const setState = async (agentId: string, state: AgentState) => {
@@ -531,6 +540,13 @@ export function installFakeCore(): void {
   mockIPC(
     (cmd, args) => {
       handle.calls.push({ cmd, args });
+      if (failing.has(cmd)) {
+        throw {
+          code: 'fake_failure',
+          message: `could not run ${cmd}: simulated failure`,
+          hint: 'Tente de novo.',
+        };
+      }
       const run = handlers[cmd];
       if (run) {
         const result = run(args ?? {});

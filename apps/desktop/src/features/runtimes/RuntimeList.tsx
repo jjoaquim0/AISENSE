@@ -1,6 +1,6 @@
 import { AlertTriangle, Check, Minus, RefreshCw, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { IconButton, Tooltip } from '@/components/ui';
+import { ErrorNotice, IconButton, SkeletonList, Tooltip } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import type { RuntimeInfo } from '@/types/generated/RuntimeInfo';
 import type { RuntimeOverview } from '@/types/generated/RuntimeOverview';
@@ -52,8 +52,14 @@ export function RuntimeList() {
         </Tooltip>
       </header>
 
-      {error && <p className="text-caption text-failed">Não foi possível verificar: {error}</p>}
-      {!overview && !error && <p className="text-caption text-muted">Verificando…</p>}
+      {error && (
+        <ErrorNotice
+          title="Não foi possível verificar os runtimes"
+          message={error}
+          onRetry={() => void load(true)}
+        />
+      )}
+      {!overview && !error && <SkeletonList rows={4} label="Verificando os runtimes" />}
 
       {overview && (
         <ul className="divide-y divide-subtle rounded-lg border border-subtle bg-surface">

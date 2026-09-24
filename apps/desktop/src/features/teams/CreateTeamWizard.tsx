@@ -1,7 +1,7 @@
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { AlertTriangle, Check, FolderOpen } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Button, Dialog, Input } from '@/components/ui';
+import { Button, Dialog, Input, SkeletonList } from '@/components/ui';
 import { runtimesApi } from '@/features/runtimes/api';
 import { cn } from '@/lib/cn';
 import type { AgentColor } from '@/types/generated/AgentColor';
@@ -321,7 +321,8 @@ function ReviewStep({
   onChange: (planned: PlannedAgent[]) => void;
   templateTitle: string;
 }) {
-  if (!planned) return <p className="text-caption text-muted">Verificando os runtimes…</p>;
+  if (!planned)
+    return <SkeletonList rows={2} label="Verificando os runtimes" rowClassName="h-12" />;
   if (planned.length === 0) {
     return (
       <p className="text-body text-secondary">

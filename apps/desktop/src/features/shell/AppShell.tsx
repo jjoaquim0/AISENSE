@@ -275,7 +275,9 @@ function Sidebar({ width }: { width: number }) {
             <h2 className="px-2.5 pb-1 text-caption tracking-[0.02em] text-muted uppercase">
               Agentes
             </h2>
-            <p className="px-2.5 py-1.5 text-caption text-muted">Nenhuma equipe aberta.</p>
+            <p className="px-2.5 py-1.5 text-caption text-muted">
+              Nenhuma equipe aberta. Escolha uma na lista ou crie com o + do trilho.
+            </p>
           </section>
         }
       />

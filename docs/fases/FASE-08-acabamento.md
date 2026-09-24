@@ -21,10 +21,21 @@ Navegação completa por teclado, ordem de foco, rótulos ARIA, `aria-live` na t
 zoom de 80% a 150%, `prefers-reduced-motion`.
 **Aceite:** percorrer os 5 fluxos críticos usando **apenas** o teclado, sem becos sem saída.
 
-### [ ] F08-03 — Estados vazios, carregamento e erro
+### [x] F08-03 — Estados vazios, carregamento e erro
 Todo estado vazio com ilustração e ação; skeletons no lugar de spinners; toda mensagem de erro com
 causa e próximo passo acionável.
 **Aceite:** nenhuma tela mostra "algo deu errado" sem dizer o que fazer.
+
+> Feito: `Skeleton`/`SkeletonList` e `ErrorNotice` no design system (`components/ui/`). Os
+> "Carregando…"/"Verificando…" viraram esqueletos na forma do conteúdo (lista de equipes,
+> biblioteca de skills, runtimes, assistente e formulário do agente, configurações, painéis da
+> Sala antes da primeira lista — antes ela mostrava "Nenhum agente ainda" por um instante). Erros
+> de carga usam `ErrorNotice`: a causa e a dica vêm do `CommandError` do core, com "Tentar de
+> novo" quando faz sentido, e sem isso o caminho do diagnóstico (Configurações → Avançado). Vazios
+> ganharam ação: equipe sem agentes tem o botão "Novo agente" (e `⌘T`); sidebar, canais e a lista
+> sem equipe dizem o que fazer. Coberto por `e2e/states.spec.ts` (falha simulada no core falso,
+> tentar de novo, vazios). Ilustrações continuam os ícones do `EmptyState` — não há ilustrações
+> próprias no design system.
 
 ### [x] F08-04 — Onboarding (T1)
 Fluxo de 3 passos com detecção de runtimes, escolha de tema e criação da primeira equipe.

@@ -20,8 +20,10 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  ErrorNotice,
   IconButton,
   Input,
+  Skeleton,
 } from '@/components/ui';
 import { errorMessage } from '@/features/teams/api';
 import type { SkillEntry } from '@/types/generated/SkillEntry';
@@ -122,8 +124,21 @@ export function SkillLibraryScreen() {
           {message.text}
         </p>
       )}
-      {loadProblem && <p className="text-caption text-failed">{loadProblem}</p>}
-      {!library && !loadProblem && <p className="text-caption text-muted">Carregando…</p>}
+      {loadProblem && (
+        <ErrorNotice title="Não foi possível ler a biblioteca de skills" message={loadProblem} />
+      )}
+      {!library && !loadProblem && (
+        <div
+          role="status"
+          aria-busy="true"
+          aria-label="Carregando skills"
+          className="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-3"
+        >
+          <Skeleton className="h-28 rounded-xl" />
+          <Skeleton className="h-28 rounded-xl" />
+          <Skeleton className="h-28 rounded-xl" />
+        </div>
+      )}
 
       {sections && (
         <>

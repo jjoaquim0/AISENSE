@@ -8,7 +8,7 @@ import {
   SquareTerminal,
 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Dialog, EmptyState, IconButton } from '@/components/ui';
+import { Button, Dialog, EmptyState, formatShortcut, IconButton, Skeleton } from '@/components/ui';
 import { AgentFormDialog } from '@/features/agents/AgentFormDialog';
 import { agentsApi } from '@/features/agents/api';
 import { boardApi } from '@/features/board/api';
@@ -63,6 +63,8 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
   const { team } = summary;
   const { selectTeam, load } = useTeams();
   const [agents, setAgents] = useState<Agent[]>([]);
+  // Até a primeira lista chegar, "nenhum agente" seria mentira: mostra esqueleto (F08-03).
+  const [agentsLoaded, setAgentsLoaded] = useState(false);
   // Reabrir a equipe volta para o agente que estava em foco (F08-06).
   const [selectedId, setSelectedId] = useState<string | null>(() => readFocused(team.layout));
   const [form, setForm] = useState<{ open: boolean; agent?: Agent }>({ open: false });
@@ -97,6 +99,7 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
   const reloadAgents = useCallback(async () => {
     const list = await agentsApi.list(team.id);
     setAgents(list);
+    setAgentsLoaded(true);
     setSelectedId((current) =>
       current && list.some((a) => a.id === current) ? current : (list[0]?.id ?? null),
     );
@@ -515,11 +518,27 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
               labelOf={(id) => `@${handleOf(id)}`}
               renderPane={renderPane}
             />
+          ) : !agentsLoaded ? (
+            <div
+              role="status"
+              aria-busy="true"
+              aria-label="Carregando os agentes"
+              className="grid h-full grid-cols-2 gap-2 p-2"
+            >
+              <Skeleton className="h-full rounded-lg" />
+              <Skeleton className="h-full rounded-lg" />
+            </div>
           ) : (
             <EmptyState
               icon={<SquareTerminal size={22} />}
               title="Nenhum agente ainda"
-              description="Crie um agente em “Novo agente” para ver o terminal dele aqui."
+              description="Cada agente é um terminal com uma IA (ou um shell) que conversa com os outros."
+              action={
+                <Button variant="primary" onClick={() => setForm({ open: true })}>
+                  Novo agente
+                </Button>
+              }
+              note={`Atalho: ${formatShortcut('⌘T')}`}
             />
           )}
         </section>
