@@ -6,12 +6,17 @@
 
 mod model;
 mod repo;
+mod service;
 
 pub use model::{
     valid_channel, Address, Channel, Delivery, DeliveryState, InboxItem, Message, MessageKind,
     MessageMeta, Priority, Sender, Target, CHANNEL_SLUG_MAX, MESSAGE_BODY_MAX,
 };
 pub use repo::{BusRepository, InboxQuery};
+pub use service::{
+    AgentInfo, BusObserver, BusService, BusStore, Directory, Identity, MessageView, NoObserver,
+    StateFn, INBOX_LIMIT, REMOVED_AGENT_LABEL, SYSTEM_LABEL, WAIT_MAX,
+};
 
 use crate::agent::{Agent, Handle};
 use crate::ids::{AgentId, ChannelId, MessageId, TeamId};
@@ -20,6 +25,8 @@ use crate::time::Millis;
 
 #[derive(Debug, thiserror::Error)]
 pub enum BusError {
+    #[error("invalid, expired or missing AISENSE_TOKEN")]
+    Unauthorized,
     #[error("there is no agent @{0} in this team")]
     UnknownAgent(String),
     #[error("@{0} is stopped")]
@@ -36,6 +43,7 @@ impl BusError {
     /// Os códigos do protocolo (`docs/07`, "Operações").
     pub fn code(&self) -> &'static str {
         match self {
+            Self::Unauthorized => "unauthorized",
             Self::UnknownAgent(_) => "unknown_agent",
             Self::AgentStopped(_) => "agent_stopped",
             Self::UnknownMessage(_) => "unknown_message",
@@ -47,6 +55,9 @@ impl BusError {
     /// O próximo passo, pronto para a CLI imprimir.
     pub fn hint(&self) -> Option<String> {
         match self {
+            Self::Unauthorized => Some(
+                "Rode o comando de dentro de um terminal de agente aberto pelo AISENSE.".into(),
+            ),
             Self::UnknownAgent(_) => Some("Veja quem está na equipe com: aisense agents".into()),
             Self::AgentStopped(handle) => Some(format!(
                 "Deixe um recado que @{handle} lê ao voltar: aisense send @{handle} \"...\""

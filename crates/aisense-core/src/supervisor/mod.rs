@@ -37,6 +37,7 @@ use crate::ids::{AgentId, SessionId, TeamId};
 use crate::project::{load_project, ProjectLookup};
 use crate::repo::{
     AgentRepository, RepoError, SessionRecord, SessionRepository, SkillRepository, TeamRepository,
+    TokenRecord, TokenRepository,
 };
 use crate::skill::{
     materialize, resolve_agent_skills, MaterializeRequest, Materialized, SkillLibrary, SkillPlan,
@@ -47,6 +48,10 @@ use crate::time::now_ms;
 /// Quanto o término de uma sessão espera o registro do início dela. Só importa
 /// quando o processo morre antes de o supervisor terminar de gravar o início.
 const SESSION_RECORD_WAIT: Duration = Duration::from_secs(5);
+
+/// Teto de vida de um `AISENSE_TOKEN`: a revogação acontece no fim da sessão; o prazo só
+/// cobre o caso de o app cair sem revogar (e a subida seguinte revoga tudo de novo).
+pub const TOKEN_TTL_MS: i64 = 7 * 24 * 60 * 60 * 1000;
 
 /// Payload do evento `agent:state` que o app emite a cada mudança.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -137,11 +142,16 @@ enum DetectorInput {
 
 /// As portas de que o supervisor precisa, juntas.
 pub trait SupervisorStore:
-    TeamRepository + AgentRepository + SessionRepository + SkillRepository + 'static
+    TeamRepository + AgentRepository + SessionRepository + SkillRepository + TokenRepository + 'static
 {
 }
-impl<T: TeamRepository + AgentRepository + SessionRepository + SkillRepository + 'static>
-    SupervisorStore for T
+impl<T> SupervisorStore for T where
+    T: TeamRepository
+        + AgentRepository
+        + SessionRepository
+        + SkillRepository
+        + TokenRepository
+        + 'static
 {
 }
 
@@ -529,6 +539,16 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
         if let Err(error) = store.start_session(&record).await {
             // O agente já está de pé; perder o histórico não é motivo para derrubá-lo.
             tracing::warn!(agent = %agent_id, %error, "sessão não registrada");
+        } else {
+            // O `AISENSE_TOKEN` só vale com a sessão gravada (I4); revogado no fim dela.
+            let owner = TokenRecord {
+                agent_id: agent_id.clone(),
+                session_id: session_id.clone(),
+                expires_at: now_ms().saturating_add(TOKEN_TTL_MS),
+            };
+            if let Err(error) = store.insert_token(&token, &owner).await {
+                tracing::warn!(agent = %agent_id, %error, "token do barramento não gravado");
+            }
         }
         let _ = recorded_tx.send(true);
 
@@ -793,6 +813,10 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
             .await
         {
             tracing::warn!(agent = %agent_id, %error, "fim da sessão não registrado");
+        }
+        // Processo morto: o token dele deixa de valer na hora (F05-04).
+        if let Err(error) = self.shared.store.revoke_session_tokens(&session_id).await {
+            tracing::warn!(agent = %agent_id, %error, "token do barramento não revogado");
         }
 
         let decision = {

@@ -44,16 +44,34 @@ Depende de F05-01, F02-02.
 > com o app, F05-05). O mesmo contrato roda contra SQLite e memória. Aceite: 100.000 mensagens
 > (10% de outra equipe) e a segunda página da linha do tempo em menos de 20 ms.
 
-### [ ] F05-03 — Servidor IPC
+### [x] F05-03 — Servidor IPC
 `aisense-ipc`: socket UDS / named pipe com permissão restrita, framing NDJSON com limite de 1 MiB,
 `hello` com validação de token, despacho de operações para o core, encerramento limpo.
 **Aceite:** conexão sem token é recusada e fechada; frame maior que o limite é rejeitado sem
 derrubar o servidor. Depende de F05-01.
+> Feito: `aisense-ipc` — `protocol.rs` (frames `{"op": ...}` do `docs/07`, respostas
+> `{"ok", "data"|"error","message","hint"}`), `frame.rs` (NDJSON com teto de 1 MiB que nunca
+> guarda mais que isso), `transport.rs` (UDS em `~/.aisense/run/` com pasta `0700` e socket
+> `0600`, socket órfão removido, segundo servidor recusado; named pipe com
+> `first_pipe_instance` e `reject_remote_clients` — tudo pelo `tokio`, sem crate nova),
+> `client.rs` (usado pela CLI e pelo MCP) e `handler.rs`, que só traduz para o
+> `bus::BusService` do core (`send`, `inbox`, `wait`, `agents`, `status`, `note`, `whoami`,
+> `notes`). O token é conferido no `hello` **e em toda operação**. Aceite: testes com socket
+> real — sem token ou primeiro frame que não é `hello` → `unauthorized` e fecha; frame de
+> 1 MiB+ → `frame_too_large`, fecha, e o servidor segue atendendo; JSON inválido não derruba
+> a conexão. **Pendência (Windows):** o pipe usa a DACL padrão (leitura para todos); a escrita
+> do `hello` sem token válido é recusada, mas a DACL restrita ao SID do usuário exige API do
+> Windows (`unsafe`) e fica registrada em riscos.
 
-### [ ] F05-04 — Emissão de tokens de sessão
+### [x] F05-04 — Emissão de tokens de sessão
 Gerar `AISENSE_TOKEN` por sessão de agente, gravar em `agent_tokens` com expiração, injetar no
 ambiente do PTY, revogar ao encerrar a sessão.
 **Aceite:** token de sessão encerrada é rejeitado imediatamente. Depende de F05-03, F02-06.
+> Feito: porta `TokenRepository` (memória e SQLite, mesmo contrato). O supervisor grava o
+> token gerado no start **junto com a sessão** (validade de 7 dias só como teto) e o revoga
+> quando o processo sai; o app revoga todos na subida. Aceite: o token que o processo recebe
+> em `AISENSE_TOKEN` vale enquanto ele vive e some ao parar (teste com processo real), e uma
+> conexão aberta perde o acesso na operação seguinte à revogação (teste de IPC).
 
 ### [ ] F05-05 — CLI `aisense`
 Binário com `whoami`, `agents`, `send`, `inbox`, `note`, `status`; `--json` em tudo; saída sem cor

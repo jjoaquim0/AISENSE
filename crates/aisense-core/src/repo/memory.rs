@@ -7,7 +7,7 @@ use std::sync::{Mutex, MutexGuard};
 use super::{
     dedup_agent_skills, skill_origin, AgentRepository, AgentSkill, RepoError, RepoResult,
     SessionRecord, SessionRepository, SkillRecord, SkillRepository, TeamFilter, TeamRepository,
-    SESSIONS_KEPT_PER_AGENT,
+    TokenRecord, TokenRepository, SESSIONS_KEPT_PER_AGENT,
 };
 use crate::agent::{Agent, Handle};
 use crate::bus::{BusRepository, Channel, Delivery, DeliveryState, InboxItem, InboxQuery, Message};
@@ -27,6 +27,8 @@ struct Inner {
     /// Por agente, na ordem de injeção.
     agent_skills: BTreeMap<String, Vec<AgentSkill>>,
     channels: Vec<Channel>,
+    /// `AISENSE_TOKEN` → dono.
+    tokens: BTreeMap<String, TokenRecord>,
     /// Por id: ULID monotônico, então a ordem da chave é a ordem de criação.
     messages: BTreeMap<String, Message>,
     /// Por (mensagem, agente).
@@ -556,6 +558,50 @@ impl BusRepository for InMemoryStore {
         }
         inner.deliveries.retain(|(m, _), _| !old.contains(m));
         Ok(old.len() as u64)
+    }
+}
+
+impl TokenRepository for InMemoryStore {
+    async fn insert_token(&self, token: &str, record: &TokenRecord) -> RepoResult<()> {
+        let mut inner = self.lock();
+        if !inner.agents.contains_key(record.agent_id.as_str()) {
+            return Err(RepoError::AgentNotFound(record.agent_id.clone()));
+        }
+        if !inner.sessions.iter().any(|s| s.id == record.session_id) {
+            return Err(RepoError::Corrupt(format!(
+                "no session {}",
+                record.session_id
+            )));
+        }
+        if inner.tokens.contains_key(token) {
+            return Err(RepoError::AlreadyExists("token".into()));
+        }
+        inner.tokens.insert(token.to_owned(), record.clone());
+        Ok(())
+    }
+
+    async fn find_token(&self, token: &str, now: Millis) -> RepoResult<Option<TokenRecord>> {
+        let inner = self.lock();
+        let alive = |r: &TokenRecord| {
+            r.expires_at > now
+                && inner.agents.contains_key(r.agent_id.as_str())
+                && inner.sessions.iter().any(|s| s.id == r.session_id)
+        };
+        Ok(inner.tokens.get(token).filter(|r| alive(r)).cloned())
+    }
+
+    async fn revoke_session_tokens(&self, session_id: &SessionId) -> RepoResult<u64> {
+        let mut inner = self.lock();
+        let before = inner.tokens.len();
+        inner.tokens.retain(|_, r| &r.session_id != session_id);
+        Ok((before - inner.tokens.len()) as u64)
+    }
+
+    async fn revoke_all_tokens(&self) -> RepoResult<u64> {
+        let mut inner = self.lock();
+        let n = inner.tokens.len() as u64;
+        inner.tokens.clear();
+        Ok(n)
     }
 }
 

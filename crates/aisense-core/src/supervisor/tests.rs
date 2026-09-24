@@ -836,3 +836,44 @@ async fn runtime_sem_quem_leia_nao_recebe_boot() {
         .message
         .contains(".aisense/agents/backend/BOOT.md"));
 }
+
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread")]
+async fn o_token_do_processo_vale_so_enquanto_a_sessao_vive() {
+    use crate::repo::TokenRepository;
+    let h = harness();
+    let script = r#"printf '%s' "$AISENSE_TOKEN" > token.txt; sleep 60"#;
+    let id = h
+        .agent(
+            vec!["sh".into(), "-c".into(), script.into()],
+            RestartPolicy::Never,
+        )
+        .await;
+    h.supervisor.start(&id).await.unwrap();
+    h.wait_for("o processo gravar o token", |h| {
+        !h.file("token.txt").is_empty()
+    })
+    .await;
+    let token = h.file("token.txt");
+    let owner = h
+        .store
+        .find_token(&token, crate::time::now_ms())
+        .await
+        .unwrap();
+    assert_eq!(owner.map(|o| o.agent_id), Some(id.clone()));
+
+    h.supervisor.stop(&id).unwrap();
+    h.wait_for("parado", |h| h.supervisor.state(&id) == AgentState::Stopped)
+        .await;
+    let deadline = Instant::now() + PATIENCE;
+    while h
+        .store
+        .find_token(&token, crate::time::now_ms())
+        .await
+        .unwrap()
+        .is_some()
+    {
+        assert!(Instant::now() < deadline, "token não revogado");
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+}

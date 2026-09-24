@@ -10,6 +10,7 @@ mod error;
 mod sessions;
 mod skills;
 mod teams;
+mod tokens;
 
 pub use db::{Store, MIGRATOR};
 pub use error::StoreError;

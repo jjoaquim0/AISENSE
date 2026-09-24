@@ -13,7 +13,8 @@ use aisense_core::bus::{
 };
 use aisense_core::repo::{
     AgentRepository, AgentSkill, InMemoryStore, RepoError, SessionRecord, SessionRepository,
-    SkillRepository, TeamFilter, TeamRepository, SESSIONS_KEPT_PER_AGENT,
+    SkillRepository, TeamFilter, TeamRepository, TokenRecord, TokenRepository,
+    SESSIONS_KEPT_PER_AGENT,
 };
 use aisense_core::skill::{parse_skill, Skill, SkillSource};
 use aisense_core::team::{Team, TeamDraft};
@@ -21,11 +22,21 @@ use aisense_core::{AgentColor, AgentId, ChannelId, MessageId, SessionId, TeamId}
 use aisense_store::Store;
 
 trait Repo:
-    TeamRepository + AgentRepository + SessionRepository + SkillRepository + BusRepository
+    TeamRepository
+    + AgentRepository
+    + SessionRepository
+    + SkillRepository
+    + BusRepository
+    + TokenRepository
 {
 }
 impl<T> Repo for T where
-    T: TeamRepository + AgentRepository + SessionRepository + SkillRepository + BusRepository
+    T: TeamRepository
+        + AgentRepository
+        + SessionRepository
+        + SkillRepository
+        + BusRepository
+        + TokenRepository
 {
 }
 
@@ -692,6 +703,58 @@ async fn bus_channels_are_unique_and_retention_prunes(repo: impl Repo) {
     assert!(repo.list_channels(&t.id).await.unwrap().is_empty());
 }
 
+async fn tokens_live_with_the_session(repo: impl Repo) {
+    let t = team("A", 1);
+    repo.create_team(&t).await.unwrap();
+    let a = add_agent(&repo, &t, "backend").await;
+    let s1 = session(&a, 10);
+    let s2 = session(&a, 20);
+    repo.start_session(&s1).await.unwrap();
+    repo.start_session(&s2).await.unwrap();
+    let record = |s: &SessionRecord, expires_at| TokenRecord {
+        agent_id: a.id.clone(),
+        session_id: s.id.clone(),
+        expires_at,
+    };
+    repo.insert_token("tok-1", &record(&s1, 1_000))
+        .await
+        .unwrap();
+    repo.insert_token("tok-2", &record(&s2, 1_000))
+        .await
+        .unwrap();
+    assert!(repo
+        .insert_token("tok-1", &record(&s2, 1_000))
+        .await
+        .is_err());
+
+    assert_eq!(
+        repo.find_token("tok-1", 500).await.unwrap(),
+        Some(record(&s1, 1_000))
+    );
+    assert_eq!(
+        repo.find_token("tok-1", 1_000).await.unwrap(),
+        None,
+        "expirado"
+    );
+    assert_eq!(repo.find_token("nada", 500).await.unwrap(), None);
+
+    // Fim da sessão: revogado na hora; o da outra sessão continua.
+    assert_eq!(repo.revoke_session_tokens(&s1.id).await.unwrap(), 1);
+    assert_eq!(repo.find_token("tok-1", 500).await.unwrap(), None);
+    assert!(repo.find_token("tok-2", 500).await.unwrap().is_some());
+    assert_eq!(repo.revoke_all_tokens().await.unwrap(), 1);
+    assert_eq!(repo.find_token("tok-2", 500).await.unwrap(), None);
+
+    // Agente excluído leva os tokens junto.
+    let s3 = session(&a, 30);
+    repo.start_session(&s3).await.unwrap();
+    repo.insert_token("tok-3", &record(&s3, 1_000))
+        .await
+        .unwrap();
+    repo.delete_agent(&a.id).await.unwrap();
+    assert_eq!(repo.find_token("tok-3", 500).await.unwrap(), None);
+}
+
 macro_rules! contract {
     ($($name:ident),+ $(,)?) => {
         mod sqlite {
@@ -730,6 +793,7 @@ contract!(
     agent_skills_keep_order_and_follow_the_agent,
     bus_round_trips_messages_and_deliveries,
     bus_channels_are_unique_and_retention_prunes,
+    tokens_live_with_the_session,
 );
 
 #[tokio::test]

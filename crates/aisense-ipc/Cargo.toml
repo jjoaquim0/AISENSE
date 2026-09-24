@@ -12,5 +12,12 @@ aisense-core.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
-tokio.workspace = true
+# `net`: Unix domain socket e named pipe do próprio tokio — sem crate nova para o transporte.
+tokio = { workspace = true, features = ["net", "io-util", "rt", "time"] }
+tokio-util.workspace = true
 tracing.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time", "net"] }
+tempfile = "3"
+ulid.workspace = true

@@ -252,6 +252,7 @@ Bugs encontrados pelos próprios testes, todos corrigidos na origem:
 | CLIs de terceiros (claude/codex/opencode) mudarem flags | Médio | Adaptadores em TOML, editáveis pelo usuário sem recompilar | — |
 | ConPTY nativo do Windows 10 rola só ~30 linhas/s (conhost antigo redesenha por linha) | Médio — saída longa (build, testes) aparece com atraso; TUIs que redesenham a tela sofrem menos | Decidir na Fase 09 se o instalador leva `conpty.dll` + `OpenConsole.exe` próprios (MIT, é o que o VS Code faz); o `portable-pty` já carrega um `conpty.dll` ao lado do executável | — |
 | Cópia local do `portable-pty` em `vendor/` (flags do ConPTY e `kill` invertido corrigidos) | Baixo — fica para trás de atualizações do original | `vendor/portable-pty/AISENSE.md` diz o que mudou e quando remover; os testes do PTY rodam no Windows no CI | — |
+| Named pipe do barramento com a DACL padrão do Windows (leitura para todos os usuários locais) | Baixo — sem `AISENSE_TOKEN` válido o `hello` é recusado e nada é lido | Restringir ao SID do usuário exige `SECURITY_ATTRIBUTES` (código `unsafe` isolado num crate próprio); decidir antes da Fase 09 | — |
 | Performance com 9+ terminais simultâneos | Médio | Ring buffer no Rust, render só do visível, coalescência a 60fps | — |
 
 ## Log de sessões
