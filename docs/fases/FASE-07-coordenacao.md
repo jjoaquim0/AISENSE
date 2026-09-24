@@ -12,13 +12,21 @@ A vista Fluxo mostra as mensagens trafegando ao vivo.
 
 ## Tarefas
 
-### [ ] F07-01 — Skill `coordenador` completa
+### [~] F07-01 — Skill `coordenador` completa
 Ensina a quebrar objetivo em cartões com dependências, atribuir por papel, acompanhar o quadro,
 consolidar o resultado — e, principalmente, **quando não delegar** (trabalho trivial é dele mesmo)
 e como escalar para o humano quando trava.
 **Aceite:** com a equipe "Squad completo", o coordenador executa o caso CU-2 de
 [01 — Visão](../01-visao-produto.md#cu-2--coordenador-distribuindo-trabalho) de ponta a ponta.
 Depende de F06-05.
+
+> Feito em parte: `skills/coordenador/SKILL.md` v2 — "o quadro é a fonte da verdade" na primeira
+> linha; quebra em cartões com checklist e `--blocked-by`, atribuição por papel respeitando WIP,
+> quando não delegar (trivial, decisão de produto, estrutura → `aisense propose`), acompanhar com
+> `task watch`/`board`, escalar com o que tentou e a recomendação, fechar o ciclo com resumo e notas.
+> Teste novo (`aisense-ipc/tests/skills_commands.rs`): todo comando citado nas skills embutidas existe
+> na CLI. **Falta:** rodar o CU-2 com um coordenador de verdade (claude/codex) numa máquina com os
+> runtimes — as peças (quadro, dependências, avisos, watch) estão cobertas pelos testes da Fase 06.
 
 ### [x] F07-02 — Propostas do coordenador
 Ações estruturais (criar agente, mudar autonomia, editar skill, alterar colunas) viram **proposta**
