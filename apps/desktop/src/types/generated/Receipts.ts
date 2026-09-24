@@ -4,4 +4,8 @@ export type Receipts = { recipients: number,
 /**
  * Entregues ou lidas.
  */
-delivered: number, read: number, };
+delivered: number, read: number, 
+/**
+ * Entrega que falhou ou expirou (aresta vermelha no Fluxo).
+ */
+failed: number, };

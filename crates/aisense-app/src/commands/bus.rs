@@ -4,7 +4,9 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use aisense_core::bus::{BusObserver, BusService, MessageMeta, MessageView, Sender, UnreadCount};
+use aisense_core::bus::{
+    BusObserver, BusService, ChannelInfo, MessageMeta, MessageView, Sender, UnreadCount,
+};
 use aisense_core::repo::TokenRepository;
 use aisense_core::{now_ms, AgentId, CommandError, DataDir, MessageId, TeamId};
 use aisense_ipc::BusHandler;
@@ -52,11 +54,10 @@ pub struct BusShutdown(pub CancellationToken);
 
 pub fn setup(
     app: &AppHandle,
-    data: &DataDir,
     store: &Store,
     supervisor: &Supervisor,
     push: super::push::PushSink,
-) -> (Bus, BusShutdown) {
+) -> Bus {
     let for_state = supervisor.clone();
     let bus = BusService::new(
         Arc::new(store.clone()),
@@ -107,10 +108,19 @@ pub fn setup(
         }
     });
 
+    bus
+}
+
+/// Sobe o socket com o quadro dentro (o handler atende barramento e `aisense task`).
+pub fn serve(
+    data: &DataDir,
+    board: super::board::BoardState,
+    proposals: super::proposals::Proposals,
+) -> BusShutdown {
     let shutdown = CancellationToken::new();
     let (endpoint, handler, stop) = (
         data.socket(),
-        Arc::new(BusHandler::new(bus.clone())),
+        Arc::new(BusHandler::new(board).with_proposals(proposals)),
         shutdown.clone(),
     );
     tauri::async_runtime::spawn(async move {
@@ -119,7 +129,7 @@ pub fn setup(
             tracing::error!(%error, "barramento indisponível");
         }
     });
-    (bus, BusShutdown(shutdown))
+    BusShutdown(shutdown)
 }
 
 fn bus_error(error: aisense_core::bus::BusError) -> CommandError {
@@ -159,6 +169,39 @@ pub async fn bus_send(
         .await
         .map_err(bus_error)?;
     Ok(sent.into_iter().map(|r| r.message.id).collect())
+}
+
+/// Canais da equipe com os inscritos (F07-05).
+#[tauri::command]
+pub async fn channels_list(
+    bus: State<'_, Bus>,
+    team_id: TeamId,
+) -> Result<Vec<ChannelInfo>, CommandError> {
+    bus.channels(&team_id).await.map_err(bus_error)
+}
+
+/// Cria ou atualiza: tópico e inscritos (`@handle`; vazio = aberto à equipe toda).
+#[tauri::command]
+pub async fn channel_save(
+    bus: State<'_, Bus>,
+    team_id: TeamId,
+    slug: String,
+    topic: String,
+    members: Vec<String>,
+) -> Result<ChannelInfo, CommandError> {
+    bus.save_channel(&team_id, &slug, &topic, &members)
+        .await
+        .map_err(bus_error)
+}
+
+/// Apaga o canal e as mensagens dele.
+#[tauri::command]
+pub async fn channel_delete(
+    bus: State<'_, Bus>,
+    team_id: TeamId,
+    slug: String,
+) -> Result<(), CommandError> {
+    bus.delete_channel(&team_id, &slug).await.map_err(bus_error)
 }
 
 /// Não lidas por agente da equipe.

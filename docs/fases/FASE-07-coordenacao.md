@@ -12,7 +12,7 @@ A vista Fluxo mostra as mensagens trafegando ao vivo.
 
 ## Tarefas
 
-### [ ] F07-01 — Skill `coordenador` completa
+### [~] F07-01 — Skill `coordenador` completa
 Ensina a quebrar objetivo em cartões com dependências, atribuir por papel, acompanhar o quadro,
 consolidar o resultado — e, principalmente, **quando não delegar** (trabalho trivial é dele mesmo)
 e como escalar para o humano quando trava.
@@ -20,36 +20,82 @@ e como escalar para o humano quando trava.
 [01 — Visão](../01-visao-produto.md#cu-2--coordenador-distribuindo-trabalho) de ponta a ponta.
 Depende de F06-05.
 
-### [ ] F07-02 — Propostas do coordenador
+> Feito em parte: `skills/coordenador/SKILL.md` v2 — "o quadro é a fonte da verdade" na primeira
+> linha; quebra em cartões com checklist e `--blocked-by`, atribuição por papel respeitando WIP,
+> quando não delegar (trivial, decisão de produto, estrutura → `aisense propose`), acompanhar com
+> `task watch`/`board`, escalar com o que tentou e a recomendação, fechar o ciclo com resumo e notas.
+> Teste novo (`aisense-ipc/tests/skills_commands.rs`): todo comando citado nas skills embutidas existe
+> na CLI. **Falta:** rodar o CU-2 com um coordenador de verdade (claude/codex) numa máquina com os
+> runtimes — as peças (quadro, dependências, avisos, watch) estão cobertas pelos testes da Fase 06.
+
+### [x] F07-02 — Propostas do coordenador
 Ações estruturais (criar agente, mudar autonomia, editar skill, alterar colunas) viram **proposta**
 na UI com [Aceitar]/[Recusar] — nunca execução direta.
 **Aceite:** agente tentando criar outro agente recebe erro do barramento e a proposta aparece na UI.
 Depende de F06-05.
 
-### [ ] F07-03 — Vista Fluxo (T4.3)
+> Feito: `aisense-core/src/proposal/` (`ProposalAction`: criar agente, autonomia, skill,
+> colunas; `ProposalService::{propose, list, decide}`), migração 0007, `aisense propose ...` e
+> `aisense_propose` respondem `needs_approval` com o id; o humano recebe aviso na linha do tempo e
+> o `ProposalsBanner` na Sala da Equipe (Aceitar/Recusar, evento `proposal:changed`). Aceitar
+> cria o agente / muda a autonomia pelo mesmo core da UI; quem propôs recebe a decisão. Teste de
+> ponta a ponta no socket: o agente pede para criar `@qa`, recebe o erro, a equipe continua com 2
+> agentes e a proposta fica pendente.
+
+### [x] F07-03 — Vista Fluxo (T4.3)
 Canvas com `@xyflow/react`: nós de agente e de canal, arestas animadas por mensagem, tracejado com
 contagem regressiva para `ask` pendente, aresta vermelha para falha, layout automático (dagre) com
 posição manual persistida, filtro por janela de tempo.
 **Aceite:** com 6 agentes trocando mensagens, o canvas mantém ≥50 fps. Depende de F05-11.
 
-### [ ] F07-04 — Cartões no canvas
+> Feito: `features/flow/FlowView.tsx` (vista **Fluxo** da Sala, `⌘G`), `@xyflow/react` (já no
+> `docs/03-stack`). Nós de agente (cor, estado, última fala em 2 linhas; duplo clique abre o
+> terminal em Foco) e de canal (hexágono, contagem); arestas agregadas por par (`flowModel.ts`):
+> espessura pelo volume, animadas por 4 s depois de cada mensagem, tracejadas com contagem
+> regressiva para `ask` pendente, vermelhas com entrega falha/expirada (`Receipts.failed` novo).
+> Layout em camadas próprio (sem dagre: grafo pequeno, sem dependência nova) com posição manual
+> salva em `teams.layout.flow.positions`; "Auto-organizar", "Congelar" e janela 5 min/30 min/2 h/
+> tudo. Banco `#/dev/flow` (6 agentes, 1 mensagem a cada 150 ms): 56–60 fps no Chromium headless.
+> Falta conferir na janela real com GPU.
+
+### [x] F07-04 — Cartões no canvas
 Nó de agente mostra o cartão em que ele está trabalhando; clicar abre o detalhe.
 Aresta pontilhada liga agente ao cartão.
 **Aceite:** mover um cartão no quadro atualiza o canvas em <300 ms. Depende de F07-03, F06-08.
 
-### [ ] F07-05 — Canais
+> Feito: o cartão em andamento de cada agente (coluna `active`, o mais recente) vira um nó ao lado
+> dele, ligado por aresta pontilhada; clicar abre o `CardDetailPanel`. `board:changed` relê o quadro
+> e o canvas acompanha (teste: cartão saindo de Fazendo some do canvas em menos de 300 ms).
+
+### [x] F07-05 — Canais
 CRUD de canais, inscrição de agentes, `aisense send #canal`, filtro na timeline, nó no canvas.
 **Aceite:** o caso CU-3 (pesquisa paralela com síntese) funciona via canal. Depende de F05-02.
 
-### [ ] F07-06 — Paleta de comandos (T10)
+> Feito: `channel_members` (migração 0006) e regra de roteamento: com inscritos, só eles
+> recebem; sem inscritos, a equipe toda (como antes). `BusService::{channels, save_channel,
+> delete_channel, subscribe_channel}`; CLI `aisense channels|join|leave`, MCP `aisense_channels`,
+> comandos `channels_list|channel_save|channel_delete` e o diálogo "Canais" na linha do tempo
+> (tópico, inscritos, apagar); canais entram no filtro De/para e nos destinos do compositor.
+> Teste do CU-3: quatro pesquisadores publicam em `#pesquisa`, o sintetizador recebe os 4 e quem
+> está fora não recebe nada. O nó de canal no canvas entra com a F07-03.
+
+### [x] F07-06 — Paleta de comandos (T10)
 `cmdk` com navegação, criação, controle de agentes, envio de mensagem, operações do quadro,
 troca de vista e configurações. Busca difusa e recentes no topo.
 **Aceite:** toda ação principal é alcançável por `⌘K` sem mouse. Depende de F03-08.
 
+> Feito: `cmdk` (já no `docs/03-stack`) em `features/palette/`: `⌘K` no shell, ações globais +
+> ações registradas pela tela aberta (`usePaletteActions`), busca difusa, 5 recentes no topo,
+> atalho à direita, `> enviar @agente texto`. Na Sala da Equipe: as 5 vistas, equipe
+> (iniciar/parar/reiniciar), cada agente (iniciar/parar/reiniciar/ir para o terminal), novo agente,
+> novo cartão (abre o diálogo do quadro), notas e comandos. Teste: digitar "fluxo" + Enter troca a
+> vista sem mouse, o usado aparece em Recentes, e o envio chega ao barramento.
+
 ## Critérios de saída
 - [ ] Um coordenador coordena 4 agentes até concluir um objetivo, usando o quadro como instrumento
-- [ ] Canvas mostra agentes, mensagens e cartões em tempo real
-- [ ] Nenhum agente executa ação estrutural sem aprovação humana
+  (depende de runtimes reais; skill e ferramentas prontas)
+- [x] Canvas mostra agentes, mensagens e cartões em tempo real
+- [x] Nenhum agente executa ação estrutural sem aprovação humana
 
 ## Riscos
 | Risco | Mitigação |

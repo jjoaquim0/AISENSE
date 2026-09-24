@@ -64,6 +64,13 @@ Nenhum agente pode, sozinho:
 O agente `@coordenador` **propõe** ("sugiro criar um `@qa`") e a UI mostra a proposta com
 [Aceitar] / [Recusar]. Isso é deliberado: agente que cria agente é como recursão sem caso base.
 
+Como funciona (F07-02): `aisense propose agent|autonomy|skill|columns ... --reason "..."` (MCP:
+`aisense_propose`) grava a proposta (tabela `proposals`) e responde com o erro `needs_approval` —
+a ação não acontece. Não existe operação do barramento que crie agente, mude autonomia, edite skill
+ou mexa em colunas: o único caminho é a proposta. Aceitar executa criar agente e mudar autonomia;
+em skill e colunas registra que você concorda e vai editar. Quem propôs recebe a decisão como
+mensagem de sistema.
+
 ## Atualizações
 
 Auto-update assinado (Tauri updater) com chave mantida fora do repositório.

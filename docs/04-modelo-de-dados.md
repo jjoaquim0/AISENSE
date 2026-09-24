@@ -99,6 +99,22 @@ CREATE TABLE channels (
   UNIQUE (team_id, slug)
 );
 
+-- 0007 (F07-02): propostas de ações estruturais (docs/11). `action` é JSON; `state`
+-- pending | accepted | rejected; decidir só vale uma vez.
+CREATE TABLE proposals (
+  id TEXT PRIMARY KEY, team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+  proposed_by TEXT REFERENCES agents(id) ON DELETE SET NULL, action TEXT NOT NULL,
+  reason TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'pending', created_at INTEGER NOT NULL,
+  decided_at INTEGER, decision_note TEXT
+);
+
+-- 0006 (F07-05): inscritos. Canal sem linhas aqui é aberto (vai para a equipe toda).
+CREATE TABLE channel_members (
+  channel_id TEXT NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+  agent_id   TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+  PRIMARY KEY (channel_id, agent_id)
+);
+
 CREATE TABLE messages (                  -- recriada na migração 0004 (F05-02)
   id          TEXT PRIMARY KEY,            -- ULID monotônico: a ordem do id é a do tempo
   team_id     TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
@@ -135,6 +151,10 @@ CREATE INDEX idx_deliveries_agent   ON deliveries(agent_id, message_id);   -- ca
 CREATE INDEX idx_deliveries_pending ON deliveries(agent_id, state) WHERE state IN ('pending', 'delivered');
 
 -- ───────────────────────────── TAREFAS ─────────────────────────────────
+-- Os cartões do quadro. A migração 0005 (Fase 06) acrescenta column_id, priority, labels,
+-- checklist, links, block_reason, version, archived_at, approved_by/at e column_since, e as
+-- tabelas boards, columns, task_dependencies, task_comments e task_activity: ver o esquema
+-- completo em 13-quadro-kanban.md. `status` fica só para as tarefas de antes do quadro.
 CREATE TABLE tasks (
   id          TEXT PRIMARY KEY,
   team_id     TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,

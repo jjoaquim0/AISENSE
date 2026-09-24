@@ -7,6 +7,10 @@
 use std::collections::BTreeMap;
 
 use aisense_core::agent::{Agent, AgentDraft, DeliveryMode, Handle, RestartPolicy, Workbench};
+use aisense_core::board::{
+    ensure_board, Activity, Actor, BoardRepository, Card, CardPriority, CardQuery, CardWrite,
+    ChecklistItem, Comment, WriteGuard,
+};
 use aisense_core::bus::{
     route, Address, BusRepository, Channel, Delivery, DeliveryState, InboxQuery, MessageKind,
     Outgoing, Sender, Target,
@@ -18,7 +22,10 @@ use aisense_core::repo::{
 };
 use aisense_core::skill::{parse_skill, Skill, SkillSource};
 use aisense_core::team::{Team, TeamDraft};
-use aisense_core::{AgentColor, AgentId, ChannelId, MessageId, SessionId, TeamId};
+use aisense_core::{
+    ActivityId, AgentColor, AgentId, CardId, ChannelId, ColumnId, CommentId, MessageId, SessionId,
+    TeamId,
+};
 use aisense_store::Store;
 
 trait Repo:
@@ -28,6 +35,8 @@ trait Repo:
     + SkillRepository
     + BusRepository
     + TokenRepository
+    + BoardRepository
+    + aisense_core::proposal::ProposalRepository
 {
 }
 impl<T> Repo for T where
@@ -37,6 +46,8 @@ impl<T> Repo for T where
         + SkillRepository
         + BusRepository
         + TokenRepository
+        + BoardRepository
+        + aisense_core::proposal::ProposalRepository
 {
 }
 
@@ -755,6 +766,397 @@ async fn tokens_live_with_the_session(repo: impl Repo) {
     assert_eq!(repo.find_token("tok-3", 500).await.unwrap(), None);
 }
 
+// ───────────────────────────── quadro (F06-02) ─────────────────────────────
+
+fn card(team: &Team, column: &ColumnId, title: &str, position: i64) -> Card {
+    Card {
+        id: CardId::new(),
+        team_id: team.id.clone(),
+        column_id: column.clone(),
+        title: title.into(),
+        body: "corpo".into(),
+        assignee: None,
+        created_by: None,
+        parent_id: None,
+        position,
+        priority: CardPriority::Normal,
+        labels: vec![],
+        checklist: vec![],
+        links: vec![],
+        block_reason: None,
+        version: 1,
+        archived_at: None,
+        approved_by: None,
+        approved_at: None,
+        column_since: 5,
+        created_at: 5,
+        updated_at: 5,
+    }
+}
+
+fn guard(version: i64) -> WriteGuard {
+    WriteGuard {
+        expected_version: version,
+        ..WriteGuard::default()
+    }
+}
+
+async fn board_round_trips_and_guards_writes(repo: impl Repo) {
+    let t = team("Squad", 1);
+    repo.create_team(&t).await.unwrap();
+    let a = add_agent(&repo, &t, "backend").await;
+    let b = add_agent(&repo, &t, "revisor").await;
+    let board = ensure_board(&repo, &t.id, 2).await.unwrap();
+    assert!(matches!(
+        repo.create_board(&board, &[]).await,
+        Err(RepoError::AlreadyExists(_))
+    ));
+    assert_eq!(repo.get_board(&t.id).await.unwrap(), Some(board.clone()));
+    let columns = repo.list_columns(&board.id).await.unwrap();
+    assert_eq!(columns.len(), 6);
+    let (todo, doing) = (columns[1].id.clone(), columns[2].id.clone());
+
+    let mut c1 = card(&t, &todo, "Migrar /users", 0);
+    c1.labels = vec!["backend".into()];
+    c1.checklist = vec![ChecklistItem {
+        text: "teste".into(),
+        done: true,
+    }];
+    c1.priority = CardPriority::High;
+    c1.created_by = Some(a.id.clone());
+    repo.insert_card(&c1).await.unwrap();
+    assert_eq!(repo.get_card(&c1.id).await.unwrap(), Some(c1.clone()));
+    assert!(matches!(
+        repo.insert_card(&c1).await,
+        Err(RepoError::AlreadyExists(_))
+    ));
+    let c2 = card(&t, &doing, "Middleware", 0);
+    repo.insert_card(&c2).await.unwrap();
+
+    // Consultas por coluna, responsável, label e estado.
+    let all = repo.list_cards(&t.id, &CardQuery::default()).await.unwrap();
+    assert_eq!(
+        all.iter().map(|c| &c.id).collect::<Vec<_>>(),
+        [&c1.id, &c2.id]
+    );
+    let by_column = CardQuery {
+        column_id: Some(doing.clone()),
+        ..CardQuery::default()
+    };
+    assert_eq!(
+        repo.list_cards(&t.id, &by_column).await.unwrap(),
+        std::slice::from_ref(&c2)
+    );
+    let by_label = CardQuery {
+        label: Some("backend".into()),
+        ..CardQuery::default()
+    };
+    assert_eq!(
+        repo.list_cards(&t.id, &by_label).await.unwrap(),
+        [c1.clone()]
+    );
+
+    // Claim: versão e "ninguém pegou" conferidos na gravação.
+    let mut claimed = c1.clone();
+    claimed.assignee = Some(a.id.clone());
+    claimed.version = 2;
+    let claim = WriteGuard {
+        require_unassigned: true,
+        ..guard(1)
+    };
+    assert_eq!(
+        repo.update_card(&claimed, &claim).await.unwrap(),
+        CardWrite::Written
+    );
+    let mut late = c1.clone();
+    late.assignee = Some(b.id.clone());
+    late.version = 2;
+    assert_eq!(
+        repo.update_card(&late, &claim).await.unwrap(),
+        CardWrite::Stale
+    );
+    let again = WriteGuard {
+        require_unassigned: true,
+        ..guard(2)
+    };
+    late.version = 3;
+    assert_eq!(
+        repo.update_card(&late, &again).await.unwrap(),
+        CardWrite::Stale
+    );
+    let mine = CardQuery {
+        assignee: Some(a.id.clone()),
+        ..CardQuery::default()
+    };
+    assert_eq!(
+        repo.list_cards(&t.id, &mine).await.unwrap(),
+        [claimed.clone()]
+    );
+    let free = CardQuery {
+        unassigned: true,
+        ..CardQuery::default()
+    };
+    assert_eq!(
+        repo.list_cards(&t.id, &free).await.unwrap(),
+        std::slice::from_ref(&c2)
+    );
+
+    // WIP por agente e total, contando os outros cartões da coluna de destino.
+    let mut c2_mine = c2.clone();
+    c2_mine.assignee = Some(a.id.clone());
+    c2_mine.version = 2;
+    repo.update_card(&c2_mine, &guard(1)).await.unwrap();
+    let mut into_doing = claimed.clone();
+    into_doing.column_id = doing.clone();
+    into_doing.version = 3;
+    let per_agent = WriteGuard {
+        wip_per_agent: Some(1),
+        ..guard(2)
+    };
+    assert_eq!(
+        repo.update_card(&into_doing, &per_agent).await.unwrap(),
+        CardWrite::WipFull
+    );
+    let total = WriteGuard {
+        wip_limit: Some(2),
+        ..guard(2)
+    };
+    assert_eq!(
+        repo.update_card(&into_doing, &total).await.unwrap(),
+        CardWrite::Written
+    );
+    let total_full = WriteGuard {
+        wip_limit: Some(1),
+        ..guard(2)
+    };
+    let mut c2_again = c2_mine.clone();
+    c2_again.version = 3;
+    c2_again.title = "renomeado".into();
+    assert_eq!(
+        repo.update_card(&c2_again, &total_full).await.unwrap(),
+        CardWrite::WipFull
+    );
+
+    // Dependências.
+    repo.add_dependency(&c2.id, &c1.id).await.unwrap();
+    repo.add_dependency(&c2.id, &c1.id).await.unwrap();
+    assert_eq!(
+        repo.dependencies(&t.id).await.unwrap(),
+        [(c2.id.clone(), c1.id.clone())]
+    );
+    assert!(repo.add_dependency(&c1.id, &c1.id).await.is_err());
+    repo.remove_dependency(&c2.id, &c1.id).await.unwrap();
+    assert!(repo.dependencies(&t.id).await.unwrap().is_empty());
+
+    // Comentários e histórico com autor (agente, humano, sistema).
+    for (i, author) in [
+        Actor::Agent {
+            agent_id: b.id.clone(),
+        },
+        Actor::Human,
+        Actor::System,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let at = 10 + i64::try_from(i).unwrap();
+        repo.insert_comment(&Comment {
+            id: CommentId::new(),
+            card_id: c1.id.clone(),
+            author: author.clone(),
+            body: format!("comentário {i}"),
+            created_at: at,
+        })
+        .await
+        .unwrap();
+        repo.insert_activity(&Activity {
+            id: ActivityId::new(),
+            card_id: c1.id.clone(),
+            actor: author,
+            action: "commented".into(),
+            detail: serde_json::json!({ "n": i }),
+            created_at: at,
+        })
+        .await
+        .unwrap();
+    }
+    let comments = repo.list_comments(&c1.id).await.unwrap();
+    assert_eq!(comments.len(), 3);
+    assert_eq!(comments[1].author, Actor::Human);
+    assert_eq!(
+        repo.comment_counts(&t.id).await.unwrap(),
+        [(c1.id.clone(), 3)]
+    );
+    let history = repo.list_activity(&c1.id).await.unwrap();
+    assert_eq!(history[0].detail["n"], 0);
+    assert_eq!(repo.activity_since(&t.id, 10).await.unwrap().len(), 2);
+
+    // Agente removido: cartão fica sem responsável, a autoria vira "sistema".
+    repo.delete_agent(&b.id).await.unwrap();
+    assert_eq!(
+        repo.list_comments(&c1.id).await.unwrap()[0].author,
+        Actor::System
+    );
+    repo.delete_agent(&a.id).await.unwrap();
+    assert_eq!(repo.get_card(&c1.id).await.unwrap().unwrap().assignee, None);
+
+    // Arquivado some da listagem padrão, mas não do banco.
+    let mut archived = repo.get_card(&c2.id).await.unwrap().unwrap();
+    archived.archived_at = Some(99);
+    archived.version += 1;
+    repo.update_card(&archived, &guard(archived.version - 1))
+        .await
+        .unwrap();
+    assert_eq!(
+        repo.list_cards(&t.id, &CardQuery::default())
+            .await
+            .unwrap()
+            .len(),
+        1
+    );
+    let with_archived = CardQuery {
+        include_archived: true,
+        ..CardQuery::default()
+    };
+    assert_eq!(
+        repo.list_cards(&t.id, &with_archived).await.unwrap().len(),
+        2
+    );
+
+    // Apagar a equipe leva o quadro junto.
+    repo.delete_team(&t.id).await.unwrap();
+    assert_eq!(repo.get_board(&t.id).await.unwrap(), None);
+    assert_eq!(repo.get_card(&c1.id).await.unwrap(), None);
+}
+
+async fn board_columns_are_replaced_atomically(repo: impl Repo) {
+    let t = team("Squad", 1);
+    repo.create_team(&t).await.unwrap();
+    let board = ensure_board(&repo, &t.id, 2).await.unwrap();
+    let mut columns = repo.list_columns(&board.id).await.unwrap();
+    let backlog = columns[0].id.clone();
+    let c = card(&t, &backlog, "no backlog", 0);
+    repo.insert_card(&c).await.unwrap();
+
+    // Trocar dois slugs de lugar e remover o backlog, movendo o cartão.
+    columns.remove(0);
+    columns[0].slug = "doing".into();
+    columns[1].slug = "todo".into();
+    columns.reverse();
+    for (i, col) in columns.iter_mut().enumerate() {
+        col.position = u32::try_from(i).unwrap();
+    }
+    let target = columns[0].id.clone();
+    // Sem destino para o cartão: recusado, nada muda.
+    assert!(repo
+        .replace_columns(&board.id, &columns, &[], 3)
+        .await
+        .is_err());
+    assert_eq!(repo.list_columns(&board.id).await.unwrap().len(), 6);
+    repo.replace_columns(&board.id, &columns, &[(backlog, target.clone())], 3)
+        .await
+        .unwrap();
+    let saved = repo.list_columns(&board.id).await.unwrap();
+    assert_eq!(saved, columns);
+    let moved = repo.get_card(&c.id).await.unwrap().unwrap();
+    assert_eq!(
+        (moved.column_id, moved.column_since, moved.version),
+        (target, 3, 2)
+    );
+}
+
+async fn channel_members_follow_channel_and_agent(repo: impl Repo) {
+    let t = team("Squad", 1);
+    repo.create_team(&t).await.unwrap();
+    let other = team("Outra", 1);
+    repo.create_team(&other).await.unwrap();
+    let a = add_agent(&repo, &t, "p1").await;
+    let b = add_agent(&repo, &t, "p2").await;
+    let stranger = add_agent(&repo, &other, "estranho").await;
+    let ch = Channel {
+        id: ChannelId::new(),
+        team_id: t.id.clone(),
+        slug: "pesquisa".into(),
+        topic: String::new(),
+        created_at: 1,
+    };
+    repo.create_channel(&ch).await.unwrap();
+    assert!(repo.channel_members(&ch.id).await.unwrap().is_empty());
+    repo.set_channel_members(&ch.id, &[a.id.clone(), b.id.clone()])
+        .await
+        .unwrap();
+    assert_eq!(repo.channel_members(&ch.id).await.unwrap().len(), 2);
+    // Agente de outra equipe não entra, e nada muda.
+    assert!(matches!(
+        repo.set_channel_members(&ch.id, std::slice::from_ref(&stranger.id))
+            .await,
+        Err(RepoError::AgentNotFound(_))
+    ));
+    repo.set_channel_topic(&ch.id, "achados").await.unwrap();
+    assert_eq!(
+        repo.channel_by_slug(&t.id, "pesquisa")
+            .await
+            .unwrap()
+            .unwrap()
+            .topic,
+        "achados"
+    );
+    repo.delete_agent(&a.id).await.unwrap();
+    assert_eq!(
+        repo.channel_members(&ch.id).await.unwrap(),
+        std::slice::from_ref(&b.id)
+    );
+    repo.delete_channel(&ch.id).await.unwrap();
+    assert!(repo
+        .channel_by_slug(&t.id, "pesquisa")
+        .await
+        .unwrap()
+        .is_none());
+    assert!(repo.channel_members(&ch.id).await.unwrap().is_empty());
+}
+
+async fn proposals_are_decided_once(repo: impl Repo) {
+    use aisense_core::proposal::{Proposal, ProposalAction, ProposalState};
+    let t = team("Squad", 1);
+    repo.create_team(&t).await.unwrap();
+    let a = add_agent(&repo, &t, "coordenador").await;
+    let p = Proposal {
+        id: aisense_core::ProposalId::new(),
+        team_id: t.id.clone(),
+        proposed_by: Some(a.id.clone()),
+        action: ProposalAction::ChangeColumns {
+            change: "coluna QA".into(),
+        },
+        reason: "falta QA".into(),
+        state: ProposalState::Pending,
+        created_at: 5,
+        decided_at: None,
+        decision_note: None,
+    };
+    repo.insert_proposal(&p).await.unwrap();
+    assert_eq!(repo.get_proposal(&p.id).await.unwrap(), Some(p.clone()));
+    assert_eq!(repo.list_proposals(&t.id, true).await.unwrap().len(), 1);
+    assert!(repo
+        .decide_proposal(&p.id, ProposalState::Rejected, 9, Some("não"))
+        .await
+        .unwrap());
+    assert!(!repo
+        .decide_proposal(&p.id, ProposalState::Accepted, 10, None)
+        .await
+        .unwrap());
+    let got = repo.get_proposal(&p.id).await.unwrap().unwrap();
+    assert_eq!(
+        (got.state, got.decided_at, got.decision_note.as_deref()),
+        (ProposalState::Rejected, Some(9), Some("não"))
+    );
+    assert!(repo.list_proposals(&t.id, true).await.unwrap().is_empty());
+    repo.delete_agent(&a.id).await.unwrap();
+    assert_eq!(
+        repo.get_proposal(&p.id).await.unwrap().unwrap().proposed_by,
+        None
+    );
+}
+
 macro_rules! contract {
     ($($name:ident),+ $(,)?) => {
         mod sqlite {
@@ -794,6 +1196,10 @@ contract!(
     bus_round_trips_messages_and_deliveries,
     bus_channels_are_unique_and_retention_prunes,
     tokens_live_with_the_session,
+    board_round_trips_and_guards_writes,
+    channel_members_follow_channel_and_agent,
+    proposals_are_decided_once,
+    board_columns_are_replaced_atomically,
 );
 
 #[tokio::test]
@@ -926,4 +1332,181 @@ async fn data_survives_closing_and_reopening() {
     let store = Store::open(&path).await.unwrap();
     assert_eq!(store.get_team(&t.id).await.unwrap(), Some(t.clone()));
     assert_eq!(store.list_agents(&t.id).await.unwrap().len(), 3);
+}
+
+#[tokio::test]
+async fn board_with_1000_cards_loads_in_under_20ms() {
+    // Aceite da F06-02: o quadro inteiro (cartões, dependências, comentários) de uma vez.
+    let store = Store::open_in_memory().await.unwrap();
+    let t = team("Grande", 1);
+    store.create_team(&t).await.unwrap();
+    let a = add_agent(&store, &t, "backend").await;
+    let board = ensure_board(&store, &t.id, 1).await.unwrap();
+    let columns = store.list_columns(&board.id).await.unwrap();
+    let mut ids = Vec::new();
+    for i in 0..1_000i64 {
+        let column = &columns[usize::try_from(i).unwrap() % columns.len()].id;
+        let mut c = card(&t, column, &format!("Cartão {i}"), i);
+        c.labels = vec!["backend".into(), format!("l{}", i % 7)];
+        c.checklist = vec![ChecklistItem {
+            text: "item".into(),
+            done: i % 2 == 0,
+        }];
+        if i % 3 == 0 {
+            c.assignee = Some(a.id.clone());
+        }
+        store.insert_card(&c).await.unwrap();
+        ids.push(c.id);
+    }
+    for pair in ids.windows(2).step_by(10) {
+        store.add_dependency(&pair[1], &pair[0]).await.unwrap();
+    }
+    // Primeira leitura prepara as instruções (como na linha do tempo, F05-02); mede a segunda.
+    store
+        .list_cards(&t.id, &CardQuery::default())
+        .await
+        .unwrap();
+    let started = std::time::Instant::now();
+    let cards = store
+        .list_cards(&t.id, &CardQuery::default())
+        .await
+        .unwrap();
+    let deps = store.dependencies(&t.id).await.unwrap();
+    let counts = store.comment_counts(&t.id).await.unwrap();
+    let elapsed = started.elapsed();
+    assert_eq!(cards.len(), 1_000);
+    assert_eq!(deps.len(), 100);
+    assert!(counts.is_empty());
+    // O aceite (<20 ms) vale para o binário otimizado (~7 ms medidos); sem otimização o
+    // parse do JSON sozinho leva ~12 ms, então o teto aqui é folgado só no build de debug.
+    let limit = if cfg!(debug_assertions) { 80 } else { 20 };
+    assert!(elapsed.as_millis() < limit, "quadro levou {elapsed:?}");
+}
+
+#[tokio::test]
+async fn board_migration_runs_on_an_existing_database() {
+    // Banco de um usuário na versão 4, com uma equipe e uma tarefa antiga (só `status`).
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("aisense.db");
+    let t = team("Antiga", 1);
+    {
+        use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
+        let options = SqliteConnectOptions::new()
+            .filename(&path)
+            .create_if_missing(true);
+        let pool = SqlitePoolOptions::new()
+            .connect_with(options)
+            .await
+            .unwrap();
+        let until_4 = sqlx::migrate::Migrator {
+            migrations: std::borrow::Cow::Owned(
+                aisense_store::MIGRATOR
+                    .iter()
+                    .filter(|m| m.version <= 4)
+                    .cloned()
+                    .collect(),
+            ),
+            ..sqlx::migrate::Migrator::DEFAULT
+        };
+        until_4.run(&pool).await.unwrap();
+        sqlx::query("INSERT INTO teams (id, name, workdir, created_at, updated_at) VALUES (?, 'Antiga', '/tmp', 1, 1)")
+            .bind(t.id.as_str())
+            .execute(&pool)
+            .await
+            .unwrap();
+        for (id, status) in [
+            ("tsk_old1", "doing"),
+            ("tsk_old2", "cancelled"),
+            ("tsk_old3", "estranho"),
+        ] {
+            sqlx::query("INSERT INTO tasks (id, team_id, title, status, created_at, updated_at) VALUES (?, ?, 'antiga', ?, 7, 7)")
+                .bind(id)
+                .bind(t.id.as_str())
+                .bind(status)
+                .execute(&pool)
+                .await
+                .unwrap();
+        }
+        pool.close().await;
+    }
+    let store = Store::open(&path).await.unwrap();
+    let board = ensure_board(&store, &t.id, 9).await.unwrap();
+    let columns = store.list_columns(&board.id).await.unwrap();
+    let slug_of = |c: &Card| {
+        columns
+            .iter()
+            .find(|col| col.id == c.column_id)
+            .unwrap()
+            .slug
+            .clone()
+    };
+    let cards = store
+        .list_cards(&t.id, &CardQuery::default())
+        .await
+        .unwrap();
+    let placed: Vec<(String, String)> = cards
+        .iter()
+        .map(|c| (c.id.to_string(), slug_of(c)))
+        .collect();
+    assert_eq!(
+        placed,
+        [
+            ("tsk_old3".to_owned(), "todo".to_owned()),
+            ("tsk_old1".to_owned(), "doing".to_owned()),
+            ("tsk_old2".to_owned(), "done".to_owned()),
+        ]
+    );
+    assert_eq!(cards[0].version, 1);
+    assert_eq!(cards[0].column_since, 7);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
+async fn claim_is_atomic_across_connections() {
+    // F06-03 no SQLite de verdade: arquivo com WAL e várias conexões no pool.
+    let dir = tempfile::tempdir().unwrap();
+    let store = Store::open(&dir.path().join("aisense.db")).await.unwrap();
+    let t = team("Squad", 1);
+    store.create_team(&t).await.unwrap();
+    let mut agents = Vec::new();
+    for i in 0..8 {
+        agents.push(add_agent(&store, &t, &format!("agente{i}")).await.id);
+    }
+    let board = ensure_board(&store, &t.id, 1).await.unwrap();
+    let todo = store.list_columns(&board.id).await.unwrap()[1].id.clone();
+    let c = card(&t, &todo, "disputado", 0);
+    store.insert_card(&c).await.unwrap();
+    let barrier = std::sync::Arc::new(tokio::sync::Barrier::new(8));
+    let mut tasks = Vec::new();
+    for agent in agents {
+        let (store, c, barrier) = (store.clone(), c.clone(), barrier.clone());
+        tasks.push(tokio::spawn(async move {
+            let mut mine = c.clone();
+            mine.assignee = Some(agent);
+            mine.version = 2;
+            barrier.wait().await;
+            store
+                .update_card(
+                    &mine,
+                    &WriteGuard {
+                        require_unassigned: true,
+                        ..guard(1)
+                    },
+                )
+                .await
+                .unwrap()
+        }));
+    }
+    let mut results = Vec::new();
+    for task in tasks {
+        results.push(task.await.unwrap());
+    }
+    assert_eq!(
+        results.iter().filter(|r| **r == CardWrite::Written).count(),
+        1,
+        "{results:?}"
+    );
+    assert_eq!(
+        results.iter().filter(|r| **r == CardWrite::Stale).count(),
+        7
+    );
 }

@@ -1,12 +1,14 @@
-import { Clock, Send, ShieldAlert } from 'lucide-react';
+import { Clock, Hash, Send, ShieldAlert } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui';
 import { busApi, onBusMessage, onBusRead } from '@/features/bus/api';
 import { errorMessage } from '@/features/teams/api';
 import { cn } from '@/lib/cn';
 import type { Agent } from '@/types/generated/Agent';
+import type { ChannelInfo } from '@/types/generated/ChannelInfo';
 import type { MessageView } from '@/types/generated/MessageView';
 import type { TeamId } from '@/types/generated/TeamId';
+import { ChannelsDialog } from './ChannelsDialog';
 import {
   applyFilter,
   askRemaining,
@@ -44,6 +46,8 @@ export function TimelineView({ teamId, agents }: TimelineViewProps) {
   const [problem, setProblem] = useState<string | null>(null);
   const [filter, setFilter] = useState<TimelineFilter>({ agent: null, onlyConversation: false });
   const [now, setNow] = useState(() => Date.now());
+  const [channels, setChannels] = useState<ChannelInfo[]>([]);
+  const [channelsOpen, setChannelsOpen] = useState(false);
   const list = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
   const prepending = useRef<number | null>(null);
@@ -81,6 +85,13 @@ export function TimelineView({ teamId, agents }: TimelineViewProps) {
       void offRead.then((stop) => stop());
     };
   }, [teamId, loadLatest]);
+
+  useEffect(() => {
+    busApi
+      .channels(teamId)
+      .then(setChannels)
+      .catch(() => {});
+  }, [teamId]);
 
   const loadOlder = () => {
     const oldest = messages[0];
@@ -121,12 +132,18 @@ export function TimelineView({ teamId, agents }: TimelineViewProps) {
   }, [pendingAsks]);
 
   const handles = agents.map((a) => a.handle);
+  // Canais conhecidos: os cadastrados e os que já aparecem na conversa.
+  const channelSlugs = useMemo(() => {
+    const seen = new Set(channels.map((c) => `#${c.channel.slug}`));
+    for (const m of messages) if (m.to.startsWith('#')) seen.add(m.to);
+    return [...seen].sort();
+  }, [channels, messages]);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex items-center gap-2 border-b border-subtle px-3 py-1.5 text-caption">
         <label className="flex items-center gap-1 text-muted">
-          Agente
+          De/para
           <select
             value={filter.agent ?? ''}
             onChange={(e) => setFilter((f) => ({ ...f, agent: e.target.value || null }))}
@@ -139,6 +156,11 @@ export function TimelineView({ teamId, agents }: TimelineViewProps) {
               </option>
             ))}
             <option value="@voce">@voce</option>
+            {channelSlugs.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
           </select>
         </label>
         <label className="flex items-center gap-1 text-muted">
@@ -149,6 +171,9 @@ export function TimelineView({ teamId, agents }: TimelineViewProps) {
           />
           só conversa
         </label>
+        <Button size="sm" variant="ghost" onClick={() => setChannelsOpen(true)}>
+          <Hash size={12} /> Canais
+        </Button>
         <span className="ml-auto text-muted tabular-nums">{visible.length} mensagens</span>
       </div>
 
@@ -195,7 +220,17 @@ export function TimelineView({ teamId, agents }: TimelineViewProps) {
           {problem}
         </p>
       )}
-      <Composer teamId={teamId} options={destinations(handles, messages)} />
+      <Composer
+        teamId={teamId}
+        options={[...new Set([...destinations(handles, messages), ...channelSlugs])]}
+      />
+      <ChannelsDialog
+        teamId={teamId}
+        agents={agents}
+        open={channelsOpen}
+        onOpenChange={setChannelsOpen}
+        onChanged={setChannels}
+      />
     </div>
   );
 }

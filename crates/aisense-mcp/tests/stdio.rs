@@ -78,7 +78,7 @@ async fn ferramentas_mcp_conversam_com_o_barramento() {
     let shutdown = CancellationToken::new();
     let (ep, stop) = (endpoint.clone(), shutdown.clone());
     tokio::spawn(async move {
-        serve(&ep, Arc::new(BusHandler::new(bus)), stop)
+        serve(&ep, Arc::new(BusHandler::from_bus(bus)), stop)
             .await
             .unwrap()
     });

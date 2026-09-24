@@ -192,7 +192,10 @@ animam quando trafegam. É a melhor forma de entender "quem está falando com qu
 - Aresta = uma mensagem. Espessura pela frequência, animação de partícula ao trafegar,
   tracejada para `ask` pendente (com contador regressivo do timeout), vermelha para entrega falha.
 - Nós de canal aparecem como hexágonos.
-- Construído com `@xyflow/react`; layout automático (dagre) com posição manual persistida.
+- Construído com `@xyflow/react`; layout automático em camadas (quem manda acima de quem recebe;
+  implementação própria, sem dagre) com posição manual persistida em `teams.layout.flow`.
+- O cartão em andamento de cada agente aparece ao lado dele (aresta pontilhada); clicar abre o
+  detalhe do cartão.
 
 ### T4.4 — Timeline
 
@@ -301,7 +304,8 @@ e a barra inferior mostra quantos agentes usam e quais precisarão reiniciar.
 
 ## T8 — Quadro Kanban ⭐
 
-Uma tela por equipe. **Especificação completa em [13 — Quadro Kanban](13-quadro-kanban.md)** —
+Uma tela por equipe — é a quarta vista da Sala da Equipe (Grade · Foco · Mensagens · **Quadro**,
+alternadas por `⌘G`). **Especificação completa em [13 — Quadro Kanban](13-quadro-kanban.md)** —
 aqui fica só o resumo visual.
 
 ```
@@ -325,6 +329,13 @@ aqui fica só o resumo visual.
 - Detalhe do cartão: Markdown, checklist, thread de comentários com agentes, dependências
   navegáveis, links de PR/commit e histórico imutável.
 - Tudo alimentado igualmente pela UI e por `aisense task ...` / ferramentas MCP.
+- Na interface os ícones são os do Lucide (seta para cima, elo, caixa marcada, balão, alerta),
+  com o mesmo significado dos símbolos acima.
+- Arrastar para a coluna de bloqueio pede o motivo antes de mover; arrastar para coluna cheia
+  mostra o erro do core (o mesmo da CLI) e o cartão volta.
+- Editores de colunas e de automações (formulário, com o TOML gerado à vista); remover coluna
+  com cartões pede o destino deles. Revisão: "Aprovar" e "Rejeitar" (motivo obrigatório) no
+  detalhe do cartão em coluna de revisão.
 
 ---
 
@@ -347,6 +358,12 @@ aqui fica só o resumo visual.
 Uma barra de busca que faz tudo. Categorias: ir para equipe/agente, criar, iniciar/parar,
 enviar mensagem (`> enviar @backend ...`), aplicar skill, mudar vista, abrir configuração.
 Busca difusa, resultados recentes no topo, atalho exibido à direita de cada item.
+
+Como está feito (F07-06): `features/palette/`. O shell registra as ações globais (ir para equipe,
+skills, nova equipe, tema, painéis); a tela aberta registra as dela com `usePaletteActions` — a
+Sala da Equipe põe vistas, iniciar/parar/reiniciar equipe e cada agente, ir para o terminal,
+novo agente, novo cartão, notas e comandos. `> enviar @agente texto` (ou `>#canal texto`) manda
+pelo barramento como `@voce`. Os recentes ficam no navegador (conveniência local).
 
 ---
 

@@ -13,6 +13,13 @@ vi.mock('@/features/bus/api', () => ({
     timeline: (...a: unknown[]) => timeline(...a),
     send: (...a: unknown[]) => send(...a),
     resume: vi.fn(),
+    channels: () =>
+      Promise.resolve([
+        {
+          channel: { id: 'c1', teamId: 't1', slug: 'pesquisa', topic: '', createdAt: 0 },
+          members: [],
+        },
+      ]),
   },
   onBusMessage: (handler: (event: BusMessageEvent) => void) => {
     emit = handler;
@@ -36,7 +43,7 @@ const msg = (id: string, over: Partial<MessageView> = {}): MessageView => ({
   replyTo: null,
   meta: { priority: 'normal', attachments: [] },
   createdAt: 1_000,
-  receipts: { recipients: 1, delivered: 0, read: 0 },
+  receipts: { recipients: 1, delivered: 0, read: 0, failed: 0 },
   ...over,
 });
 
@@ -44,7 +51,7 @@ describe('regras da linha do tempo', () => {
   it('junta sem repetir, na ordem do id, e a versão nova vence', () => {
     const merged = model.mergeMessages(
       [msg('m2'), msg('m1')],
-      [msg('m3'), msg('m1', { receipts: { recipients: 1, delivered: 1, read: 1 } })],
+      [msg('m3'), msg('m1', { receipts: { recipients: 1, delivered: 1, read: 1, failed: 0 } })],
     );
     expect(merged.map((m) => m.id)).toEqual(['m1', 'm2', 'm3']);
     expect(merged[0]?.receipts.read).toBe(1);
@@ -70,10 +77,14 @@ describe('regras da linha do tempo', () => {
     expect(model.applyFilter(all, { agent: '@revisor', onlyConversation: false })).toHaveLength(1);
     expect(model.applyFilter(all, { agent: null, onlyConversation: true })).toHaveLength(2);
     expect(
-      model.receiptLabel(msg('x', { receipts: { recipients: 3, delivered: 2, read: 1 } })),
+      model.receiptLabel(
+        msg('x', { receipts: { recipients: 3, delivered: 2, read: 1, failed: 0 } }),
+      ),
     ).toBe('lida por 1 de 3');
     expect(
-      model.receiptLabel(msg('y', { receipts: { recipients: 0, delivered: 0, read: 0 } })),
+      model.receiptLabel(
+        msg('y', { receipts: { recipients: 0, delivered: 0, read: 0, failed: 0 } }),
+      ),
     ).toBe(null);
     expect(model.destinations(['backend'], all)).toEqual(['@all', '@backend', '#deploys']);
     expect(model.nearBottom({ scrollTop: 900, scrollHeight: 1000, clientHeight: 80 })).toBe(true);
@@ -143,5 +154,10 @@ describe('<TimelineView />', () => {
       textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })),
     );
     expect(send).toHaveBeenCalledWith('t1', ['@all'], 'parem e resumam');
+    // Canais cadastrados entram no filtro e nos destinos do compositor.
+    const options = [...container.querySelectorAll('select[aria-label="Para"] option')].map(
+      (o) => o.textContent,
+    );
+    expect(options).toContain('#pesquisa');
   });
 });

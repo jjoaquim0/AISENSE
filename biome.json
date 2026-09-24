@@ -46,6 +46,16 @@
           }
         }
       }
+    },
+    {
+      "includes": ["apps/desktop/src/features/board/**"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noThenProperty": "off"
+          }
+        }
+      }
     }
   ]
 }

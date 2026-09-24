@@ -42,10 +42,17 @@ Board (1 por equipe)
 |---|---|---|---|
 | `backlog` | Backlog | — | Ideias e trabalho ainda não priorizado |
 | `todo` | A fazer | — | Pronto para alguém pegar. **É daqui que o agente puxa trabalho** |
-| `doing` | Fazendo | 1 por agente | Em execução. WIP limitado evita agente picando tarefa |
+| `doing` | Fazendo | 1 por agente (`wip_per_agent`) | Em execução. WIP limitado evita agente picando tarefa |
 | `blocked` | Bloqueada | — | Requer algo de fora. Exige motivo obrigatório |
 | `review` | Revisão | — | Feito, aguardando outro agente ou você |
 | `done` | Feita | — | Concluída |
+
+Uma coluna tem dois limites independentes: `wip_limit` (cartões na coluna, somando todos) e
+`wip_per_agent` (cartões de um mesmo responsável). Os dois são conferidos na mesma instrução que
+grava o cartão, então dois agentes não passam juntos pelo último lugar.
+
+IDs no texto: `aisense board` mostra o id curto (`tsk_` + os 6 últimos caracteres); toda operação
+`aisense task` aceita o id inteiro, o curto ou só o final, desde que não seja ambíguo.
 
 Colunas são configuráveis por equipe (criar, renomear, reordenar, remover, mudar WIP), mas toda
 coluna tem um **tipo semântico** (`intake · ready · active · blocked · review · terminal`) para que
@@ -130,7 +137,8 @@ Mover para uma coluna cheia falha com mensagem acionável:
 
 ### Dependências são verificadas
 Mover para `doing` um cartão com dependência aberta gera aviso (não bloqueio) informando qual
-cartão falta. Ciclos de dependência são recusados na criação.
+cartão falta — a operação dá certo e devolve o aviso `blocked_by_open` junto. `task next` não
+oferece cartão com dependência aberta. Ciclos de dependência são recusados na criação.
 
 ### Histórico é imutável
 Toda mudança grava uma linha em `activity` com autor (agente ou humano), timestamp e diff.
@@ -231,13 +239,14 @@ CREATE TABLE boards (
 );
 
 CREATE TABLE columns (
-  id        TEXT PRIMARY KEY,
-  board_id  TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
-  slug      TEXT NOT NULL,
-  name      TEXT NOT NULL,
-  kind      TEXT NOT NULL,                  -- intake|ready|active|blocked|review|terminal
-  wip_limit INTEGER,                        -- NULL = sem limite
-  position  INTEGER NOT NULL,
+  id            TEXT PRIMARY KEY,
+  board_id      TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+  slug          TEXT NOT NULL,
+  name          TEXT NOT NULL,
+  kind          TEXT NOT NULL,              -- intake|ready|active|blocked|review|terminal
+  wip_limit     INTEGER,                    -- NULL = sem limite
+  wip_per_agent INTEGER,                    -- NULL = sem limite por agente
+  position      INTEGER NOT NULL,
   UNIQUE (board_id, slug)
 );
 
@@ -252,6 +261,7 @@ ALTER TABLE tasks ADD COLUMN version    INTEGER NOT NULL DEFAULT 1;     -- trava
 ALTER TABLE tasks ADD COLUMN archived_at INTEGER;
 ALTER TABLE tasks ADD COLUMN approved_by  TEXT REFERENCES agents(id) ON DELETE SET NULL;
 ALTER TABLE tasks ADD COLUMN approved_at  INTEGER;
+ALTER TABLE tasks ADD COLUMN column_since INTEGER NOT NULL DEFAULT 0;   -- card_stale, "há 18min"
 
 ALTER TABLE columns ADD COLUMN requires_approval    INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE columns ADD COLUMN approver_must_differ INTEGER NOT NULL DEFAULT 1;
@@ -265,9 +275,10 @@ CREATE TABLE task_dependencies (
 );
 
 CREATE TABLE task_comments (
-  id         TEXT PRIMARY KEY,
-  task_id    TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-  author     TEXT REFERENCES agents(id) ON DELETE SET NULL,  -- NULL = humano
+  id          TEXT PRIMARY KEY,
+  task_id     TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  author_kind TEXT NOT NULL DEFAULT 'human',                  -- human | agent | system
+  author      TEXT REFERENCES agents(id) ON DELETE SET NULL,  -- o agente, quando é agente
   body       TEXT NOT NULL,
   created_at INTEGER NOT NULL
 );
@@ -275,8 +286,9 @@ CREATE TABLE task_comments (
 CREATE TABLE task_activity (
   id         TEXT PRIMARY KEY,
   task_id    TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  author_kind TEXT NOT NULL DEFAULT 'human',
   author     TEXT REFERENCES agents(id) ON DELETE SET NULL,
-  action     TEXT NOT NULL,       -- created|moved|assigned|commented|blocked|done|...
+  action     TEXT NOT NULL,       -- created|moved|assigned|commented|blocked|approved|...
   detail     TEXT NOT NULL DEFAULT '{}',
   created_at INTEGER NOT NULL
 );
@@ -324,3 +336,9 @@ A qualidade da mensagem de erro define se a IA se recupera sozinha ou trava:
 | `dependency_cycle` | `Isso criaria um ciclo: tsk_A → tsk_B → tsk_A.` |
 | `self_approval` | `Você fez este cartão, então não pode aprová-lo. Peça a @revisor ou @arquiteto.` |
 | `gate_failed` | `O comando 'test' falhou (exit 1). A saída está anexada ao cartão.` |
+| `approval_required` | `Feita exige aprovação para entrar.` (dica: mandar para revisão; quem revisa usa `task approve`) |
+| `unknown_card` | `O cartão tsk_x não existe nesta equipe.` |
+
+`blocked_by_open` não é erro: vem como aviso na resposta de `move`/`claim` (ver "Dependências são
+verificadas"). Autoria em comentários e histórico: `author_kind` distingue você (`human`) do
+próprio AISENSE (`system`: automação, gate); agente removido vira `system`.

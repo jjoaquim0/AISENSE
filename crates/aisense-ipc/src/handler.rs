@@ -4,28 +4,75 @@
 use std::path::Path;
 use std::time::Duration;
 
-use aisense_core::bus::{BusError, BusService, BusStore, Identity, Sender};
+use std::sync::Arc;
+
+use aisense_core::board::{
+    render_board, render_card, render_cards, render_comment, render_moved, render_next, Actor,
+    BoardError, BoardService, BoardStore, NoBoardObserver, NoGate,
+};
+use aisense_core::bus::{BusError, BusService, Identity, Sender};
 use aisense_core::notes::{NoteError, NoteSave, TeamNotes};
+use aisense_core::now_ms;
+use aisense_core::proposal::{
+    NoProposalObserver, ProposalError, ProposalRepository, ProposalService,
+};
 use serde_json::json;
 
-use crate::protocol::{codes, NotesOp, Request, Response};
+use crate::protocol::{codes, NotesOp, Request, Response, TaskOp};
 use crate::transport::Handler;
 
 /// Timeout padrão de `wait` quando o cliente não diz (`docs/07`).
 pub const WAIT_DEFAULT: Duration = Duration::from_secs(300);
 
+/// Timeout padrão de `task watch` (plantão).
+pub const WATCH_DEFAULT: Duration = Duration::from_secs(600);
+
 pub struct BusHandler<S> {
     bus: BusService<S>,
+    board: BoardService<S>,
+    proposals: ProposalService<S>,
 }
 
-impl<S> BusHandler<S> {
-    pub fn new(bus: BusService<S>) -> Self {
-        Self { bus }
+impl<S: BoardStore + ProposalRepository> BusHandler<S> {
+    /// O quadro traz o barramento dentro: é por ele que avisa (F06-07).
+    pub fn new(board: BoardService<S>) -> Self {
+        let proposals = ProposalService::new(board.bus().clone(), Arc::new(NoProposalObserver));
+        Self {
+            bus: board.bus().clone(),
+            board,
+            proposals,
+        }
+    }
+
+    /// Com o serviço de propostas do app (que avisa a UI).
+    pub fn with_proposals(self, proposals: ProposalService<S>) -> Self {
+        Self { proposals, ..self }
+    }
+
+    /// Sem observador do quadro nem executor de gate (testes, ferramentas).
+    pub fn from_bus(bus: BusService<S>) -> Self {
+        Self::new(BoardService::new(
+            bus,
+            Arc::new(NoBoardObserver),
+            Arc::new(NoGate),
+        ))
     }
 
     pub fn bus(&self) -> &BusService<S> {
         &self.bus
     }
+
+    pub fn board(&self) -> &BoardService<S> {
+        &self.board
+    }
+}
+
+pub fn proposal_error(error: &ProposalError) -> Response {
+    Response::error(error.code(), error.to_string(), error.hint())
+}
+
+pub fn board_error(error: &BoardError) -> Response {
+    Response::error(error.code(), error.to_string(), error.hint())
 }
 
 pub fn bus_error(error: &BusError) -> Response {
@@ -36,7 +83,7 @@ fn note_error(error: &NoteError) -> Response {
     Response::error(error.code(), error.to_string(), error.hint())
 }
 
-impl<S: BusStore + 'static> Handler for BusHandler<S> {
+impl<S: BoardStore + ProposalRepository + 'static> Handler for BusHandler<S> {
     async fn hello(&self, token: &str) -> Result<Response, Response> {
         let identity = self
             .bus
@@ -67,7 +114,7 @@ impl<S: BusStore + 'static> Handler for BusHandler<S> {
     }
 }
 
-impl<S: BusStore + 'static> BusHandler<S> {
+impl<S: BoardStore + ProposalRepository + 'static> BusHandler<S> {
     async fn dispatch(&self, me: &Identity, request: Request) -> Result<Response, Response> {
         let err = |e: BusError| bus_error(&e);
         let from = Sender::Agent {
@@ -146,6 +193,142 @@ impl<S: BusStore + 'static> BusHandler<S> {
                 Response::ok(json!({ "id": routed.message.id }))
             }
             Request::Notes(op) => self.notes(me, op).await?,
+            Request::Board { column, full } => {
+                let view = self
+                    .board
+                    .board(&me.team_id)
+                    .await
+                    .map_err(|e| board_error(&e))?;
+                if let Some(slug) = &column {
+                    aisense_core::board::column_by_slug(&view.columns, slug)
+                        .map_err(|e| board_error(&e))?;
+                }
+                let text = render_board(&view, column.as_deref(), full);
+                Response::ok(json!({ "text": text, "board": view }))
+            }
+            Request::Task(op) => self.task(me, op).await.map_err(|e| board_error(&e))?,
+            Request::Propose { action, reason } => {
+                let proposal = self
+                    .proposals
+                    .propose(me, action.clone(), &reason)
+                    .await
+                    .map_err(|e| proposal_error(&e))?;
+                // A proposta foi registrada; a ação em si é recusada até o humano decidir.
+                let described = action.describe();
+                let mut chars = described.chars();
+                let refused = ProposalError::NeedsApproval {
+                    id: proposal.id.clone(),
+                    action: chars
+                        .next()
+                        .map(|c| c.to_uppercase().chain(chars).collect())
+                        .unwrap_or_default(),
+                };
+                Response {
+                    data: serde_json::to_value(&proposal).ok(),
+                    ..proposal_error(&refused)
+                }
+            }
+            Request::Channels => Response::ok(self.bus.channels(&me.team_id).await.map_err(err)?),
+            Request::Subscribe { channel, join } => Response::ok(
+                self.bus
+                    .subscribe_channel(me, &channel, join)
+                    .await
+                    .map_err(err)?,
+            ),
+        })
+    }
+
+    /// Cartões: o mesmo `BoardService` da UI. A resposta leva o texto pronto (`text`), para
+    /// CLI e MCP mostrarem exatamente o mesmo, e a estrutura para quem pede `--json`.
+    async fn task(&self, me: &Identity, op: TaskOp) -> Result<Response, BoardError> {
+        let board = &self.board;
+        let team = &me.team_id;
+        let actor = Actor::Agent {
+            agent_id: me.agent_id.clone(),
+        };
+        let moved = |m: aisense_core::board::Moved| {
+            Response::ok(
+                json!({ "text": render_moved(&m), "card": m.card, "warnings": m.warnings }),
+            )
+        };
+        Ok(match op {
+            TaskOp::Next => {
+                let card = board.next(team, &me.agent_id).await?;
+                Response::ok(json!({ "text": render_next(card.as_ref(), now_ms()), "card": card }))
+            }
+            TaskOp::List { filter } => {
+                let cards = board.list(team, Some(&me.agent_id), &filter).await?;
+                Response::ok(json!({ "text": render_cards(&cards, now_ms()), "cards": cards }))
+            }
+            TaskOp::Show { id } => {
+                let detail = board.show(team, &id).await?;
+                Response::ok(json!({ "text": render_card(&detail, now_ms()), "card": detail }))
+            }
+            TaskOp::Add { card } => moved(board.add(team, &actor, card).await?),
+            TaskOp::Claim { id } => {
+                let m = board.claim(team, &me.agent_id, &id).await?;
+                let mut text = render_moved(&m);
+                text.push_str(&format!(
+                    "Próximo passo: aisense task move {} doing\n",
+                    aisense_core::board::short_id(m.card.card.id.as_str())
+                ));
+                Response::ok(json!({ "text": text, "card": m.card, "warnings": m.warnings }))
+            }
+            TaskOp::Move { id, column, reason } => moved(
+                board
+                    .move_card(team, &actor, &id, &column, reason.as_deref())
+                    .await?,
+            ),
+            TaskOp::Update { id, patch } => moved(board.update(team, &actor, &id, patch).await?),
+            TaskOp::Check { id, item, undo } => moved(
+                board
+                    .check(team, &actor, &id, usize::try_from(item).unwrap_or(0), !undo)
+                    .await?,
+            ),
+            TaskOp::Comment { id, body } => {
+                let comment = board.comment(team, &actor, &id, &body).await?;
+                Response::ok(json!({ "text": render_comment(&comment), "comment": comment }))
+            }
+            TaskOp::Link { id, kind, target } => {
+                moved(board.link(team, &actor, &id, kind, &target).await?)
+            }
+            TaskOp::Block { id, reason } => moved(board.block(team, &actor, &id, &reason).await?),
+            TaskOp::Done { id, note } => {
+                moved(board.done(team, &actor, &id, note.as_deref()).await?)
+            }
+            TaskOp::Split { id, titles } => {
+                let cards = board.split(team, &actor, &id, &titles).await?;
+                Response::ok(json!({ "text": render_cards(&cards, now_ms()), "cards": cards }))
+            }
+            TaskOp::Watch { timeout_s } => {
+                let timeout = timeout_s
+                    .map_or(WATCH_DEFAULT, |s| Duration::from_secs(s.into()))
+                    .min(aisense_core::bus::WAIT_MAX);
+                match board.watch(&me.agent_id, timeout).await {
+                    Some(event) => {
+                        let text = match &event.card_id {
+                            Some(card) => format!(
+                                "{} mudou ({}). Veja com: aisense task show {}\n",
+                                aisense_core::board::short_id(card.as_str()),
+                                event.action,
+                                aisense_core::board::short_id(card.as_str())
+                            ),
+                            None => format!("o quadro mudou ({})\n", event.action),
+                        };
+                        Response::ok(json!({ "text": text, "event": event }))
+                    }
+                    None => Response::error(
+                        "timeout",
+                        format!("nada mudou nos seus cartões em {} s", timeout.as_secs()),
+                        None,
+                    ),
+                }
+            }
+            TaskOp::Approve { id, note } => {
+                moved(board.approve(team, &actor, &id, note.as_deref()).await?)
+            }
+            TaskOp::Reject { id, reason } => moved(board.reject(team, &actor, &id, &reason).await?),
+            TaskOp::Archive { id } => moved(board.archive(team, &actor, &id).await?),
         })
     }
 

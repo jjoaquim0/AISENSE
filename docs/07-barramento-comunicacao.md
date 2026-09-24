@@ -9,9 +9,14 @@
 | Forma | Exemplo | Destino |
 |---|---|---|
 | Agente | `@backend` | Um agente da mesma equipe |
-| Canal | `#geral` | Todos os inscritos no canal |
+| Canal | `#geral` | Os inscritos no canal; canal sem inscritos vai para a equipe toda |
 | Equipe | `@all` | Todos os agentes ativos da equipe |
 | Humano | `@voce` | Notificação na UI, sem PTY |
+
+Canais nascem no primeiro envio (abertos) ou pela UI (T4.4, botão "Canais": tópico e inscritos).
+O agente entra e sai com `aisense join #canal` / `aisense leave #canal` (entrar num canal que não
+existe cria o canal só com ele) e vê a lista com `aisense channels` (MCP: `aisense_channels`).
+Apagar um canal apaga as mensagens dele.
 
 Escopo: **mensagens não atravessam equipes.** Equipes são silos por design — isso mantém o contexto
 limpo e evita que um agente de "Infra" apareça no meio da conversa de "Produto". Quando for preciso
@@ -91,8 +96,19 @@ servidor MCP stdio do agente. As mesmas operações viram ferramentas nativas:
 | `aisense_send_message` | `aisense send` |
 | `aisense_ask_agent` | `aisense ask` |
 | `aisense_read_inbox` | `aisense inbox` |
+| `aisense_reply` | `aisense reply` |
+| `aisense_notes` | `aisense notes ...` |
+| `aisense_board` | `aisense board` |
+| `aisense_next_task` | `aisense task next` |
+| `aisense_list_tasks` | `aisense task list` |
+| `aisense_show_task` | `aisense task show` |
 | `aisense_create_task` | `aisense task add` |
-| `aisense_update_task` | `aisense task done` |
+| `aisense_update_task` | `aisense task claim\|move\|update\|check\|comment\|link\|block\|done\|split\|approve\|reject\|archive` (campo `action`) |
+| `aisense_watch_tasks` | `aisense task watch` |
+
+Cada ferramenta monta **o mesmo frame** do comando equivalente (teste de contrato em
+`aisense-mcp/src/tools.rs`). No quadro, a resposta do servidor já traz o texto (`text`, feito por
+`board::render_*` no core) — CLI e MCP mostram exatamente a mesma coisa.
 
 Por que os dois caminhos existem: MCP é mais confiável (a IA sabe que a ferramenta existe, com schema),
 mas nem todo runtime suporta. A CLI é o denominador comum. **Ambos chamam exatamente o mesmo core** —

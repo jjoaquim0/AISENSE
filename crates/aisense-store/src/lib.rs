@@ -3,10 +3,12 @@
 #![warn(clippy::unwrap_used, clippy::expect_used)]
 
 mod agents;
+mod board;
 mod bus;
 mod convert;
 mod db;
 mod error;
+mod proposals;
 mod sessions;
 mod skills;
 mod teams;

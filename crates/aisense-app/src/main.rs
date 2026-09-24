@@ -53,8 +53,10 @@ fn main() {
                 std::sync::Arc::clone(&library),
                 push.clone(),
             );
-            let (bus, bus_shutdown) =
-                commands::bus::setup(app.handle(), &data, &store, &supervisor, push.clone());
+            let bus = commands::bus::setup(app.handle(), &store, &supervisor, push.clone());
+            let board = commands::board::setup(app.handle(), &bus, &store, data.benches());
+            let proposals = commands::proposals::setup(app.handle(), &bus);
+            let bus_shutdown = commands::bus::serve(&data, board.clone(), proposals.clone());
             commands::push::start(
                 app.handle(),
                 &push,
@@ -65,6 +67,8 @@ fn main() {
                 &pty_for_push,
             );
             app.manage(bus);
+            app.manage(board);
+            app.manage(proposals);
             app.manage(bus_shutdown);
             app.manage(store);
             app.manage(registry);
@@ -143,6 +147,27 @@ fn main() {
             commands::bus::bus_unread,
             commands::bus::bus_resume,
             commands::bus::bus_paused,
+            commands::bus::channels_list,
+            commands::bus::channel_save,
+            commands::bus::channel_delete,
+            commands::board::board_get,
+            commands::board::board_changes,
+            commands::board::card_show,
+            commands::board::card_add,
+            commands::board::card_move,
+            commands::board::card_update,
+            commands::board::card_check,
+            commands::board::card_comment,
+            commands::board::card_link,
+            commands::board::card_approve,
+            commands::board::card_reject,
+            commands::board::card_archive,
+            commands::board::board_columns_save,
+            commands::board::board_automations_save,
+            commands::board::board_automations_toml,
+            commands::board::board_automations_parse,
+            commands::proposals::proposals_list,
+            commands::proposals::proposal_decide,
             commands::project::project_lookup,
             commands::project::project_accept,
         ])

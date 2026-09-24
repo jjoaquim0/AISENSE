@@ -10,8 +10,14 @@ use super::{
     TokenRecord, TokenRepository, SESSIONS_KEPT_PER_AGENT,
 };
 use crate::agent::{Agent, Handle};
+use crate::board::{
+    Activity, Actor, Automation, Board, BoardRepository, Card, CardQuery, CardWrite, Column,
+    Comment, WriteGuard,
+};
 use crate::bus::{BusRepository, Channel, Delivery, DeliveryState, InboxItem, InboxQuery, Message};
-use crate::ids::{AgentId, MessageId, SessionId, SkillId, TeamId};
+use crate::ids::{
+    AgentId, BoardId, CardId, ChannelId, ColumnId, MessageId, SessionId, SkillId, TeamId,
+};
 use crate::skill::Skill;
 use crate::team::Team;
 use crate::time::Millis;
@@ -27,12 +33,23 @@ struct Inner {
     /// Por agente, na ordem de injeção.
     agent_skills: BTreeMap<String, Vec<AgentSkill>>,
     channels: Vec<Channel>,
+    /// (canal, agente).
+    channel_members: std::collections::BTreeSet<(String, String)>,
     /// `AISENSE_TOKEN` → dono.
     tokens: BTreeMap<String, TokenRecord>,
     /// Por id: ULID monotônico, então a ordem da chave é a ordem de criação.
     messages: BTreeMap<String, Message>,
     /// Por (mensagem, agente).
     deliveries: BTreeMap<(String, String), Delivery>,
+    /// Por equipe.
+    boards: BTreeMap<String, Board>,
+    columns: Vec<Column>,
+    cards: BTreeMap<String, Card>,
+    /// (cartão, depende de).
+    dependencies: std::collections::BTreeSet<(String, String)>,
+    comments: Vec<Comment>,
+    activity: Vec<Activity>,
+    proposals: Vec<crate::proposal::Proposal>,
 }
 
 #[derive(Default)]
@@ -56,6 +73,40 @@ impl Inner {
         self.agents
             .values()
             .any(|a| a.team_id == agent.team_id && a.handle == agent.handle && a.id != agent.id)
+    }
+}
+
+impl Inner {
+    /// Cartões, dependências, comentários e histórico de cartões que não existem mais.
+    fn forget_orphans(&mut self) {
+        let cards = &self.cards;
+        self.dependencies
+            .retain(|(t, d)| cards.contains_key(t) && cards.contains_key(d));
+        self.comments
+            .retain(|c| cards.contains_key(c.card_id.as_str()));
+        self.activity
+            .retain(|a| cards.contains_key(a.card_id.as_str()));
+    }
+
+    fn card_fits(&self, card: &Card, guard: &WriteGuard) -> bool {
+        let others = || {
+            self.cards.values().filter(move |c| {
+                c.column_id == card.column_id && c.archived_at.is_none() && c.id != card.id
+            })
+        };
+        let total_ok = guard
+            .wip_limit
+            .is_none_or(|limit| others().count() < limit as usize);
+        let agent_ok = match (&card.assignee, guard.wip_per_agent) {
+            (Some(agent), Some(limit)) => {
+                others()
+                    .filter(|c| c.assignee.as_ref() == Some(agent))
+                    .count()
+                    < limit as usize
+            }
+            _ => true,
+        };
+        total_ok && agent_ok
     }
 }
 
@@ -114,8 +165,17 @@ impl TeamRepository for InMemoryStore {
             return Err(RepoError::TeamNotFound(id.clone()));
         }
         inner.agents.retain(|_, a| a.team_id != *id);
+        // Cascata do quadro.
+        if let Some(board) = inner.boards.remove(id.as_str()) {
+            inner.columns.retain(|c| c.board_id != board.id);
+        }
+        inner.cards.retain(|_, c| c.team_id != *id);
+        inner.proposals.retain(|p| p.team_id != *id);
+        inner.forget_orphans();
         // Cascata do barramento, como as FKs do SQLite.
         inner.channels.retain(|c| c.team_id != *id);
+        let channels: Vec<String> = inner.channels.iter().map(|c| c.id.to_string()).collect();
+        inner.channel_members.retain(|(c, _)| channels.contains(c));
         inner.messages.retain(|_, m| m.team_id != *id);
         let (messages, agents) = (&inner.messages, &inner.agents);
         let kept: BTreeMap<(String, String), Delivery> = inner
@@ -217,6 +277,37 @@ impl AgentRepository for InMemoryStore {
                 inner
                     .deliveries
                     .retain(|(_, agent), _| agent != id.as_str());
+                inner.channel_members.retain(|(_, a)| a != id.as_str());
+                for p in &mut inner.proposals {
+                    if p.proposed_by.as_ref() == Some(id) {
+                        p.proposed_by = None;
+                    }
+                }
+                // ON DELETE SET NULL do quadro.
+                for card in inner.cards.values_mut() {
+                    for field in [
+                        &mut card.assignee,
+                        &mut card.created_by,
+                        &mut card.approved_by,
+                    ] {
+                        if field.as_ref() == Some(id) {
+                            *field = None;
+                        }
+                    }
+                }
+                let removed = |actor: &mut Actor| {
+                    if actor.agent() == Some(id) {
+                        *actor = Actor::System;
+                    }
+                };
+                inner
+                    .comments
+                    .iter_mut()
+                    .for_each(|c| removed(&mut c.author));
+                inner
+                    .activity
+                    .iter_mut()
+                    .for_each(|a| removed(&mut a.actor));
                 Ok(())
             }
             None => Err(RepoError::AgentNotFound(id.clone())),
@@ -391,6 +482,71 @@ impl BusRepository for InMemoryStore {
             .collect();
         list.sort_by(|a, b| a.slug.cmp(&b.slug));
         Ok(list)
+    }
+
+    async fn set_channel_topic(&self, id: &ChannelId, topic: &str) -> RepoResult<()> {
+        let mut inner = self.lock();
+        let channel = inner
+            .channels
+            .iter_mut()
+            .find(|c| &c.id == id)
+            .ok_or_else(|| RepoError::Corrupt(format!("channel {id} not found")))?;
+        channel.topic = topic.to_owned();
+        Ok(())
+    }
+
+    async fn delete_channel(&self, id: &ChannelId) -> RepoResult<()> {
+        let mut inner = self.lock();
+        inner.channels.retain(|c| &c.id != id);
+        inner.channel_members.retain(|(c, _)| c != id.as_str());
+        inner.messages.retain(
+            |_, m| !matches!(&m.to, crate::bus::Target::Channel { channel_id } if channel_id == id),
+        );
+        let messages = &inner.messages;
+        let kept: BTreeMap<(String, String), Delivery> = inner
+            .deliveries
+            .iter()
+            .filter(|((m, _), _)| messages.contains_key(m))
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        inner.deliveries = kept;
+        Ok(())
+    }
+
+    async fn channel_members(&self, id: &ChannelId) -> RepoResult<Vec<AgentId>> {
+        Ok(self
+            .lock()
+            .channel_members
+            .iter()
+            .filter(|(c, _)| c == id.as_str())
+            .map(|(_, a)| AgentId::from_raw(a.clone()))
+            .collect())
+    }
+
+    async fn set_channel_members(&self, id: &ChannelId, members: &[AgentId]) -> RepoResult<()> {
+        let mut inner = self.lock();
+        let team = inner
+            .channels
+            .iter()
+            .find(|c| &c.id == id)
+            .map(|c| c.team_id.clone())
+            .ok_or_else(|| RepoError::Corrupt(format!("channel {id} not found")))?;
+        for agent in members {
+            let ok = inner
+                .agents
+                .get(agent.as_str())
+                .is_some_and(|a| a.team_id == team);
+            if !ok {
+                return Err(RepoError::AgentNotFound(agent.clone()));
+            }
+        }
+        inner.channel_members.retain(|(c, _)| c != id.as_str());
+        for agent in members {
+            inner
+                .channel_members
+                .insert((id.as_str().to_owned(), agent.as_str().to_owned()));
+        }
+        Ok(())
     }
 
     async fn insert_message(&self, message: &Message, deliveries: &[Delivery]) -> RepoResult<()> {
@@ -602,6 +758,349 @@ impl TokenRepository for InMemoryStore {
         let n = inner.tokens.len() as u64;
         inner.tokens.clear();
         Ok(n)
+    }
+}
+
+impl BoardRepository for InMemoryStore {
+    async fn create_board(&self, board: &Board, columns: &[Column]) -> RepoResult<()> {
+        let mut inner = self.lock();
+        if !inner.teams.contains_key(board.team_id.as_str()) {
+            return Err(RepoError::TeamNotFound(board.team_id.clone()));
+        }
+        if inner.boards.contains_key(board.team_id.as_str()) {
+            return Err(RepoError::AlreadyExists(format!(
+                "board of {}",
+                board.team_id
+            )));
+        }
+        inner
+            .boards
+            .insert(board.team_id.as_str().to_owned(), board.clone());
+        inner.columns.extend(columns.iter().cloned());
+        Ok(())
+    }
+
+    async fn get_board(&self, team_id: &TeamId) -> RepoResult<Option<Board>> {
+        Ok(self.lock().boards.get(team_id.as_str()).cloned())
+    }
+
+    async fn set_automations(
+        &self,
+        board_id: &BoardId,
+        automations: &[Automation],
+    ) -> RepoResult<()> {
+        let mut inner = self.lock();
+        let board = inner
+            .boards
+            .values_mut()
+            .find(|b| &b.id == board_id)
+            .ok_or_else(|| RepoError::Corrupt(format!("board {board_id} not found")))?;
+        board.automations = automations.to_vec();
+        Ok(())
+    }
+
+    async fn list_columns(&self, board_id: &BoardId) -> RepoResult<Vec<Column>> {
+        let mut columns: Vec<Column> = self
+            .lock()
+            .columns
+            .iter()
+            .filter(|c| &c.board_id == board_id)
+            .cloned()
+            .collect();
+        columns.sort_by_key(|c| c.position);
+        Ok(columns)
+    }
+
+    async fn replace_columns(
+        &self,
+        board_id: &BoardId,
+        columns: &[Column],
+        moves: &[(ColumnId, ColumnId)],
+        now: Millis,
+    ) -> RepoResult<()> {
+        let mut inner = self.lock();
+        for (from, to) in moves {
+            for card in inner.cards.values_mut().filter(|c| &c.column_id == from) {
+                card.column_id = to.clone();
+                card.column_since = now;
+                card.version += 1;
+                card.updated_at = now;
+            }
+        }
+        let kept: Vec<&ColumnId> = columns.iter().map(|c| &c.id).collect();
+        let orphan = inner.cards.values().any(|card| {
+            inner.columns.iter().any(|c| {
+                &c.board_id == board_id && c.id == card.column_id && !kept.contains(&&c.id)
+            })
+        });
+        if orphan {
+            return Err(RepoError::Corrupt(
+                "a removed column still has cards".into(),
+            ));
+        }
+        inner.columns.retain(|c| &c.board_id != board_id);
+        inner.columns.extend(columns.iter().cloned());
+        Ok(())
+    }
+
+    async fn insert_card(&self, card: &Card) -> RepoResult<()> {
+        let mut inner = self.lock();
+        if !inner.teams.contains_key(card.team_id.as_str()) {
+            return Err(RepoError::TeamNotFound(card.team_id.clone()));
+        }
+        if inner.cards.contains_key(card.id.as_str()) {
+            return Err(RepoError::AlreadyExists(card.id.to_string()));
+        }
+        if !inner.columns.iter().any(|c| c.id == card.column_id) {
+            return Err(RepoError::Corrupt(format!(
+                "column {} not found",
+                card.column_id
+            )));
+        }
+        inner
+            .cards
+            .insert(card.id.as_str().to_owned(), card.clone());
+        Ok(())
+    }
+
+    async fn get_card(&self, id: &CardId) -> RepoResult<Option<Card>> {
+        Ok(self.lock().cards.get(id.as_str()).cloned())
+    }
+
+    async fn list_cards(&self, team_id: &TeamId, query: &CardQuery) -> RepoResult<Vec<Card>> {
+        let inner = self.lock();
+        let position = |id: &ColumnId| {
+            inner
+                .columns
+                .iter()
+                .find(|c| &c.id == id)
+                .map_or(u32::MAX, |c| c.position)
+        };
+        let mut cards: Vec<Card> = inner
+            .cards
+            .values()
+            .filter(|c| &c.team_id == team_id)
+            .filter(|c| query.include_archived || c.archived_at.is_none())
+            .filter(|c| {
+                query
+                    .column_id
+                    .as_ref()
+                    .is_none_or(|col| &c.column_id == col)
+            })
+            .filter(|c| query.assignee.is_none() || c.assignee == query.assignee)
+            .filter(|c| !query.unassigned || c.assignee.is_none())
+            .filter(|c| query.label.as_ref().is_none_or(|l| c.labels.contains(l)))
+            .cloned()
+            .collect();
+        cards.sort_by(|a, b| {
+            position(&a.column_id)
+                .cmp(&position(&b.column_id))
+                .then(a.position.cmp(&b.position))
+                .then(a.id.as_str().cmp(b.id.as_str()))
+        });
+        Ok(cards)
+    }
+
+    async fn update_card(&self, card: &Card, guard: &WriteGuard) -> RepoResult<CardWrite> {
+        let mut inner = self.lock();
+        let Some(current) = inner.cards.get(card.id.as_str()) else {
+            return Err(RepoError::Corrupt(format!("card {} not found", card.id)));
+        };
+        if current.version != guard.expected_version
+            || (guard.require_unassigned && current.assignee.is_some())
+        {
+            return Ok(CardWrite::Stale);
+        }
+        if !inner.card_fits(card, guard) {
+            return Ok(CardWrite::WipFull);
+        }
+        inner
+            .cards
+            .insert(card.id.as_str().to_owned(), card.clone());
+        Ok(CardWrite::Written)
+    }
+
+    async fn dependencies(&self, team_id: &TeamId) -> RepoResult<Vec<(CardId, CardId)>> {
+        let inner = self.lock();
+        Ok(inner
+            .dependencies
+            .iter()
+            .filter(|(t, _)| inner.cards.get(t).is_some_and(|c| &c.team_id == team_id))
+            .map(|(t, d)| (CardId::from_raw(t.clone()), CardId::from_raw(d.clone())))
+            .collect())
+    }
+
+    async fn add_dependency(&self, task: &CardId, depends_on: &CardId) -> RepoResult<()> {
+        let mut inner = self.lock();
+        if task == depends_on
+            || !inner.cards.contains_key(task.as_str())
+            || !inner.cards.contains_key(depends_on.as_str())
+        {
+            return Err(RepoError::Corrupt(format!(
+                "dependency {task} -> {depends_on}"
+            )));
+        }
+        inner
+            .dependencies
+            .insert((task.as_str().to_owned(), depends_on.as_str().to_owned()));
+        Ok(())
+    }
+
+    async fn remove_dependency(&self, task: &CardId, depends_on: &CardId) -> RepoResult<()> {
+        self.lock()
+            .dependencies
+            .remove(&(task.as_str().to_owned(), depends_on.as_str().to_owned()));
+        Ok(())
+    }
+
+    async fn insert_comment(&self, comment: &Comment) -> RepoResult<()> {
+        let mut inner = self.lock();
+        if !inner.cards.contains_key(comment.card_id.as_str()) {
+            return Err(RepoError::Corrupt(format!(
+                "card {} not found",
+                comment.card_id
+            )));
+        }
+        inner.comments.push(comment.clone());
+        Ok(())
+    }
+
+    async fn comment_counts(&self, team_id: &TeamId) -> RepoResult<Vec<(CardId, u32)>> {
+        let inner = self.lock();
+        let mut counts: BTreeMap<String, u32> = BTreeMap::new();
+        for c in &inner.comments {
+            if inner
+                .cards
+                .get(c.card_id.as_str())
+                .is_some_and(|card| &card.team_id == team_id)
+            {
+                *counts.entry(c.card_id.as_str().to_owned()).or_default() += 1;
+            }
+        }
+        Ok(counts
+            .into_iter()
+            .map(|(id, n)| (CardId::from_raw(id), n))
+            .collect())
+    }
+
+    async fn list_comments(&self, card_id: &CardId) -> RepoResult<Vec<Comment>> {
+        let mut comments: Vec<Comment> = self
+            .lock()
+            .comments
+            .iter()
+            .filter(|c| &c.card_id == card_id)
+            .cloned()
+            .collect();
+        comments.sort_by(|a, b| {
+            a.created_at
+                .cmp(&b.created_at)
+                .then(a.id.as_str().cmp(b.id.as_str()))
+        });
+        Ok(comments)
+    }
+
+    async fn insert_activity(&self, activity: &Activity) -> RepoResult<()> {
+        let mut inner = self.lock();
+        if !inner.cards.contains_key(activity.card_id.as_str()) {
+            return Err(RepoError::Corrupt(format!(
+                "card {} not found",
+                activity.card_id
+            )));
+        }
+        inner.activity.push(activity.clone());
+        Ok(())
+    }
+
+    async fn list_activity(&self, card_id: &CardId) -> RepoResult<Vec<Activity>> {
+        let mut out: Vec<Activity> = self
+            .lock()
+            .activity
+            .iter()
+            .filter(|a| &a.card_id == card_id)
+            .cloned()
+            .collect();
+        out.sort_by(|a, b| {
+            a.created_at
+                .cmp(&b.created_at)
+                .then(a.id.as_str().cmp(b.id.as_str()))
+        });
+        Ok(out)
+    }
+
+    async fn activity_since(&self, team_id: &TeamId, since: Millis) -> RepoResult<Vec<Activity>> {
+        let inner = self.lock();
+        let mut out: Vec<Activity> = inner
+            .activity
+            .iter()
+            .filter(|a| a.created_at > since)
+            .filter(|a| {
+                inner
+                    .cards
+                    .get(a.card_id.as_str())
+                    .is_some_and(|c| &c.team_id == team_id)
+            })
+            .cloned()
+            .collect();
+        out.sort_by(|a, b| {
+            a.created_at
+                .cmp(&b.created_at)
+                .then(a.id.as_str().cmp(b.id.as_str()))
+        });
+        Ok(out)
+    }
+}
+
+impl crate::proposal::ProposalRepository for InMemoryStore {
+    async fn insert_proposal(&self, proposal: &crate::proposal::Proposal) -> RepoResult<()> {
+        let mut inner = self.lock();
+        if !inner.teams.contains_key(proposal.team_id.as_str()) {
+            return Err(RepoError::TeamNotFound(proposal.team_id.clone()));
+        }
+        inner.proposals.push(proposal.clone());
+        Ok(())
+    }
+
+    async fn get_proposal(
+        &self,
+        id: &crate::ids::ProposalId,
+    ) -> RepoResult<Option<crate::proposal::Proposal>> {
+        Ok(self.lock().proposals.iter().find(|p| &p.id == id).cloned())
+    }
+
+    async fn list_proposals(
+        &self,
+        team_id: &TeamId,
+        pending_only: bool,
+    ) -> RepoResult<Vec<crate::proposal::Proposal>> {
+        let mut out: Vec<_> = self
+            .lock()
+            .proposals
+            .iter()
+            .filter(|p| &p.team_id == team_id)
+            .filter(|p| !pending_only || p.state == crate::proposal::ProposalState::Pending)
+            .cloned()
+            .collect();
+        out.sort_by(|a, b| b.id.cmp(&a.id));
+        Ok(out)
+    }
+
+    async fn decide_proposal(
+        &self,
+        id: &crate::ids::ProposalId,
+        state: crate::proposal::ProposalState,
+        now: Millis,
+        note: Option<&str>,
+    ) -> RepoResult<bool> {
+        let mut inner = self.lock();
+        match inner.proposals.iter_mut().find(|p| &p.id == id) {
+            Some(p) if p.state == crate::proposal::ProposalState::Pending => {
+                p.state = state;
+                p.decided_at = Some(now);
+                p.decision_note = note.map(str::to_owned);
+                Ok(true)
+            }
+            _ => Ok(false),
+        }
     }
 }
 

@@ -4,7 +4,7 @@
 use std::future::Future;
 
 use super::model::{Channel, Delivery, InboxItem, Message};
-use crate::ids::{AgentId, MessageId, TeamId};
+use crate::ids::{AgentId, ChannelId, MessageId, TeamId};
 use crate::repo::RepoResult;
 use crate::time::Millis;
 
@@ -30,6 +30,24 @@ pub trait BusRepository: Send + Sync {
         &self,
         team_id: &TeamId,
     ) -> impl Future<Output = RepoResult<Vec<Channel>>> + Send;
+    fn set_channel_topic(
+        &self,
+        id: &ChannelId,
+        topic: &str,
+    ) -> impl Future<Output = RepoResult<()>> + Send;
+    /// Apaga o canal e, em cascata, as mensagens dele e as inscrições.
+    fn delete_channel(&self, id: &ChannelId) -> impl Future<Output = RepoResult<()>> + Send;
+    /// Inscritos, na ordem de `agent_id`. Vazio = canal aberto (vai para a equipe toda).
+    fn channel_members(
+        &self,
+        id: &ChannelId,
+    ) -> impl Future<Output = RepoResult<Vec<AgentId>>> + Send;
+    /// Troca a lista inteira. Agente de outra equipe ou inexistente: `AgentNotFound`.
+    fn set_channel_members(
+        &self,
+        id: &ChannelId,
+        members: &[AgentId],
+    ) -> impl Future<Output = RepoResult<()>> + Send;
 
     /// A mensagem e uma entrega por destinatário, na mesma transação (invariante I3).
     fn insert_message(

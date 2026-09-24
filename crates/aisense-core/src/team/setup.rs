@@ -6,6 +6,7 @@ use ts_rs::TS;
 use super::Team;
 use super::TeamDraft;
 use crate::agent::{Agent, AgentDraft, AgentState, Handle};
+use crate::board::{ensure_board, BoardRepository};
 use crate::color::AgentColor;
 use crate::ids::AgentId;
 use crate::repo::{AgentRepository, RepoError, TeamRepository};
@@ -36,9 +37,10 @@ impl TeamSetupError {
     }
 }
 
-/// Cria a equipe e seus agentes de uma vez. Tudo é validado antes de gravar; se um
-/// agente falhar na gravação, a equipe é desfeita — não sobra equipe pela metade.
-pub async fn create_team_with_agents<S: TeamRepository + AgentRepository>(
+/// Cria a equipe, seus agentes e o quadro (`docs/13`: não existe equipe sem quadro) de uma
+/// vez. Tudo é validado antes de gravar; se algo falhar na gravação, a equipe é desfeita —
+/// não sobra equipe pela metade.
+pub async fn create_team_with_agents<S: TeamRepository + AgentRepository + BoardRepository>(
     store: &S,
     draft: &TeamDraft,
     agents: &[AgentDraft],
@@ -68,6 +70,12 @@ pub async fn create_team_with_agents<S: TeamRepository + AgentRepository>(
             }
             return Err(error.into());
         }
+    }
+    if let Err(error) = ensure_board(store, &team.id, now).await {
+        if let Err(cleanup) = store.delete_team(&team.id).await {
+            tracing::warn!(team = %team.id, %cleanup, "equipe parcial não foi desfeita");
+        }
+        return Err(error.into());
     }
     Ok((team, created))
 }
