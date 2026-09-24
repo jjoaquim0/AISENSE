@@ -161,7 +161,6 @@ pub struct MessageMeta {
     #[ts(optional)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timeout_s: Option<u32>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub attachments: Vec<String>,
 }
 

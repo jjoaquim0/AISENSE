@@ -11,6 +11,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react
 import { Button, Dialog, EmptyState, IconButton } from '@/components/ui';
 import { AgentFormDialog } from '@/features/agents/AgentFormDialog';
 import { agentsApi } from '@/features/agents/api';
+import { useUnread } from '@/features/bus/useUnread';
 import { ProjectCommandsDialog } from '@/features/project/ProjectCommandsDialog';
 import { ShellSlot } from '@/features/shell/slots';
 import { usePanels } from '@/features/shell/usePanels';
@@ -62,6 +63,7 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
   );
 
   const { stateOf, confidenceOf, eventsOf } = useLiveStates(summary.agents);
+  const { pendingOf } = useUnread(team.id, agents);
   const showInspector = usePanels((s) => s.showInspector);
 
   const reloadAgents = useCallback(async () => {
@@ -213,6 +215,7 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
           selectedId={selectedId}
           stateOf={stateOf}
           confidenceOf={confidenceOf}
+          pendingOf={pendingOf}
           onSelect={setSelectedId}
           onInspect={(id) => {
             setSelectedId(id);

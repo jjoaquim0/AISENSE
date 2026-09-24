@@ -50,6 +50,10 @@ fn main() {
                 setup_manager,
                 std::sync::Arc::clone(&library),
             );
+            let (bus, bus_shutdown) =
+                commands::bus::setup(app.handle(), &data, &store, &supervisor);
+            app.manage(bus);
+            app.manage(bus_shutdown);
             app.manage(store);
             app.manage(registry);
             app.manage(supervisor);
@@ -122,6 +126,9 @@ fn main() {
             commands::notes::note_append,
             commands::notes::note_delete,
             commands::notes::notes_search,
+            commands::bus::bus_timeline,
+            commands::bus::bus_send,
+            commands::bus::bus_unread,
             commands::project::project_lookup,
             commands::project::project_accept,
         ])
@@ -132,6 +139,9 @@ fn main() {
                 // Antes de matar: senão a política de reinício traria os agentes de volta.
                 if let Some(supervisor) = window.try_state::<commands::agents::Supervisor>() {
                     supervisor.shutdown();
+                }
+                if let Some(bus) = window.try_state::<commands::bus::BusShutdown>() {
+                    bus.0.cancel();
                 }
                 shutdown_manager.shutdown();
             }

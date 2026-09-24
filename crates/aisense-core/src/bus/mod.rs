@@ -14,8 +14,9 @@ pub use model::{
 };
 pub use repo::{BusRepository, InboxQuery};
 pub use service::{
-    AgentInfo, BusObserver, BusService, BusStore, Directory, Identity, MessageView, NoObserver,
-    StateFn, INBOX_LIMIT, REMOVED_AGENT_LABEL, SYSTEM_LABEL, WAIT_MAX,
+    AgentInfo, BusMessageEvent, BusObserver, BusService, BusStore, Directory, Identity,
+    MessageView, NoObserver, StateFn, UnreadCount, INBOX_LIMIT, REMOVED_AGENT_LABEL, SYSTEM_LABEL,
+    WAIT_MAX,
 };
 
 use crate::agent::{Agent, Handle};

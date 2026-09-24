@@ -412,3 +412,57 @@ impl Directory {
         }
     }
 }
+
+/// Não lidas de um agente (badge da sidebar).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../apps/desktop/src/types/generated/")]
+pub struct UnreadCount {
+    pub agent_id: AgentId,
+    pub count: u32,
+}
+
+/// Payload de `bus:message`: a mensagem já com os nomes, e a equipe dela.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../apps/desktop/src/types/generated/")]
+pub struct BusMessageEvent {
+    pub team_id: TeamId,
+    pub message: MessageView,
+    /// Quantos agentes receberam (entregas criadas).
+    pub recipients: u32,
+}
+
+impl<S: BusStore> BusService<S> {
+    pub async fn unread(&self, team_id: &TeamId) -> BusResult<Vec<UnreadCount>> {
+        Ok(self
+            .store
+            .unread_counts(team_id)
+            .await?
+            .into_iter()
+            .map(|(agent_id, count)| UnreadCount { agent_id, count })
+            .collect())
+    }
+
+    /// A linha do tempo com nomes resolvidos (UI).
+    pub async fn timeline_views(
+        &self,
+        team_id: &TeamId,
+        before: Option<&crate::ids::MessageId>,
+        limit: u32,
+    ) -> BusResult<Vec<MessageView>> {
+        let dir = self.directory(team_id).await?;
+        let messages = self.timeline(team_id, before, limit).await?;
+        Ok(messages.iter().map(|m| dir.view(m)).collect())
+    }
+
+    /// O evento para a UI de uma mensagem recém-roteada.
+    pub async fn event_for(&self, routed: &Routed) -> BusResult<BusMessageEvent> {
+        let dir = self.directory(&routed.message.team_id).await?;
+        Ok(BusMessageEvent {
+            team_id: routed.message.team_id.clone(),
+            message: dir.view(&routed.message),
+            recipients: u32::try_from(routed.deliveries.len()).unwrap_or(u32::MAX),
+        })
+    }
+}

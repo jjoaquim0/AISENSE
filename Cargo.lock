@@ -22,6 +22,7 @@ name = "aisense-app"
 version = "0.1.0"
 dependencies = [
  "aisense-core",
+ "aisense-ipc",
  "aisense-pty",
  "aisense-store",
  "base64 0.22.1",
@@ -31,6 +32,8 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-dialog",
  "thiserror 2.0.20",
+ "tokio",
+ "tokio-util",
  "tracing",
  "tracing-subscriber",
  "ts-rs",
@@ -41,8 +44,13 @@ name = "aisense-cli"
 version = "0.1.0"
 dependencies = [
  "aisense-core",
+ "aisense-ipc",
+ "aisense-pty",
  "serde",
  "serde_json",
+ "tempfile",
+ "tokio",
+ "tokio-util",
 ]
 
 [[package]]

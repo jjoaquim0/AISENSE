@@ -73,12 +73,25 @@ ambiente do PTY, revogar ao encerrar a sessão.
 > em `AISENSE_TOKEN` vale enquanto ele vive e some ao parar (teste com processo real), e uma
 > conexão aberta perde o acesso na operação seguinte à revogação (teste de IPC).
 
-### [ ] F05-05 — CLI `aisense`
+### [x] F05-05 — CLI `aisense`
 Binário com `whoami`, `agents`, `send`, `inbox`, `note`, `status`; `--json` em tudo; saída sem cor
 quando não é TTY; exit codes de [07](../07-barramento-comunicacao.md#as-três-interfaces-do-barramento).
 Empacotado como sidecar e injetado no PATH dos PTYs.
 **Aceite:** dentro de um agente `shell`, `aisense send @outro "oi"` funciona e a mensagem aparece na
 UI em <50 ms. **Este é o marco que prova o produto.** Depende de F05-04.
+> Feito: `aisense-cli` (`args.rs` à mão, sem parser novo; `render.rs` com texto limpo e sem
+> cor) com `whoami`, `agents`, `send` (vários destinos), `broadcast`, `inbox [--drain]
+> [--if-any]`, `wait [--timeout]`, `note`, `status [--note]` e `notes ...`; `--json` em tudo;
+> exit codes 0/1/2/3 do `docs/07`; erro com "dica:" vinda do core. No app,
+> `commands/bus.rs` sobe o servidor com o app (fecha junto), revoga os tokens antigos, roda a
+> retenção de 90 dias na subida e a cada 6 h, e repassa **toda** mensagem roteada como
+> `bus:message` (já com `@nomes`) e leituras como `bus:read`; comandos `bus_timeline`,
+> `bus_send` (o humano) e `bus_unread`. A sidebar mostra as não lidas por agente na cor de
+> quem mandou. `pnpm app` compila `aisense` e `aisense-mcp` antes (o supervisor os põe no
+> `PATH` do agente). Aceite: teste de ponta a ponta com supervisor, PTY e socket reais — um
+> agente roda `aisense send @frontend "oi do shell"` no próprio terminal, a mensagem chega à
+> caixa do destinatário e ao hub que alimenta a UI (o `bus:message` sai do mesmo hub); o
+> teste inteiro roda em ~70 ms. A medida "<50 ms na janela" só uma máquina com tela confere.
 
 ### [ ] F05-06 — Pergunta e resposta (`ask`/`reply`)
 Conexão persistente bloqueante com correlação por `reply_to`, timeout configurável, erro imediato
