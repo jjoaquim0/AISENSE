@@ -157,7 +157,8 @@ perder o contraste AA.
 > cores de agente do tema claro escureceram um pouco. 237 testes do front e 33 E2E (axe nos dois
 > temas) verdes; screenshots em `docs/screenshots/identidade/`. Ficou de fora de propósito: o
 > prefixo `[AISENSE]` digitado nos terminais dos agentes, a pasta `%APPDATA%\AISENSE`, o
-> `productName` do instalador e a documentação em prosa — mudar esses é decisão à parte.
+> `productName` do instalador e a documentação em prosa. **Decidido pelo usuário
+> (2026-09-24): esses três ficam como estão.**
 
 ## Critérios de saída
 - [ ] Instaladores assinados para macOS, Windows e Linux

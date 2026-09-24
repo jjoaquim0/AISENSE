@@ -20,7 +20,9 @@ A marca vem do **Manual de Marca do aisense** (v1.0, 2026). O que ele define e o
 Arquivos em `assets/logo/`: `aisense-simbolo.svg` (fundo claro), `aisense-simbolo-branco.svg`
 (fundo escuro), `aisense-simbolo-mono.svg` (uma cor), `aisense-icone-app.svg` e `favicon.svg`
 (também em `apps/desktop/public/`). O nome do produto em texto de interface é **aisense**, em
-minúsculas; `AISENSE_*` continuam sendo os nomes das variáveis de ambiente.
+minúsculas. Ficam em caixa alta, por decisão do usuário (2026-09-24): as variáveis `AISENSE_*`,
+o prefixo `[AISENSE]` digitado nos terminais dos agentes, o nome do instalador e da pasta de
+dados (`%APPDATA%\AISENSE`) e o nome na documentação em prosa.
 
 **Proporção de cor:** numa tela, cerca de 85% é Tinta e Papel e no máximo 5% é verde. O verde vai
 no botão principal, num status "ativo" ou num destaque — nunca como fundo de área grande.
