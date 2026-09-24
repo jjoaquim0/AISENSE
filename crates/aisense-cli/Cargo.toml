@@ -13,5 +13,14 @@ path = "src/main.rs"
 
 [dependencies]
 aisense-core.workspace = true
+aisense-ipc.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+# Runtime de uma thread só: a CLI roda a cada mensagem e precisa subir em milissegundos.
+tokio = { workspace = true, features = ["rt", "net", "io-util", "time"] }
+
+[dev-dependencies]
+aisense-pty.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time", "net"] }
+tokio-util.workspace = true
+tempfile = "3"

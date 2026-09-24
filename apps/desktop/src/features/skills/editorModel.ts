@@ -22,8 +22,7 @@ Descreva o papel e como o agente deve trabalhar.
 2. Segundo passo.
 `;
 
-/** Embutida que vai em todo agente e não aparece na lista de atribuição (docs/06). */
-export const ALWAYS_ON_SKILL = 'trabalho-em-equipe';
+export { ALWAYS_ON_SKILL } from './assign';
 
 export interface LibrarySections {
   builtin: SkillEntry[];

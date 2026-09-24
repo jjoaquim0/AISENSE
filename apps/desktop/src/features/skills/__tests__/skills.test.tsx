@@ -62,6 +62,8 @@ describe('regras de atribuição', () => {
     expect(supports(entry('x', { targets: ['claude'] }), 'codex')).toBe(false);
     const gone = entry('gone', { source: null });
     expect(available([entry('a'), entry('b'), gone], [a]).map((s) => s.id)).toEqual(['b']);
+    // `trabalho-em-equipe` vai em todo agente pelo BOOT.md: não se atribui.
+    expect(available([entry('trabalho-em-equipe')], [])).toEqual([]);
   });
 });
 

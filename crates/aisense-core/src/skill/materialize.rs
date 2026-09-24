@@ -68,6 +68,9 @@ fn io_err(path: &Path) -> impl FnOnce(io::Error) -> MaterializeError + '_ {
 pub struct Materialized {
     /// `<workdir>/.aisense/agents/<handle>/`.
     pub agent_dir: PathBuf,
+    /// `<agent_dir>/BOOT.md` e o que foi escrito nele — o que a injeção entrega (F04-06).
+    pub boot_path: PathBuf,
+    pub boot: String,
     /// Ressalvas que não impedem o start (skill nativa que já existia e não é nossa).
     pub warnings: Vec<String>,
 }
@@ -180,7 +183,28 @@ pub fn materialize(req: &MaterializeRequest<'_>) -> Result<Materialized, Materia
     fs::write(&card_path, json + "\n").map_err(io_err(&card_path))?;
 
     let mut warnings = Vec::new();
-    let boot = compose_boot(req.agent, req.team, req.colleagues, req.workdir, req.skills);
+    // As notas são da equipe (no diretório dela, não na bancada do agente): só o índice
+    // entra (`docs/15`). Pasta ilegível não impede o boot — fica sem a seção.
+    let notes = crate::notes::TeamNotes::new(Path::new(&req.team.workdir))
+        .list()
+        .unwrap_or_default();
+    let notes_index = crate::notes::boot_index(&notes, req.now, crate::notes::NOTES_BOOT_INDEX);
+    // Comandos do projeto (`docs/17`), do `aisense.toml` do diretório do agente.
+    let commands = match crate::project::load_project(req.workdir) {
+        crate::project::ProjectLookup::Found { config, .. } => {
+            crate::project::run::boot_section(&config)
+        }
+        _ => String::new(),
+    };
+    let notes_index = commands + &notes_index;
+    let boot = compose_boot(
+        req.agent,
+        req.team,
+        req.colleagues,
+        req.workdir,
+        req.skills,
+        &notes_index,
+    );
     let boot_path = agent_dir.join(BOOT_FILE);
     fs::write(&boot_path, &boot.markdown).map_err(io_err(&boot_path))?;
     if boot.truncated {
@@ -191,8 +215,44 @@ pub fn materialize(req: &MaterializeRequest<'_>) -> Result<Materialized, Materia
     if let Some(target) = &req.adapter.skills {
         sync_native(req, &root, &target.dir, handle, &old_handles, &mut warnings)?;
     }
+    // Ferramentas do barramento por MCP (F05-09), onde o adaptador diz o arquivo.
+    if let Some(config) = &req.adapter.capabilities.mcp_config {
+        let settings = req
+            .adapter
+            .skills
+            .as_ref()
+            .and_then(|t| t.settings_file.as_deref())
+            .map(|f| req.workdir.join(f));
+        if let Err(problem) =
+            crate::bus::install_mcp_server(&req.workdir.join(config), settings.as_deref())
+        {
+            warnings.push(format!("@{handle}: {problem}"));
+        }
+    }
+    // Modo `hook` (F05-08): o runtime checa a caixa sozinho ao fim do turno.
+    if req.agent.delivery_mode == crate::agent::DeliveryMode::Hook {
+        let settings = req
+            .adapter
+            .skills
+            .as_ref()
+            .and_then(|t| t.settings_file.as_deref())
+            .filter(|_| req.adapter.capabilities.hooks);
+        match settings {
+            Some(file) => {
+                if let Err(problem) = crate::bus::install_inbox_hook(&req.workdir.join(file)) {
+                    warnings.push(format!("@{handle}: {problem}"));
+                }
+            }
+            None => warnings.push(format!(
+                "@{handle} está em modo hook, mas o runtime {} não tem hooks: as mensagens ficam na caixa (pull)",
+                req.adapter.id
+            )),
+        }
+    }
     Ok(Materialized {
         agent_dir,
+        boot_path,
+        boot: boot.markdown,
         warnings,
     })
 }

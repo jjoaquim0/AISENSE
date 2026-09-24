@@ -64,6 +64,7 @@ struct CapabilitiesFile {
     model_flag: Option<String>,
     cwd_is_project: bool,
     resume_flag: Option<String>,
+    mcp_config: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -82,6 +83,7 @@ struct InjectFile {
     submit: Option<String>,
     prefix: Option<String>,
     max_chars: Option<u32>,
+    boot: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -186,6 +188,7 @@ fn validate(file: AdapterFile, source: AdapterSource) -> Result<Adapter, Invalid
         submit: file.inject.submit.unwrap_or_else(|| DEFAULT_SUBMIT.into()),
         prefix: file.inject.prefix.unwrap_or_else(|| DEFAULT_PREFIX.into()),
         max_chars: file.inject.max_chars.unwrap_or(DEFAULT_MAX_CHARS),
+        boot: file.inject.boot.unwrap_or(true),
     };
     if inject.max_chars == 0 {
         return Err(invalid("max_chars", "max_chars must be greater than zero"));
@@ -237,6 +240,7 @@ fn validate(file: AdapterFile, source: AdapterSource) -> Result<Adapter, Invalid
             model_flag: caps.model_flag,
             cwd_is_project: caps.cwd_is_project,
             resume_flag: caps.resume_flag,
+            mcp_config: caps.mcp_config,
         },
         state,
         inject,
@@ -288,6 +292,7 @@ mod tests {
         assert_eq!(a.inject.mode, InjectMode::Stdin);
         assert_eq!(a.inject.submit, "\r");
         assert_eq!(a.inject.max_chars, DEFAULT_MAX_CHARS);
+        assert!(a.inject.boot, "IA por padrão recebe o BOOT.md");
         assert!(!a.capabilities.mcp);
         assert!(a.detect.is_none());
     }

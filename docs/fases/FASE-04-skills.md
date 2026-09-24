@@ -106,17 +106,40 @@ Depende de F04-04.
 > integração no start. A F04-06 fará a injeção; a F04-07 registrará a skill embutida
 > na biblioteca para materialização automática.
 
-### [ ] F04-06 — Injeção no boot
+### [x] F04-06 — Injeção no boot
 Escolher o melhor caminho conforme as capacidades do adaptador: `system_prompt_flag` → MCP →
 stdin (fallback "leia .aisense/agents/<handle>/BOOT.md e siga"). Registrar qual caminho foi usado.
 **Aceite:** os 3 caminhos testados; o de stdin espera o primeiro `idle` antes de digitar.
 Depende de F04-05, F03-01.
+> Feito: `aisense-core/src/supervisor/boot.rs` (`choose_boot_channel`) e o start do supervisor.
+> Ordem: **flag** (`claude --append-system-prompt`, `opencode --prompt`: o `BOOT.md` inteiro vai
+> como argumento) → **MCP** (o `aisense-mcp` entregaria o arquivo como `instructions` do
+> `initialize`; só é escolhido com `SupervisorConfig::mcp_boot`, `false` até a F05-09) →
+> **terminal** (codex, gemini: digita "[AISENSE] Leia .aisense/agents/<handle>/BOOT.md e siga as
+> instruções..." no primeiro `idle` com confiança **alta**; nunca em `awaiting_input` nem no
+> ocioso só por silêncio; desiste em 30 s e avisa). Adaptador sem quem leia fica em `none`: campo
+> novo `[inject] boot = false` no `shell` (o `custom` já tem `mode = "none"`). Todo agente recebe
+> `AISENSE_BOOT_FILE`. O caminho e o resultado ficam em `BootDelivery` (`StartOutcome.boot`,
+> `AgentSupervisor::boot`, evento `agent:boot`, comando `agent_boot`) e aparecem na linha "Boot" da
+> aba Visão; falha também volta como ressalva do start. Aceite: testes com processo real para a
+> flag (o processo recebe o `BOOT.md` inteiro), o terminal (nada digitado antes do prompt, que
+> demora 1 s) e o terminal diante de uma pergunta "(s/n)" (não digita; desiste no prazo); a
+> escolha dos 3 caminhos testada em `boot.rs` para cada adaptador embutido. Os testes de
+> processo são só Unix (usam `sh`), como o do detector.
 
-### [ ] F04-07 — Skills embutidas
+### [x] F04-07 — Skills embutidas
 Escrever `trabalho-em-equipe`, `coordenador`, `revisor-rigoroso`, `implementador`, `pesquisador`,
 `sintetizador` e `documentador` conforme [06](../06-sistema-de-skills.md#biblioteca-de-skills-embutidas-do-v1).
 **Aceite:** `trabalho-em-equipe` entra em todos os agentes automaticamente e não aparece na lista
 de atribuição. Depende de F04-01.
+> Feito: `skills/<nome>/SKILL.md` para as 7, embutidas no binário por `include_str!`
+> (`BUILTIN_SKILLS`, `skill/catalog.rs`); todas sem `targets` (rodam em qualquer runtime) e
+> `trabalho-em-equipe` com `priority: 0`. `TEAMWORK_SKILL` fica fora da lista "Adicionar" da aba
+> Skills e, se já estiver atribuída a alguém, a resolução a pula — o `BOOT.md` já a traz em
+> seção própria (F04-05) e ela entraria duas vezes. Na biblioteca aparece como "sempre ativa".
+> Teste: as 7 carregam sem problema com o nome da pasta. **Limite:** o compositor usa a cópia
+> embutida de `trabalho-em-equipe`, então uma versão do usuário com o mesmo nome não muda o
+> protocolo do `BOOT.md`.
 
 ### [~] F04-08 — Biblioteca e editor de skills (T7)
 Grid da biblioteca, editor Markdown com preview e validação ao vivo, contador de caracteres,
@@ -143,7 +166,7 @@ Depende de F04-02.
 > (2) import/export em `.zip` (hoje só pasta; pede a crate `zip`). A tela de skills é carregada
 > sob demanda para o Markdown não pesar no bundle inicial.
 
-### [ ] F04-09 — Notas da equipe
+### [x] F04-09 — Notas da equipe
 Armazenamento em `<workdir>/.aisense/notes/`, leitura, `append` atômico (`O_APPEND`) e `write` com
 trava otimista por hash. Índice das notas (título e resumo, não o conteúdo) no `BOOT.md`, dentro do
 orçamento de 12.000 caracteres. Editor na UI reaproveitando o editor de skills.
@@ -151,6 +174,24 @@ Ver [15 — Notas da Equipe](../15-notas-da-equipe.md).
 **Aceite:** dois agentes dando `append` na mesma nota ao mesmo tempo não perdem conteúdo (teste de
 concorrência); `write` com hash desatualizado falha com `stale_note` e mostra o diff.
 Depende de F04-05.
+> Feito: `aisense-core/src/notes.rs` (`TeamNotes`): `<workdir>/.aisense/notes/<slug>.md` no
+> diretório **da equipe** (não na bancada do agente), slug `^[a-z0-9][a-z0-9-]*$`, título do
+> primeiro `#`. `append` numa escrita só com `O_APPEND` (mais uma trava por pasta no processo);
+> `write` exige o hash lido (FNV-1a 64, sem dependência nova) para substituir, falha com
+> `stale_note` e o diff (prefixo/sufixo comuns, linear) e só cria sem hash; troca atômica por
+> rename. Também `read --section`, `search` (literal, sem caixa, com linha), `create`,
+> `delete`, limites de 256 KB e 200 notas. Índice das 20 mais recentes na seção "Memória da
+> equipe" do `BOOT.md`, depois do protocolo da equipe. Comandos `notes_list`, `note_read`,
+> `note_create`, `note_save` (conflito volta como `stale`, não como erro), `note_append`,
+> `note_delete`, `notes_search`. UI: botão **Notas** na Sala da Equipe abre
+> `features/notes/NotesPanel.tsx` (lista, busca, editor com o preview das skills; confere o
+> disco a cada 3 s — sem edição acompanha, com edição avisa; salvar desatualizado mostra o diff
+> com "usar a do disco" ou "gravar a minha por cima"). Aceite: 8 threads × 50 `append` sem
+> perda (e 4 escritores com arquivos abertos separados, só com `O_APPEND`); `write` com hash
+> velho falha com `stale_note` e o diff; no front, o diálogo mostra o diff. **Fica para
+> depois:** `aisense notes ...` na CLI chega com o IPC (Fase 05) sobre o mesmo core; o
+> "histórico de quem mudou o quê" e o "por @quem" do índice precisam do autor, que vem pelo
+> barramento; a busca global `⌘⇧F` é da Fase 08.
 
 ## Critérios de saída
 - [ ] Agente sobe com identidade e skills aplicadas, sem intervenção

@@ -32,7 +32,12 @@ export function supports(skill: Pick<SkillEntry, 'targets'>, adapterId: string):
   return skill.targets.length === 0 || skill.targets.includes(adapterId);
 }
 
+/** Vai em todo agente, pelo próprio `BOOT.md`; não entra na lista de atribuição (docs/06). */
+export const ALWAYS_ON_SKILL = 'trabalho-em-equipe';
+
 /** O que ainda dá para atribuir: da biblioteca, carregada do disco e não atribuída. */
 export function available(library: SkillEntry[], list: AgentSkill[]): SkillEntry[] {
-  return library.filter((s) => s.source !== null && !list.some((a) => a.skillId === s.id));
+  return library.filter(
+    (s) => s.source !== null && s.name !== ALWAYS_ON_SKILL && !list.some((a) => a.skillId === s.id),
+  );
 }

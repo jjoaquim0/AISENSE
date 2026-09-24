@@ -42,6 +42,8 @@ fn main() {
             let store = open_store(&data)?;
             let (registry, watcher) = commands::runtimes::setup(app.handle(), &data);
             let (library, skill_watcher) = commands::skills::setup(app.handle(), &data, &store);
+            let (push, injections) = commands::push::channel();
+            let pty_for_push = std::sync::Arc::clone(&setup_manager);
             let supervisor = commands::agents::setup(
                 app.handle(),
                 &data,
@@ -49,7 +51,21 @@ fn main() {
                 std::sync::Arc::clone(&registry),
                 setup_manager,
                 std::sync::Arc::clone(&library),
+                push.clone(),
             );
+            let (bus, bus_shutdown) =
+                commands::bus::setup(app.handle(), &data, &store, &supervisor, push.clone());
+            commands::push::start(
+                app.handle(),
+                &push,
+                injections,
+                &bus,
+                &store,
+                &registry,
+                &pty_for_push,
+            );
+            app.manage(bus);
+            app.manage(bus_shutdown);
             app.manage(store);
             app.manage(registry);
             app.manage(supervisor);
@@ -81,6 +97,7 @@ fn main() {
             commands::agents::agent_stop,
             commands::agents::agent_restart,
             commands::agents::agent_state,
+            commands::agents::agent_boot,
             commands::agents::agents_list,
             commands::agents::agent_create,
             commands::agents::agent_update,
@@ -114,6 +131,18 @@ fn main() {
             commands::skills::skill_import,
             commands::skills::skill_export,
             commands::skills::skill_users,
+            commands::notes::notes_list,
+            commands::notes::note_read,
+            commands::notes::note_create,
+            commands::notes::note_save,
+            commands::notes::note_append,
+            commands::notes::note_delete,
+            commands::notes::notes_search,
+            commands::bus::bus_timeline,
+            commands::bus::bus_send,
+            commands::bus::bus_unread,
+            commands::bus::bus_resume,
+            commands::bus::bus_paused,
             commands::project::project_lookup,
             commands::project::project_accept,
         ])
@@ -124,6 +153,9 @@ fn main() {
                 // Antes de matar: senão a política de reinício traria os agentes de volta.
                 if let Some(supervisor) = window.try_state::<commands::agents::Supervisor>() {
                     supervisor.shutdown();
+                }
+                if let Some(bus) = window.try_state::<commands::bus::BusShutdown>() {
+                    bus.0.cancel();
                 }
                 shutdown_manager.shutdown();
             }

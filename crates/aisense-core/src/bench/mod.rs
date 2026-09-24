@@ -5,6 +5,7 @@
 //! repositório, para não poluir o `git status` nem ser commitado por acidente.
 
 pub mod git;
+pub mod local;
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};

@@ -123,21 +123,27 @@ Regras rígidas de segurança:
 1. Só injeta com estado `idle` **e** confiança alta.
 2. **Nunca** injeta com estado `awaiting_input` (a IA está pedindo confirmação ao humano).
 3. Fila FIFO por agente; se chegarem 5 mensagens durante um `busy`, são agrupadas em uma só injeção.
-4. Sanitização obrigatória: remove `\x1b`, `\x07`, `\r` do corpo e limita a `inject.max_chars`;
-   acima disso grava em `.aisense/inbox/<id>.md` e injeta só o caminho.
+4. Sanitização obrigatória: remove todo controle C0/C1 (inclui `\x1b`, `\x07`, `\r`) e o DEL,
+   junta o corpo numa linha só (`\n` vira ` / `) e limita a `inject.max_chars`; acima disso
+   injeta só o aviso "N mensagem(ns) longa(s) de @x — leia com: aisense inbox" (o corpo inteiro
+   continua na caixa; nada é gravado em arquivo).
 5. Throttle: no máximo 1 injeção por agente a cada 3 s.
 6. A UI mostra um chip **"mensagem injetada"** na linha do terminal — nada é invisível.
 
 ### `hook` (o melhor, quando disponível)
 Para runtimes com hooks (Claude Code), o AISENSE instala um hook de fim de turno que roda
-`aisense inbox --drain --if-any`. Resultado: o agente checa a caixa **sozinho**, no momento certo,
-sem injeção e sem depender da heurística de estado.
+`aisense inbox --drain --if-any --hook-json`. Com mensagem nova, a CLI responde
+`{"decision":"block","reason":"<as mensagens>"}` — o formato do hook `Stop` que faz o agente
+continuar em vez de parar, já com as mensagens em mãos; sem mensagem, não imprime nada e ele para
+normalmente. Fora de um terminal do AISENSE (o mesmo projeto aberto à mão), o comando sai calado
+com exit 0. Resultado: o agente checa a caixa **sozinho**, no momento certo, sem injeção e sem
+depender da heurística de estado.
 
 ```jsonc
-// <workdir>/.claude/settings.json (mesclado, não sobrescrito)
+// <workdir>/.claude/settings.json (mesclado, não sobrescrito; instalado no start do agente)
 {
   "hooks": {
-    "Stop": [{ "hooks": [{ "type": "command", "command": "aisense inbox --drain --if-any" }] }]
+    "Stop": [{ "hooks": [{ "type": "command", "command": "aisense inbox --drain --if-any --hook-json" }] }]
   }
 }
 ```

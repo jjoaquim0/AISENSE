@@ -1,8 +1,18 @@
-import { ArrowLeft, FileCode, Folder, Plus, RotateCw, SquareTerminal } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  ArrowLeft,
+  FileCode,
+  Folder,
+  NotebookPen,
+  Plus,
+  RotateCw,
+  SquareTerminal,
+} from 'lucide-react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, Dialog, EmptyState, IconButton } from '@/components/ui';
 import { AgentFormDialog } from '@/features/agents/AgentFormDialog';
 import { agentsApi } from '@/features/agents/api';
+import { GuardBanner } from '@/features/bus/GuardBanner';
+import { useUnread } from '@/features/bus/useUnread';
 import { ProjectCommandsDialog } from '@/features/project/ProjectCommandsDialog';
 import { ShellSlot } from '@/features/shell/slots';
 import { usePanels } from '@/features/shell/usePanels';
@@ -20,12 +30,18 @@ import type { PaneAction } from '@/features/team-room/paneMenu';
 import { roomShortcuts } from '@/features/team-room/shortcuts';
 import { isRunning } from '@/features/team-room/sidebar';
 import { focusAgentPane } from '@/features/terminal/focus';
+import { TimelineView } from '@/features/timeline/TimelineView';
 import { useShortcuts } from '@/lib/useShortcuts';
 import type { Agent } from '@/types/generated/Agent';
 import type { StartOutcome } from '@/types/generated/StartOutcome';
 import type { TeamSummary } from '@/types/generated/TeamSummary';
 import { describeStartReport, errorMessage } from './api';
 import { useTeams } from './store';
+
+// Sob demanda: o editor de notas traz o preview de Markdown.
+const NotesPanel = lazy(() =>
+  import('@/features/notes/NotesPanel').then((m) => ({ default: m.NotesPanel })),
+);
 
 /**
  * Uma equipe aberta: os agentes, seus controles e o terminal do selecionado.
@@ -41,6 +57,7 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
   const [notice, setNotice] = useState<{ text: string; restart?: Agent } | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [commandsOpen, setCommandsOpen] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
   const { grid, setGrid, view, setView } = useTeamLayout(
     team,
     agents.map((a) => a.id),
@@ -48,6 +65,7 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
   );
 
   const { stateOf, confidenceOf, eventsOf } = useLiveStates(summary.agents);
+  const { pendingOf } = useUnread(team.id, agents);
   const showInspector = usePanels((s) => s.showInspector);
 
   const reloadAgents = useCallback(async () => {
@@ -188,12 +206,18 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+      {notesOpen && (
+        <Suspense fallback={null}>
+          <NotesPanel teamId={team.id} teamName={team.name} onClose={() => setNotesOpen(false)} />
+        </Suspense>
+      )}
       <ShellSlot name="sidebar">
         <AgentSidebar
           agents={agents}
           selectedId={selectedId}
           stateOf={stateOf}
           confidenceOf={confidenceOf}
+          pendingOf={pendingOf}
           onSelect={setSelectedId}
           onInspect={(id) => {
             setSelectedId(id);
@@ -241,6 +265,9 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
         {view === 'grid' && (
           <PresetPicker value={grid.preset} onChange={(preset) => setGrid({ ...grid, preset })} />
         )}
+        <Button onClick={() => setNotesOpen(true)}>
+          <NotebookPen size={13} /> Notas
+        </Button>
         <Button onClick={() => setCommandsOpen(true)}>
           <FileCode size={13} /> Comandos
         </Button>
@@ -260,6 +287,7 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
         </Button>
       </header>
 
+      <GuardBanner teamId={team.id} />
       {(problem || notice) && (
         <div className="flex flex-col gap-1 border-b border-subtle px-4 py-2">
           {problem && (
@@ -289,7 +317,9 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
 
       <div className="flex min-h-0 flex-1">
         <section aria-label="Terminais da equipe" className="flex min-w-0 flex-1 flex-col p-2">
-          {agents.length > 0 && view === 'focus' ? (
+          {view === 'timeline' ? (
+            <TimelineView teamId={team.id} agents={agents} />
+          ) : agents.length > 0 && view === 'focus' ? (
             <FocusView
               order={grid.order}
               agents={agents}

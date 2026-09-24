@@ -48,6 +48,9 @@ pub struct Capabilities {
     pub model_flag: Option<String>,
     pub cwd_is_project: bool,
     pub resume_flag: Option<String>,
+    /// Arquivo de servidores MCP do projeto, no formato `mcpServers` (ex.: `.mcp.json` do
+    /// Claude Code). Com ele, o AISENSE registra o `aisense-mcp` no start (F05-09).
+    pub mcp_config: Option<String>,
 }
 
 /// Heurística do detector de estado. Os regex já foram compilados uma vez na
@@ -78,6 +81,9 @@ pub struct InjectRules {
     pub submit: String,
     pub prefix: String,
     pub max_chars: u32,
+    /// Se o `BOOT.md` pode entrar pelo terminal (F04-06). `false` num shell puro: digitar
+    /// "leia o BOOT.md" ali viraria um comando inexistente.
+    pub boot: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]

@@ -1,12 +1,14 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type { Agent } from '@/types/generated/Agent';
+import type { AgentBootChanged } from '@/types/generated/AgentBootChanged';
 import type { AgentDraft } from '@/types/generated/AgentDraft';
 import type { AgentId } from '@/types/generated/AgentId';
 import type { AgentPreview } from '@/types/generated/AgentPreview';
 import type { AgentState } from '@/types/generated/AgentState';
 import type { AgentStateChanged } from '@/types/generated/AgentStateChanged';
 import type { AgentUpdate } from '@/types/generated/AgentUpdate';
+import type { BootDelivery } from '@/types/generated/BootDelivery';
 import type { SessionId } from '@/types/generated/SessionId';
 import type { SessionSummary } from '@/types/generated/SessionSummary';
 import type { StartOutcome } from '@/types/generated/StartOutcome';
@@ -37,6 +39,8 @@ export const agentsApi = {
   stop: (agentId: AgentId): Promise<void> => invoke('agent_stop', { agentId }),
   restart: (agentId: AgentId): Promise<StartOutcome> => invoke('agent_restart', { agentId }),
   state: (agentId: AgentId): Promise<AgentState> => invoke('agent_state', { agentId }),
+  /** Por onde o `BOOT.md` da sessão atual foi entregue (F04-06); `null` se não subiu. */
+  boot: (agentId: AgentId): Promise<BootDelivery | null> => invoke('agent_boot', { agentId }),
 
   /** Sessões do agente, mais recente primeiro (aba Logs do inspetor). */
   sessions: (agentId: AgentId): Promise<SessionSummary[]> => invoke('agent_sessions', { agentId }),
@@ -51,4 +55,9 @@ export const agentsApi = {
 /** Toda mudança de estado de qualquer agente (inclusive reinícios da política). */
 export function onAgentState(handler: (event: AgentStateChanged) => void): Promise<UnlistenFn> {
   return listen<AgentStateChanged>('agent:state', ({ payload }) => handler(payload));
+}
+
+/** A entrega do `BOOT.md` mudou — pelo terminal, ela termina depois do start. */
+export function onAgentBoot(handler: (event: AgentBootChanged) => void): Promise<UnlistenFn> {
+  return listen<AgentBootChanged>('agent:boot', ({ payload }) => handler(payload));
 }

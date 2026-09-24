@@ -1,5 +1,5 @@
 /** Vistas da Sala da Equipe disponíveis nesta fase (docs/09, T4.1 e T4.2). */
-export const ROOM_VIEWS = ['grid', 'focus'] as const;
+export const ROOM_VIEWS = ['grid', 'focus', 'timeline'] as const;
 export type RoomView = (typeof ROOM_VIEWS)[number];
 
 /** Lê `teams.layout.view`; ausente ou desconhecido (vista de uma fase futura) vira Grid. */

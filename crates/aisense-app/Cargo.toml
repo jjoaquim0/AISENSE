@@ -16,6 +16,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 aisense-core.workspace = true
+aisense-ipc.workspace = true
 aisense-pty.workspace = true
 aisense-store.workspace = true
 base64.workspace = true
@@ -28,3 +29,5 @@ thiserror.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 ts-rs.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true

@@ -19,7 +19,7 @@ pub enum GitError {
     Failed { command: String, stderr: String },
 }
 
-fn git(dir: &Path, args: &[&str]) -> Result<String, GitError> {
+pub(crate) fn git(dir: &Path, args: &[&str]) -> Result<String, GitError> {
     let output = Command::new("git")
         .arg("-C")
         .arg(dir)

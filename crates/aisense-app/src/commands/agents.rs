@@ -11,8 +11,8 @@ use aisense_core::repo::{
 };
 use aisense_core::state::StateConfidence;
 use aisense_core::supervisor::{
-    AgentPreview, AgentStateChanged, AgentSupervisor, LaunchContext, StartOutcome,
-    SupervisorConfig, SupervisorError, SupervisorObserver,
+    AgentBootChanged, AgentPreview, AgentStateChanged, AgentSupervisor, BootDelivery,
+    LaunchContext, StartOutcome, SupervisorConfig, SupervisorError, SupervisorObserver,
 };
 use aisense_core::transcript::{
     export_transcript, read_transcript, summarize_sessions, SessionSummary, Transcript,
@@ -29,9 +29,13 @@ use super::runtimes::Registry;
 pub type Supervisor = AgentSupervisor<Store>;
 
 pub const AGENT_STATE: &str = "agent:state";
+/// A entrega do `BOOT.md` mudou (pelo terminal, termina depois do start — F04-06).
+pub const AGENT_BOOT: &str = "agent:boot";
 
 struct TauriObserver {
     app: AppHandle,
+    /// Estado do detector alimenta a entrega `push` (F05-07).
+    push: super::push::PushSink,
 }
 
 impl SupervisorObserver for TauriObserver {
@@ -44,7 +48,25 @@ impl SupervisorObserver for TauriObserver {
         if let Err(error) = self.app.emit(AGENT_STATE, payload) {
             tracing::warn!(agent = %agent_id, %error, "falha ao emitir o estado do agente");
         }
+        self.push.state(agent_id, state, confidence);
     }
+
+    fn boot_changed(&self, agent_id: &AgentId, boot: &BootDelivery) {
+        let payload = AgentBootChanged {
+            agent_id: agent_id.clone(),
+            boot: boot.clone(),
+        };
+        if let Err(error) = self.app.emit(AGENT_BOOT, payload) {
+            tracing::warn!(agent = %agent_id, %error, "falha ao emitir o boot do agente");
+        }
+    }
+}
+
+/// Por onde o `BOOT.md` da sessão atual foi entregue; `None` se o agente não subiu
+/// nesta execução do app.
+#[tauri::command]
+pub fn agent_boot(supervisor: State<'_, Supervisor>, agent_id: AgentId) -> Option<BootDelivery> {
+    supervisor.boot(&agent_id)
 }
 
 pub fn setup(
@@ -54,6 +76,7 @@ pub fn setup(
     runtimes: Registry,
     pty: Manager,
     skills: super::skills::Library,
+    push: super::push::PushSink,
 ) -> Supervisor {
     // Em desenvolvimento e no pacote, `aisense` e `aisense-mcp` ficam ao lado do app.
     let sidecar_dir = std::env::current_exe()
@@ -64,7 +87,10 @@ pub fn setup(
         runtimes,
         pty,
         Arc::new(TauriSink::new(app.clone())),
-        Arc::new(TauriObserver { app: app.clone() }),
+        Arc::new(TauriObserver {
+            app: app.clone(),
+            push,
+        }),
         SupervisorConfig {
             logs_dir: data.logs(),
             benches_dir: data.benches(),
@@ -75,6 +101,10 @@ pub fn setup(
             },
             size: TerminalSize::default(),
             skills,
+            // O `aisense-mcp` entrega o BOOT.md como `instructions` (F05-09) onde o AISENSE
+            // registra o servidor (`capabilities.mcp_config`).
+            mcp_boot: true,
+            stdin_boot_timeout: aisense_core::supervisor::STDIN_BOOT_TIMEOUT,
         },
     )
 }

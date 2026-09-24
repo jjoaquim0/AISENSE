@@ -94,6 +94,37 @@ pub trait SessionRepository: Send + Sync {
     ) -> impl Future<Output = RepoResult<Vec<SessionRecord>>> + Send;
 }
 
+/// O dono de um `AISENSE_TOKEN` (tabela `agent_tokens`, invariante I4).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TokenRecord {
+    pub agent_id: AgentId,
+    pub session_id: SessionId,
+    pub expires_at: Millis,
+}
+
+/// Tokens de IPC: um por sessão de agente, apagados quando ela termina (F05-04).
+pub trait TokenRepository: Send + Sync {
+    /// Falha com `AgentNotFound`/`Corrupt` se o agente ou a sessão não existem.
+    fn insert_token(
+        &self,
+        token: &str,
+        record: &TokenRecord,
+    ) -> impl Future<Output = RepoResult<()>> + Send;
+    /// Só devolve token ainda não expirado.
+    fn find_token(
+        &self,
+        token: &str,
+        now: Millis,
+    ) -> impl Future<Output = RepoResult<Option<TokenRecord>>> + Send;
+    /// Revoga os tokens de uma sessão (fim do processo). Devolve quantos saíram.
+    fn revoke_session_tokens(
+        &self,
+        session_id: &SessionId,
+    ) -> impl Future<Output = RepoResult<u64>> + Send;
+    /// Revoga tudo — na subida do app, nenhuma sessão anterior está viva.
+    fn revoke_all_tokens(&self) -> impl Future<Output = RepoResult<u64>> + Send;
+}
+
 /// Uma skill da biblioteca como o banco a conhece (tabela `skills`). O conteúdo mora no
 /// disco (`SKILL.md`); aqui fica a identidade estável que as atribuições referenciam.
 #[derive(Debug, Clone, PartialEq, Eq)]

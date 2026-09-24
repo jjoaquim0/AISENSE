@@ -37,6 +37,7 @@ hooks              = true    # suporta hooks → habilita o modo de entrega 'hoo
 model_flag         = "--model"
 cwd_is_project     = true    # a IA trata o cwd como projeto
 resume_flag        = "--continue"
+mcp_config         = ".mcp.json"    # onde registrar o aisense-mcp (formato mcpServers); pré-aprovado em settings_file
 
 [state]
 # Heurística de detecção de estado. Ver "Calibração" abaixo.
@@ -51,6 +52,7 @@ mode      = "stdin"             # stdin | none
 submit    = "\r"
 prefix    = "[AISENSE] "
 max_chars = 4000                # acima disso, grava em arquivo e injeta só o caminho
+boot      = true                # o BOOT.md pode entrar por aqui (F04-06); false no shell puro
 
 [skills]
 # Onde este runtime espera encontrar skills nativamente (além de .aisense/agents/<handle>/skills/)
@@ -109,6 +111,20 @@ versão da CLI em que as flags foram conferidas. Particularidades:
 > tratado como *configuração que pode quebrar*, nunca como contrato estável. Por isso a UI mostra
 > o resultado de `detect` e permite editar o TOML sem sair do app (Configurações → Runtimes).
 
+## Entrega do `BOOT.md` (F04-06)
+
+Na subida, o supervisor escolhe o melhor caminho que o adaptador tem e registra qual usou
+(linha "Boot" do inspetor, evento `agent:boot`):
+
+1. `capabilities.system_prompt_flag` → o `BOOT.md` inteiro vai como argumento depois da flag.
+2. `capabilities.mcp` **e** `capabilities.mcp_config` (o AISENSE registra o `aisense-mcp` no
+   arquivo do projeto) → entregue como `instructions` na conexão MCP. O `codex` tem MCP, mas a
+   configuração dele é global do usuário: o AISENSE não mexe nela, e ele segue pelo terminal.
+3. `[inject] mode = "stdin"` com `boot = true` → no primeiro ocioso com confiança alta o
+   supervisor digita `<prefix>Leia .aisense/agents/<handle>/BOOT.md e siga as instruções...` +
+   `submit`. Nunca com o agente aguardando o humano; sem prompt em 30 s, desiste e avisa.
+4. Senão, nada: o arquivo fica em `.aisense/agents/<handle>/BOOT.md` para quem quiser ler.
+
 ## Ambiente injetado em TODO agente
 
 Independente do adaptador, todo PTY recebe:
@@ -121,6 +137,7 @@ AISENSE_AGENT_HANDLE=backend
 AISENSE_TEAM_ID=tem_01J...
 AISENSE_TEAM_NAME=Squad Produto
 AISENSE_WORKDIR=/Users/voce/projeto
+AISENSE_BOOT_FILE=/Users/voce/projeto/.aisense/agents/backend/BOOT.md
 PATH=<dir dos sidecars>:$PATH     # coloca `aisense` e `aisense-mcp` à mão
 ```
 

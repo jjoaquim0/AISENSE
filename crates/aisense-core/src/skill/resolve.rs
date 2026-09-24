@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-use super::catalog::SkillCatalog;
+use super::catalog::{SkillCatalog, TEAMWORK_SKILL};
 use super::model::Skill;
 use crate::ids::AgentId;
 use crate::repo::{RepoResult, SkillRepository};
@@ -114,6 +114,10 @@ pub async fn resolve_agent_skills<S: SkillRepository>(
         let Some(record) = records.iter().find(|r| r.id == entry.skill_id) else {
             continue;
         };
+        // Já vai em todo BOOT.md, em seção própria; atribuída, entraria duas vezes.
+        if record.slug == TEAMWORK_SKILL {
+            continue;
+        }
         match catalog.get(&record.slug) {
             None => resolved
                 .ignored
@@ -277,5 +281,29 @@ mod tests {
             .unwrap();
         assert!(resolved.active.is_empty());
         assert_eq!(resolved.ignored[0].reason, IgnoreReason::Missing);
+    }
+
+    #[tokio::test]
+    async fn trabalho_em_equipe_atribuida_nao_entra_duas_vezes() {
+        let (store, catalog, agent, records) = setup(
+            "claude",
+            &[
+                (TEAMWORK_SKILL, md(TEAMWORK_SKILL, "")),
+                ("outra", md("outra", "")),
+            ],
+        )
+        .await;
+        store
+            .set_agent_skills(
+                &agent,
+                &assign(&records, &[(TEAMWORK_SKILL, true), ("outra", true)]),
+            )
+            .await
+            .unwrap();
+        let resolved = resolve_agent_skills(&store, &catalog, &agent, "claude")
+            .await
+            .unwrap();
+        assert_eq!(resolved.plan().active, ["outra"]);
+        assert!(resolved.ignored.is_empty());
     }
 }
