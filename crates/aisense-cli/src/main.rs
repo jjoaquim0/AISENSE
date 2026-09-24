@@ -57,10 +57,16 @@ fn main() -> ExitCode {
 }
 
 async fn run(parsed: Parsed) -> u8 {
+    let quiet_if_absent = matches!(parsed.command, Command::Inbox { if_any: true, .. });
     let (Ok(socket), Ok(token)) = (
         std::env::var("AISENSE_SOCKET"),
         std::env::var("AISENSE_TOKEN"),
     ) else {
+        // O hook roda também quando o runtime é aberto fora do AISENSE: aí não há caixa
+        // para ler, e isso não é erro.
+        if quiet_if_absent {
+            return exit::OK;
+        }
         eprintln!("erro: este terminal não foi aberto pelo AISENSE (AISENSE_SOCKET/AISENSE_TOKEN ausentes).");
         eprintln!("dica: rode o comando no terminal de um agente da equipe.");
         return exit::UNAVAILABLE;
@@ -75,6 +81,13 @@ async fn run(parsed: Parsed) -> u8 {
         }
     };
     let if_any = matches!(parsed.command, Command::Inbox { if_any: true, .. });
+    let hook_json = matches!(
+        parsed.command,
+        Command::Inbox {
+            hook_json: true,
+            ..
+        }
+    );
     let request = match parsed.command.into_request() {
         Ok(request) => request,
         Err(message) => {
@@ -99,6 +112,12 @@ async fn run(parsed: Parsed) -> u8 {
         return exit::OK;
     }
     let text = render::render(op, &data, if_any);
+    if hook_json {
+        if let Some(line) = aisense_core::bus::hook_output(&text) {
+            println!("{line}");
+        }
+        return exit::OK;
+    }
     if !text.is_empty() {
         print!("{text}");
     }

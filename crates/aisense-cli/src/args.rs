@@ -12,6 +12,7 @@ aisense — fale com a sua equipe de agentes (AISENSE)
   aisense ask @alguem \"pergunta\"         pergunta e espera a resposta [--timeout 300]
   aisense reply <id> \"texto\"             responde uma pergunta que te fizeram
   aisense inbox [--drain] [--if-any]     mensagens não lidas (--drain marca como lidas)
+                 [--hook-json]           formato do hook Stop do Claude Code
   aisense wait [--timeout 120]           espera a próxima mensagem
   aisense note \"texto\"                   registra na linha do tempo
   aisense status \"estado\" [--note x]     diz o que você está fazendo
@@ -47,6 +48,8 @@ pub enum Command {
     Inbox {
         drain: bool,
         if_any: bool,
+        /// Saída no formato do hook `Stop` do Claude Code (F05-08).
+        hook_json: bool,
     },
     Wait {
         timeout_s: Option<u32>,
@@ -120,7 +123,15 @@ pub fn parse(argv: &[String]) -> Result<Parsed, String> {
         "inbox" => {
             let drain = take_flag(&mut args, "--drain");
             let if_any = take_flag(&mut args, "--if-any");
-            no_args(&args, Command::Inbox { drain, if_any })?
+            let hook_json = take_flag(&mut args, "--hook-json");
+            no_args(
+                &args,
+                Command::Inbox {
+                    drain,
+                    if_any,
+                    hook_json,
+                },
+            )?
         }
         "wait" => {
             let timeout_s = take_number(&mut args, "--timeout")?;
@@ -265,7 +276,8 @@ mod tests {
             parsed.command,
             Command::Inbox {
                 drain: true,
-                if_any: false
+                if_any: false,
+                hook_json: false
             }
         );
         assert_eq!(

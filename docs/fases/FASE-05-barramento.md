@@ -127,11 +127,20 @@ nenhuma injeção ocorre com o agente em `awaiting_input`. Depende de F05-05, F0
 > ligação no app não tem teste automatizado (o crate do app fica fora da suíte por depender de
 > GUI) — é cola fina sobre as regras testadas.
 
-### [ ] F05-08 — Entrega em modo `hook`
+### [x] F05-08 — Entrega em modo `hook`
 Mesclar (nunca sobrescrever) o hook de fim de turno em `.claude/settings.json` para runtimes com
 `capabilities.hooks = true`, executando `aisense inbox --drain --if-any`.
 **Aceite:** um agente Claude Code checa a caixa sozinho ao fim de cada turno; configuração
 pré-existente do usuário é preservada. Depende de F05-05.
+> Feito: `aisense-core/src/bus/hook.rs`. No start de um agente com `delivery_mode = hook` num
+> runtime com `capabilities.hooks` e `skills.settings_file`, a materialização mescla o hook
+> `Stop` no `settings.json` (uma vez; o resto do arquivo intacto; JSON quebrado não é tocado e
+> vira ressalva; runtime sem hooks vira ressalva "fica em pull"). O comando é
+> `aisense inbox --drain --if-any --hook-json`: com mensagem, `{"decision":"block","reason":...}`
+> para o Claude Code continuar com as mensagens; sem mensagem ou fora do AISENSE, silêncio e
+> exit 0. Aceite: testes de mescla (configuração do usuário e hook `Stop` dele preservados,
+> idempotente, arquivo criado quando não existe) e do formato de saída. "Checa sozinho ao fim
+> de cada turno" com o Claude Code de verdade só se confere numa máquina com ele instalado.
 
 ### [ ] F05-09 — Servidor MCP `aisense-mcp`
 Binário MCP stdio expondo `aisense_list_agents`, `aisense_send_message`, `aisense_ask_agent`,

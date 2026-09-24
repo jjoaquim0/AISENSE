@@ -132,14 +132,18 @@ Regras rígidas de segurança:
 
 ### `hook` (o melhor, quando disponível)
 Para runtimes com hooks (Claude Code), o AISENSE instala um hook de fim de turno que roda
-`aisense inbox --drain --if-any`. Resultado: o agente checa a caixa **sozinho**, no momento certo,
-sem injeção e sem depender da heurística de estado.
+`aisense inbox --drain --if-any --hook-json`. Com mensagem nova, a CLI responde
+`{"decision":"block","reason":"<as mensagens>"}` — o formato do hook `Stop` que faz o agente
+continuar em vez de parar, já com as mensagens em mãos; sem mensagem, não imprime nada e ele para
+normalmente. Fora de um terminal do AISENSE (o mesmo projeto aberto à mão), o comando sai calado
+com exit 0. Resultado: o agente checa a caixa **sozinho**, no momento certo, sem injeção e sem
+depender da heurística de estado.
 
 ```jsonc
-// <workdir>/.claude/settings.json (mesclado, não sobrescrito)
+// <workdir>/.claude/settings.json (mesclado, não sobrescrito; instalado no start do agente)
 {
   "hooks": {
-    "Stop": [{ "hooks": [{ "type": "command", "command": "aisense inbox --drain --if-any" }] }]
+    "Stop": [{ "hooks": [{ "type": "command", "command": "aisense inbox --drain --if-any --hook-json" }] }]
   }
 }
 ```

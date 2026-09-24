@@ -197,6 +197,16 @@ fn fora_de_um_agente_explica_e_sai_com_3() {
     assert_eq!(out.status.code(), Some(3));
     assert!(String::from_utf8_lossy(&out.stderr).contains("não foi aberto pelo AISENSE"));
 
+    // O hook Stop também roda quando o Claude Code é aberto fora do AISENSE: silêncio, exit 0.
+    let hook = std::process::Command::new(env!("CARGO_BIN_EXE_aisense"))
+        .args(["inbox", "--drain", "--if-any", "--hook-json"])
+        .env_remove("AISENSE_SOCKET")
+        .env_remove("AISENSE_TOKEN")
+        .output()
+        .unwrap();
+    assert_eq!(hook.status.code(), Some(0));
+    assert!(hook.stdout.is_empty() && hook.stderr.is_empty());
+
     let usage = std::process::Command::new(env!("CARGO_BIN_EXE_aisense"))
         .args(["send", "sem-destino"])
         .output()

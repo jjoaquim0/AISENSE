@@ -207,6 +207,26 @@ pub fn materialize(req: &MaterializeRequest<'_>) -> Result<Materialized, Materia
     if let Some(target) = &req.adapter.skills {
         sync_native(req, &root, &target.dir, handle, &old_handles, &mut warnings)?;
     }
+    // Modo `hook` (F05-08): o runtime checa a caixa sozinho ao fim do turno.
+    if req.agent.delivery_mode == crate::agent::DeliveryMode::Hook {
+        let settings = req
+            .adapter
+            .skills
+            .as_ref()
+            .and_then(|t| t.settings_file.as_deref())
+            .filter(|_| req.adapter.capabilities.hooks);
+        match settings {
+            Some(file) => {
+                if let Err(problem) = crate::bus::install_inbox_hook(&req.workdir.join(file)) {
+                    warnings.push(format!("@{handle}: {problem}"));
+                }
+            }
+            None => warnings.push(format!(
+                "@{handle} está em modo hook, mas o runtime {} não tem hooks: as mensagens ficam na caixa (pull)",
+                req.adapter.id
+            )),
+        }
+    }
     Ok(Materialized {
         agent_dir,
         boot_path,

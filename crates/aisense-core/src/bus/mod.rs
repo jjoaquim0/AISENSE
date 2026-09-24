@@ -5,12 +5,14 @@
 //! e a UI chamam esta mesma função — nenhuma fachada tem lógica própria.
 
 mod guards;
+mod hook;
 mod model;
 mod push;
 mod repo;
 mod service;
 
 pub use guards::{BlockReason, BusBlocked, GuardConfig};
+pub use hook::{hook_output, install_inbox_hook, HookInstall, INBOX_HOOK_COMMAND};
 pub use model::{
     valid_channel, Address, Channel, Delivery, DeliveryState, InboxItem, Message, MessageKind,
     MessageMeta, Priority, Sender, Target, CHANNEL_SLUG_MAX, MESSAGE_BODY_MAX,
