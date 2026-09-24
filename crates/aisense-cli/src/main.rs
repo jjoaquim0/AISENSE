@@ -5,6 +5,8 @@
 //! (ver `docs/02-arquitetura.md` e ADR 0004).
 #![forbid(unsafe_code)]
 
+mod local;
+
 use std::process::ExitCode;
 
 use aisense_ipc::{Client, ClientError, Response};
@@ -55,6 +57,10 @@ fn main() -> ExitCode {
 }
 
 async fn run(parsed: Parsed) -> u8 {
+    // `run`, `commands` e `bench` acontecem aqui mesmo, no terminal do agente.
+    if let Some(code) = local::handle(&parsed.command, parsed.json).await {
+        return code;
+    }
     let quiet_if_absent = matches!(parsed.command, Command::Inbox { if_any: true, .. });
     let (Ok(socket), Ok(token)) = (
         std::env::var("AISENSE_SOCKET"),

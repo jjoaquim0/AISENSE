@@ -189,6 +189,14 @@ pub fn materialize(req: &MaterializeRequest<'_>) -> Result<Materialized, Materia
         .list()
         .unwrap_or_default();
     let notes_index = crate::notes::boot_index(&notes, req.now, crate::notes::NOTES_BOOT_INDEX);
+    // Comandos do projeto (`docs/17`), do `aisense.toml` do diretório do agente.
+    let commands = match crate::project::load_project(req.workdir) {
+        crate::project::ProjectLookup::Found { config, .. } => {
+            crate::project::run::boot_section(&config)
+        }
+        _ => String::new(),
+    };
+    let notes_index = commands + &notes_index;
     let boot = compose_boot(
         req.agent,
         req.team,
