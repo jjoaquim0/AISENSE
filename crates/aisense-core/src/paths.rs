@@ -43,6 +43,11 @@ impl DataDir {
         self.0.join("aisense.db")
     }
 
+    /// Preferências do app (T9; F08-05).
+    pub fn settings(&self) -> PathBuf {
+        self.0.join("settings.json")
+    }
+
     pub fn adapters(&self) -> PathBuf {
         self.0.join("adapters")
     }

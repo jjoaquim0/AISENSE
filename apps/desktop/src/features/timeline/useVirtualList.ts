@@ -96,9 +96,29 @@ export function useVirtualList(keys: string[], container: RefObject<HTMLElement 
     [observer],
   );
 
+  /** Onde começa o item `key`, e qual item está na altura `y` (âncora da F08-06). */
+  const offsetOf = useCallback(
+    (key: string): number | null => {
+      const index = keys.indexOf(key);
+      return index < 0 ? null : (offsets[index] ?? null);
+    },
+    [keys, offsets],
+  );
+  const keyAt = useCallback(
+    (y: number): { key: string; offset: number } | null => {
+      if (keys.length === 0) return null;
+      const index = indexAt(offsets, y);
+      const key = keys[index];
+      return key === undefined ? null : { key, offset: offsets[index] ?? 0 };
+    },
+    [keys, offsets],
+  );
+
   return {
     first,
     last,
+    offsetOf,
+    keyAt,
     before: offsets[first] ?? 0,
     after: total - (offsets[last + 1] ?? total),
     total,

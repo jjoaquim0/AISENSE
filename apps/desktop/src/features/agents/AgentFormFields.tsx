@@ -3,7 +3,7 @@ import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { AlertTriangle, Check, ChevronRight, FolderOpen, Minus, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { type Resolver, useForm } from 'react-hook-form';
-import { Button, Input } from '@/components/ui';
+import { Button, Input, SkeletonList } from '@/components/ui';
 import { runtimesApi } from '@/features/runtimes/api';
 import { errorMessage } from '@/features/teams/api';
 import { cn } from '@/lib/cn';
@@ -170,7 +170,7 @@ export function AgentFormFields({
 
       <fieldset className="flex flex-col gap-1">
         <legend className="text-label text-secondary">Runtime</legend>
-        {!runtimes && <p className="text-caption text-muted">Verificando os runtimes…</p>}
+        {!runtimes && <SkeletonList rows={3} label="Verificando os runtimes" />}
         <div className="divide-y divide-subtle rounded-lg border border-subtle">
           {runtimes?.map((r) => (
             <RuntimeOption

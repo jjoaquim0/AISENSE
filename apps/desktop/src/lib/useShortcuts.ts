@@ -6,6 +6,8 @@ import {
   DOUBLE_ESCAPE_MS,
   isMacPlatform,
   normalize,
+  type Remap,
+  resolveCombo,
 } from './shortcuts';
 
 /**
@@ -29,6 +31,12 @@ export function useShortcuts(bindings: Bindings): void {
 }
 
 const layers: Bindings[] = [];
+let remap: Remap = { toDefault: new Map(), disabled: new Set() };
+
+/** Remapeamento vindo das Configurações (`buildRemap`). Vale na próxima tecla. */
+export function setShortcutRemap(next: Remap): void {
+  remap = next;
+}
 let installed = false;
 let lastEscape = Number.NEGATIVE_INFINITY;
 
@@ -47,7 +55,8 @@ function onKeyDown(event: KeyboardEvent): void {
 
   if (terminal && leaveTerminal(event, terminal)) return;
 
-  const combo = comboOf(event);
+  const pressed = comboOf(event);
+  const combo = pressed && resolveCombo(pressed, remap);
   if (!combo) return;
   for (let i = layers.length - 1; i >= 0; i--) {
     const binding = layers[i]?.[combo];

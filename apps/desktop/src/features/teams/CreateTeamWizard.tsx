@@ -1,7 +1,7 @@
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { AlertTriangle, Check, FolderOpen } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Button, Dialog, Input } from '@/components/ui';
+import { Button, Dialog, Input, SkeletonList } from '@/components/ui';
 import { runtimesApi } from '@/features/runtimes/api';
 import { cn } from '@/lib/cn';
 import type { AgentColor } from '@/types/generated/AgentColor';
@@ -12,7 +12,7 @@ import type { TeamTemplate } from '@/types/generated/TeamTemplate';
 import { errorMessage, teamsApi } from './api';
 import { useTeams } from './store';
 
-const COLORS: AgentColor[] = [
+export const COLORS: AgentColor[] = [
   'violet',
   'cyan',
   'emerald',
@@ -23,7 +23,7 @@ const COLORS: AgentColor[] = [
   'fuchsia',
 ];
 
-const TEMPLATES: { id: TeamTemplate; title: string; agents: string }[] = [
+export const TEMPLATES: { id: TeamTemplate; title: string; agents: string }[] = [
   { id: 'empty', title: 'Vazio', agents: 'Comece sem agentes e adicione depois.' },
   { id: 'duo-dev', title: 'Dupla Dev', agents: '@dev implementa, @revisor revisa.' },
   {
@@ -321,7 +321,8 @@ function ReviewStep({
   onChange: (planned: PlannedAgent[]) => void;
   templateTitle: string;
 }) {
-  if (!planned) return <p className="text-caption text-muted">Verificando os runtimes…</p>;
+  if (!planned)
+    return <SkeletonList rows={2} label="Verificando os runtimes" rowClassName="h-12" />;
   if (planned.length === 0) {
     return (
       <p className="text-body text-secondary">

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 /** Telas de primeiro nível, trocadas pelo trilho esquerdo (docs/09). */
-export type Screen = 'teams' | 'skills';
+export type Screen = 'teams' | 'skills' | 'settings';
 
 interface NavState {
   screen: Screen;

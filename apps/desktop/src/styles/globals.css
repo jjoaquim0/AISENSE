@@ -79,6 +79,32 @@ body,
   height: 100%;
 }
 
+/* Indicadores de estado animados em passos (F08-01): o mesmo sinal com 4 a 6 repinturas
+   por segundo em vez de 60. Sem GPU (WebKitGTK com GL por software), 12 pontos girando
+   suavemente custavam um núcleo inteiro do processo da página. */
+@keyframes aisense-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes aisense-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+@utility motion-spin-steps {
+  animation: aisense-spin 2s steps(8) infinite;
+}
+@utility motion-pulse-steps {
+  animation: aisense-pulse 1.5s steps(6) infinite;
+}
+
+/* Controles nativos na cor de acento do tema, não no azul do navegador (F08-09). */
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: var(--accent);
+}
+
 body {
   margin: 0;
   background-color: var(--bg-base);

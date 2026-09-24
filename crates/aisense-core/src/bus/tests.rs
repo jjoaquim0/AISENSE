@@ -582,6 +582,41 @@ mod guards {
     }
 
     #[tokio::test]
+    async fn limites_novos_valem_sem_reiniciar_o_barramento() {
+        let s = squad().await;
+        let (team, a) = (s.team.clone(), from(&s, "backend"));
+        let bus = BusService::new(
+            Arc::new(s.store),
+            Arc::new(|_: &AgentId| AgentState::Idle),
+            Arc::new(NoObserver),
+        );
+        assert_eq!(bus.ask_default(), ASK_DEFAULT);
+        bus.set_limits(
+            GuardConfig {
+                team_per_hour: 2,
+                ..GuardConfig::default()
+            },
+            std::time::Duration::from_secs(42),
+        );
+        assert_eq!(bus.ask_default(), std::time::Duration::from_secs(42));
+        for i in 0..2 {
+            let out = Outgoing::message(a.clone(), addr("@frontend"), format!("oi {i}"));
+            bus.dispatch(&team, out).await.unwrap();
+        }
+        let out = Outgoing::message(a.clone(), addr("@frontend"), "mais uma");
+        assert_eq!(
+            bus.dispatch(&team, out).await.unwrap_err().code(),
+            "team_paused"
+        );
+        // O teto do ask continua valendo.
+        bus.set_limits(
+            GuardConfig::default(),
+            std::time::Duration::from_secs(99_999),
+        );
+        assert_eq!(bus.ask_default(), ASK_MAX);
+    }
+
+    #[tokio::test]
     async fn ping_pong_e_interrompido_e_o_humano_decide() {
         let s = squad().await;
         let (team, a, b) = (s.team.clone(), from(&s, "backend"), from(&s, "frontend"));

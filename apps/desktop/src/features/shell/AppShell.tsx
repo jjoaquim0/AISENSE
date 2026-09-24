@@ -1,4 +1,4 @@
-import { BookOpen, Moon, PanelRight, Plus, Sun, Users } from 'lucide-react';
+import { BookOpen, Moon, PanelRight, Plus, Settings, Sun, Users } from 'lucide-react';
 import { type ReactNode, useCallback, useMemo } from 'react';
 import { IconButton, Tooltip } from '@/components/ui';
 import { formatShortcut } from '@/components/ui/Kbd';
@@ -11,7 +11,8 @@ import { useShortcuts } from '@/lib/useShortcuts';
 import { type Screen, useNav } from './nav';
 import { ResizeHandle } from './ResizeHandle';
 import { type SlotName, useShellSlots } from './slots';
-import { INSPECTOR_BOUNDS, SIDEBAR_BOUNDS, usePanels } from './usePanels';
+import { fitPanels, INSPECTOR_BOUNDS, SIDEBAR_BOUNDS, usePanels } from './usePanels';
+import { useWindowWidth } from './useWindowWidth';
 
 /**
  * Estrutura global da janela — docs/09-telas-e-fluxos.md:
@@ -28,6 +29,18 @@ export function AppShell({ children }: { children: ReactNode }) {
     toggleSidebar,
     toggleInspector,
   } = usePanels();
+  const windowWidth = useWindowWidth();
+  // Com zoom alto ou janela estreita os painéis cedem espaço ao terminal (F08-02).
+  const fit = fitPanels(windowWidth, {
+    sidebarWidth,
+    inspectorWidth,
+    sidebarVisible,
+    inspectorVisible,
+  });
+  // Skills e Configurações ocupam a área toda: a sidebar e o inspetor falam da equipe
+  // aberta, que não é o assunto dessas telas (F08-09).
+  const screen = useNav((s) => s.screen);
+  const teamScreen = screen === 'teams';
   const { toggle: toggleTheme } = useTheme();
   const setPaletteOpen = usePalette((s) => s.setOpen);
   const go = useNav((s) => s.go);
@@ -41,8 +54,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       '⌘I': toggleInspector,
       '⌘⇧D': toggleTheme,
       '⌘K': () => setPaletteOpen(true),
+      '⌘,': () => go('settings'),
     }),
-    [toggleSidebar, toggleInspector, toggleTheme, setPaletteOpen],
+    [toggleSidebar, toggleInspector, toggleTheme, setPaletteOpen, go],
   );
   useShortcuts(shortcuts);
 
@@ -82,6 +96,14 @@ export function AppShell({ children }: { children: ReactNode }) {
         },
       },
       {
+        id: 'go:settings',
+        label: 'Configurações',
+        group: 'Ir para',
+        shortcut: '⌘,',
+        keywords: ['preferências', 'ajustes', 'calibração', 'segredos', 'atalhos'],
+        run: () => go('settings'),
+      },
+      {
         id: 'settings:theme',
         label: 'Alternar tema claro/escuro',
         group: 'Configurações',
@@ -110,10 +132,15 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-full flex-col bg-base text-primary">
       <CommandPalette global={globalActions} />
-      <TitleBar onToggleInspector={toggleInspector} inspectorVisible={inspectorVisible} />
+      <TitleBar
+        onToggleInspector={toggleInspector}
+        inspectorVisible={fit.inspector && teamScreen}
+        inspectorSqueezed={teamScreen && inspectorVisible && !fit.inspector}
+        showInspectorToggle={teamScreen}
+      />
       <div className="flex min-h-0 flex-1">
         <TeamRail />
-        {sidebarVisible && (
+        {fit.sidebar && teamScreen && (
           <>
             <Sidebar width={sidebarWidth} />
             <ResizeHandle
@@ -127,7 +154,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </>
         )}
         <main className="min-w-0 flex-1 overflow-auto">{children}</main>
-        {inspectorVisible && (
+        {fit.inspector && teamScreen && (
           <>
             <ResizeHandle
               value={inspectorWidth}
@@ -148,9 +175,14 @@ export function AppShell({ children }: { children: ReactNode }) {
 function TitleBar({
   onToggleInspector,
   inspectorVisible,
+  inspectorSqueezed,
+  showInspectorToggle,
 }: {
   onToggleInspector: () => void;
   inspectorVisible: boolean;
+  /** Ligado, mas sem espaço na janela: o botão explica em vez de parecer quebrado. */
+  inspectorSqueezed: boolean;
+  showInspectorToggle: boolean;
 }) {
   const { theme, toggle } = useTheme();
   const dark = isDark(theme);
@@ -162,17 +194,23 @@ function TitleBar({
     >
       <span className="text-label text-secondary">AISENSE</span>
       <div className="flex items-center gap-0.5">
-        <Tooltip
-          content={`${inspectorVisible ? 'Ocultar' : 'Mostrar'} inspetor · ${formatShortcut('⌘I')}`}
-        >
-          <IconButton
-            label={inspectorVisible ? 'Ocultar inspetor' : 'Mostrar inspetor'}
-            onClick={onToggleInspector}
-            className={inspectorVisible ? 'text-primary' : undefined}
+        {showInspectorToggle && (
+          <Tooltip
+            content={
+              inspectorSqueezed
+                ? 'Sem espaço para o inspetor: aumente a janela ou diminua o zoom'
+                : `${inspectorVisible ? 'Ocultar' : 'Mostrar'} inspetor · ${formatShortcut('⌘I')}`
+            }
           >
-            <PanelRight size={15} />
-          </IconButton>
-        </Tooltip>
+            <IconButton
+              label={inspectorVisible ? 'Ocultar inspetor' : 'Mostrar inspetor'}
+              onClick={onToggleInspector}
+              className={inspectorVisible ? 'text-primary' : undefined}
+            >
+              <PanelRight size={15} />
+            </IconButton>
+          </Tooltip>
+        )}
         <Tooltip content={`Tema ${dark ? 'claro' : 'escuro'} · ${formatShortcut('⌘⇧D')}`}>
           <IconButton label={dark ? 'Usar tema claro' : 'Usar tema escuro'} onClick={toggle}>
             {dark ? <Sun size={15} /> : <Moon size={15} />}
@@ -205,8 +243,9 @@ function TeamRail() {
           <Plus size={16} />
         </button>
       </Tooltip>
-      <div className="mt-auto">
+      <div className="mt-auto flex flex-col gap-2">
         <RailButton screen="skills" label="Biblioteca de skills" icon={<BookOpen size={16} />} />
+        <RailButton screen="settings" label="Configurações" icon={<Settings size={16} />} />
       </div>
     </nav>
   );
@@ -265,7 +304,9 @@ function Sidebar({ width }: { width: number }) {
             <h2 className="px-2.5 pb-1 text-caption tracking-[0.02em] text-muted uppercase">
               Agentes
             </h2>
-            <p className="px-2.5 py-1.5 text-caption text-muted">Nenhuma equipe aberta.</p>
+            <p className="px-2.5 py-1.5 text-caption text-muted">
+              Nenhuma equipe aberta. Escolha uma na lista ou crie com o + do trilho.
+            </p>
           </section>
         }
       />

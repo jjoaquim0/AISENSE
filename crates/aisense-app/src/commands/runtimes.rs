@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use aisense_core::adapter::{AdapterCatalog, AdapterWatcher, RuntimeOverview, RuntimeRegistry};
 use aisense_core::{CommandError, DataDir};
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 pub type Registry = Arc<RuntimeRegistry>;
 
@@ -21,6 +21,10 @@ pub fn setup(app: &AppHandle, data: &DataDir) -> (Registry, Option<Mutex<Adapter
     let handle = app.clone();
     let watcher = AdapterWatcher::spawn(&dir, move |catalog| {
         for_watcher.set_catalog(catalog);
+        // Regras de estado novas valem já nas sessões vivas (modo calibração, F08-05).
+        if let Some(supervisor) = handle.try_state::<super::agents::Supervisor>() {
+            supervisor.refresh_state_rules();
+        }
         if let Err(error) = handle.emit(ADAPTERS_CHANGED, ()) {
             tracing::warn!(%error, "falha ao avisar a UI sobre adaptadores novos");
         }

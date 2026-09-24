@@ -87,3 +87,24 @@ function pick(state: PanelStore): PanelState {
     inspectorVisible: state.inspectorVisible,
   };
 }
+
+/** Largura do trilho de equipes (docs/09). */
+export const RAIL_WIDTH = 48;
+/** Abaixo disto a área principal não serve para um terminal: os painéis cedem (F08-02). */
+export const MAIN_MIN = 420;
+
+/**
+ * Quais painéis cabem numa janela de `windowWidth` px (CSS — com zoom de 150%, uma
+ * janela de 1024 vira 683). Quem cede primeiro é o inspetor, depois a sidebar; a
+ * preferência do usuário não muda, e com espaço os dois voltam sozinhos.
+ */
+export function fitPanels(
+  windowWidth: number,
+  { sidebarWidth, inspectorWidth, sidebarVisible, inspectorVisible }: PanelState,
+): { sidebar: boolean; inspector: boolean } {
+  let room = windowWidth - RAIL_WIDTH;
+  const sidebar = sidebarVisible && room - sidebarWidth >= MAIN_MIN;
+  if (sidebar) room -= sidebarWidth;
+  const inspector = inspectorVisible && room - inspectorWidth >= MAIN_MIN;
+  return { sidebar, inspector };
+}

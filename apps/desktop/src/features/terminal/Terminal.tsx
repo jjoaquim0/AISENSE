@@ -5,6 +5,8 @@ import { WebglAddon } from '@xterm/addon-webgl';
 import { Terminal as Xterm } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
 import { useEffect, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
+import { terminalFontOf, useSettings } from '@/features/settings/store';
 import { cn } from '@/lib/cn';
 import { onPtyData, onPtyExit } from '@/lib/events';
 import { useTheme } from '@/lib/theme';
@@ -49,6 +51,9 @@ export function Terminal({
   const gate = useRef<HydrationGate | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const { theme } = useTheme();
+  const font = useSettings(useShallow((s) => terminalFontOf(s.view?.settings)));
+  const fontAtMount = useRef(font);
+  fontAtMount.current = font;
   // O efeito de montagem lê o tema uma vez; colocá-lo nas dependências recriaria o
   // terminal (e apagaria o conteúdo) a cada troca de tema.
   const themeAtMount = useRef(theme);
@@ -62,9 +67,7 @@ export function Terminal({
     const xterm = new Xterm({
       allowProposedApi: true,
       cursorBlink: true,
-      fontFamily: 'var(--font-mono)',
-      fontSize: 13,
-      lineHeight: 1.4,
+      ...fontAtMount.current,
       scrollback: 10_000,
       theme: readTerminalTheme(themeAtMount.current),
       // O histórico vive no core; o xterm é só a tela.
@@ -106,6 +109,18 @@ export function Terminal({
     fitAddon.fit();
     void terminalApi.resize(agentId, xterm.rows, xterm.cols).catch(reportError);
 
+    // A fonte mono chega depois do primeiro desenho: o xterm mediu os caracteres com a
+    // reserva e ficaria com espaçamento errado até a próxima troca de fonte. Trocar e
+    // voltar força a medição de novo.
+    let disposed = false;
+    void document.fonts?.ready.then(() => {
+      if (disposed) return;
+      const family = xterm.options.fontFamily;
+      xterm.options.fontFamily = 'monospace';
+      xterm.options.fontFamily = family;
+      fitAddon.fit();
+    });
+
     // A saída ao vivo passa pelo portão: durante uma reidratação ela espera o
     // histórico ser escrito, para não aparecer acima dele.
     const hydration = new HydrationGate((data) => xterm.write(data));
@@ -123,6 +138,7 @@ export function Terminal({
     });
 
     return () => {
+      disposed = true;
       unregisterFocus();
       stopData();
       stopExit();
@@ -163,6 +179,25 @@ export function Terminal({
   useEffect(() => {
     if (term.current) term.current.options.theme = readTerminalTheme(theme);
   }, [theme]);
+
+  // ── Fonte e densidade (Configurações): muda a métrica, então refaz o encaixe ──
+  useEffect(() => {
+    const xterm = term.current;
+    if (!xterm) return;
+    const { fontFamily, fontSize, lineHeight } = font;
+    if (
+      xterm.options.fontFamily === fontFamily &&
+      xterm.options.fontSize === fontSize &&
+      xterm.options.lineHeight === lineHeight
+    ) {
+      return;
+    }
+    xterm.options.fontFamily = fontFamily;
+    xterm.options.fontSize = fontSize;
+    xterm.options.lineHeight = lineHeight;
+    fit.current?.fit();
+    void terminalApi.resize(agentId, xterm.rows, xterm.cols).catch(reportError);
+  }, [agentId, font]);
 
   // ── Limpar: tela do xterm e histórico do core juntos, senão a próxima reidratação
   //    traria de volta o que o usuário acabou de apagar ──
@@ -206,7 +241,8 @@ export function Terminal({
         ref={host}
         role="application"
         aria-label={`${label}. Esc duas vezes volta para a interface.`}
-        className="size-full"
+        // Respiro para o texto não encostar na borda; o FitAddon desconta o padding.
+        className="size-full px-2 pt-1.5"
       />
     </div>
   );

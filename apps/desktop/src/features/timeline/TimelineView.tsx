@@ -2,6 +2,7 @@ import { Clock, Hash, Send, ShieldAlert } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui';
 import { busApi, onBusMessage, onBusRead } from '@/features/bus/api';
+import type { TimelineScroll } from '@/features/team-room/hooks/useTeamLayout';
 import { errorMessage } from '@/features/teams/api';
 import { cn } from '@/lib/cn';
 import type { Agent } from '@/types/generated/Agent';
@@ -29,7 +30,13 @@ const time = new Intl.DateTimeFormat('pt-BR', { timeStyle: 'short' });
 interface TimelineViewProps {
   teamId: TeamId;
   agents: Agent[];
+  /** Onde a rolagem estava da última vez (F08-06); `null` = no fim. */
+  initialScroll?: TimelineScroll | null;
+  onScrollChange?: (scroll: TimelineScroll | null) => void;
 }
+
+/** Enquanto a posição salva é reaplicada: as alturas reais chegam depois da primeira pintura. */
+const RESTORE_WINDOW_MS = 1500;
 
 /**
  * Linha do tempo da equipe (docs/09, T4.4): toda a conversa, com cor de quem mandou,
@@ -40,7 +47,12 @@ interface TimelineViewProps {
  * mil rolam leves. Mensagem nova só rola a tela se você já estava no fim — lendo o
  * histórico, nada pula.
  */
-export function TimelineView({ teamId, agents }: TimelineViewProps) {
+export function TimelineView({
+  teamId,
+  agents,
+  initialScroll = null,
+  onScrollChange,
+}: TimelineViewProps) {
   const [messages, setMessages] = useState<MessageView[]>([]);
   const [hasOlder, setHasOlder] = useState(true);
   const [problem, setProblem] = useState<string | null>(null);
@@ -49,8 +61,17 @@ export function TimelineView({ teamId, agents }: TimelineViewProps) {
   const [channels, setChannels] = useState<ChannelInfo[]>([]);
   const [channelsOpen, setChannelsOpen] = useState(false);
   const list = useRef<HTMLDivElement>(null);
-  const stickToBottom = useRef(true);
+  const stickToBottom = useRef(initialScroll === null);
   const prepending = useRef<number | null>(null);
+  // Posição a restaurar; some quando o usuário rola ou a janela de restauração passa.
+  const restore = useRef<TimelineScroll | null>(initialScroll);
+  useEffect(() => {
+    if (!restore.current) return;
+    const timer = setTimeout(() => {
+      restore.current = null;
+    }, RESTORE_WINDOW_MS);
+    return () => clearTimeout(timer);
+  }, []);
 
   const colorOf = useMemo(() => {
     const map = new Map(agents.map((a) => [`@${a.handle}`, a.color]));
@@ -70,7 +91,7 @@ export function TimelineView({ teamId, agents }: TimelineViewProps) {
   useEffect(() => {
     setMessages([]);
     setHasOlder(true);
-    stickToBottom.current = true;
+    stickToBottom.current = restore.current === null;
     loadLatest();
     const offMessage = onBusMessage((event) => {
       if (event.teamId !== teamId) return;
@@ -116,9 +137,14 @@ export function TimelineView({ teamId, agents }: TimelineViewProps) {
   useLayoutEffect(() => {
     const el = list.current;
     if (!el) return;
+    const saved = restore.current;
+    const at = saved ? rows.offsetOf(saved.anchor) : null;
     if (prepending.current !== null) {
       el.scrollTop += el.scrollHeight - prepending.current;
       prepending.current = null;
+    } else if (saved && messages.length > 0) {
+      // Âncora fora da página carregada (mensagem velha demais): começa do topo dela.
+      el.scrollTop = at === null ? 0 : at + saved.delta;
     } else if (stickToBottom.current) {
       el.scrollTop = el.scrollHeight;
     }
@@ -182,11 +208,31 @@ export function TimelineView({ teamId, agents }: TimelineViewProps) {
         role="log"
         aria-label="Linha do tempo da equipe"
         aria-live="polite"
+        // Focável para rolar com as setas e Page Up/Down, sem mouse (F08-02).
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: região rolável precisa de foco para o teclado
+        tabIndex={0}
         onScroll={() => {
           const el = list.current;
-          if (el) stickToBottom.current = nearBottom(el);
+          if (!el) return;
+          stickToBottom.current = nearBottom(el);
+          if (restore.current) return;
+          const top = rows.keyAt(el.scrollTop);
+          onScrollChange?.(
+            stickToBottom.current || !top
+              ? null
+              : { anchor: top.key, delta: Math.round(el.scrollTop - top.offset) },
+          );
         }}
-        className="min-h-0 flex-1 overflow-y-auto px-3 py-2"
+        onWheel={() => {
+          restore.current = null;
+        }}
+        onPointerDown={() => {
+          restore.current = null;
+        }}
+        onKeyDown={() => {
+          restore.current = null;
+        }}
+        className="min-h-0 flex-1 overflow-y-auto px-3 py-2 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
       >
         {hasOlder && messages.length > 0 && (
           <div className="flex justify-center pb-2">

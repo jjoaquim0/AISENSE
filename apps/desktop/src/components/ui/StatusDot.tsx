@@ -12,17 +12,22 @@ const STATES: Record<AgentState, { color: string; label: string; shape: Shape; m
     color: 'text-busy',
     label: 'Trabalhando',
     shape: 'half',
-    motion: 'animate-spin [animation-duration:2s]',
+    motion: 'motion-spin-steps',
   },
   awaiting_input: {
     color: 'text-awaiting',
     label: 'Aguardando você',
     shape: 'solid',
-    motion: 'animate-pulse [animation-duration:1.5s]',
+    motion: 'motion-pulse-steps',
   },
   failed: { color: 'text-failed', label: 'Erro', shape: 'triangle', motion: '' },
   stopped: { color: 'text-stopped', label: 'Parado', shape: 'ring', motion: '' },
-  starting: { color: 'text-busy', label: 'Iniciando', shape: 'spinner', motion: 'animate-spin' },
+  starting: {
+    color: 'text-busy',
+    label: 'Iniciando',
+    shape: 'spinner',
+    motion: 'motion-spin-steps [animation-duration:1s]',
+  },
 };
 
 function Glyph({ shape }: { shape: Shape }) {

@@ -22,9 +22,13 @@ fn open_store(
 }
 
 fn main() {
+    // O nível de log das Configurações vale na subida; `AISENSE_LOG` ainda vence.
+    let level = aisense_core::DataDir::resolve()
+        .map(|d| aisense_core::settings::SettingsFile::new(d.settings()).load())
+        .map_or("info", |loaded| loaded.settings.advanced.log_level.as_str());
     tracing_subscriber::fmt()
         .with_env_filter(
-            EnvFilter::try_from_env("AISENSE_LOG").unwrap_or_else(|_| EnvFilter::new("info")),
+            EnvFilter::try_from_env("AISENSE_LOG").unwrap_or_else(|_| EnvFilter::new(level)),
         )
         .init();
 
@@ -36,10 +40,12 @@ fn main() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .setup(move |app| {
             let data = aisense_core::DataDir::resolve()
                 .ok_or("could not find the user's home directory; set AISENSE_HOME")?;
             let store = open_store(&data)?;
+            let settings = commands::settings::setup(&data);
             let (registry, watcher) = commands::runtimes::setup(app.handle(), &data);
             let (library, skill_watcher) = commands::skills::setup(app.handle(), &data, &store);
             let (push, injections) = commands::push::channel();
@@ -53,7 +59,12 @@ fn main() {
                 std::sync::Arc::clone(&library),
                 push.clone(),
             );
-            let bus = commands::bus::setup(app.handle(), &store, &supervisor, push.clone());
+            let secrets = std::sync::Arc::clone(&settings);
+            supervisor.set_secret_env(std::sync::Arc::new(move |adapter: &str| {
+                secrets.secret_env(adapter)
+            }));
+            let bus =
+                commands::bus::setup(app.handle(), &store, &supervisor, push.clone(), &settings);
             let board = commands::board::setup(app.handle(), &bus, &store, data.benches());
             let proposals = commands::proposals::setup(app.handle(), &bus);
             let bus_shutdown = commands::bus::serve(&data, board.clone(), proposals.clone());
@@ -66,7 +77,9 @@ fn main() {
                 &registry,
                 &pty_for_push,
             );
+            commands::settings::relaunch(&settings, &supervisor);
             app.manage(bus);
+            app.manage(settings);
             app.manage(board);
             app.manage(proposals);
             app.manage(bus_shutdown);
@@ -75,6 +88,9 @@ fn main() {
             app.manage(supervisor);
             app.manage(library);
             app.manage(commands::skills::SkillsHome(data.skills()));
+            if let Some(tray) = commands::notify::setup_tray(app.handle()) {
+                app.manage(tray);
+            }
             if let Some(watcher) = skill_watcher {
                 app.manage(watcher);
             }
@@ -85,6 +101,7 @@ fn main() {
             Ok(())
         })
         .manage(manager)
+        .manage(commands::notify::Viewing::default())
         .invoke_handler(tauri::generate_handler![
             commands::app_info,
             commands::pty::pty_spawn,
@@ -97,6 +114,18 @@ fn main() {
             commands::pty::pty_set_visible,
             commands::pty::pty_is_running,
             commands::runtimes::runtimes_overview,
+            commands::settings::settings_get,
+            commands::settings::settings_save,
+            commands::settings::settings_reset,
+            commands::settings::settings_onboarding_done,
+            commands::settings::settings_last_team,
+            commands::settings::secret_set,
+            commands::settings::secret_delete,
+            commands::settings::calibration_screen,
+            commands::settings::calibration_test,
+            commands::settings::calibration_apply,
+            commands::settings::diagnostics_export,
+            commands::notify::ui_viewing,
             commands::agents::agent_start,
             commands::agents::agent_stop,
             commands::agents::agent_restart,
@@ -171,12 +200,25 @@ fn main() {
             commands::project::project_lookup,
             commands::project::project_accept,
         ])
+        .on_page_load(|webview, payload| {
+            // Diagnóstico de subida: sem isto, uma página que não carrega no pacote é
+            // uma janela em branco sem nenhuma pista no log.
+            tracing::info!(
+                url = %payload.url(),
+                event = ?payload.event(),
+                window = webview.label(),
+                "página"
+            );
+        })
         .on_window_event(move |window, event| {
             // Fechar a janela precisa matar os processos dos agentes; senão eles
             // continuam vivos sem dono, consumindo CPU e segurando arquivos.
             if matches!(event, tauri::WindowEvent::Destroyed) {
                 // Antes de matar: senão a política de reinício traria os agentes de volta.
                 if let Some(supervisor) = window.try_state::<commands::agents::Supervisor>() {
+                    if let Some(settings) = window.try_state::<commands::settings::Settings>() {
+                        commands::settings::remember_running(&settings, &supervisor);
+                    }
                     supervisor.shutdown();
                 }
                 if let Some(bus) = window.try_state::<commands::bus::BusShutdown>() {

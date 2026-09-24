@@ -22,9 +22,15 @@ aisense-store.workspace = true
 base64.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-tauri = { version = "2", features = [] }
+# `tray-icon`: resumo e silenciar na bandeja (F08-07).
+tauri = { version = "2", features = ["tray-icon"] }
 # Seletor nativo de pasta para o diretório da equipe (docs/09, T3 passo 1).
 tauri-plugin-dialog = "2"
+# Notificação do SO quando um agente espera ou cai com o app em segundo plano (F08-07).
+tauri-plugin-notification = "2"
+# Segredos dos runtimes no keychain do SO (R3, F08-05). `async-secret-service` fala
+# com o Secret Service do Linux em Rust puro (zbus), sem exigir libdbus no sistema.
+keyring = { version = "3", features = ["apple-native", "windows-native", "async-secret-service", "tokio", "crypto-rust"] }
 thiserror.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true

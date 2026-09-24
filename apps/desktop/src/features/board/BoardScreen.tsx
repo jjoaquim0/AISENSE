@@ -214,7 +214,13 @@ export function BoardScreen({ teamId }: { teamId: TeamId }) {
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1 gap-2 overflow-x-auto p-2">
+      {/* Focável: com o quadro vazio não há cartão para levar o teclado à rolagem (F08-02). */}
+      <section
+        aria-label="Colunas do quadro"
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: região rolável precisa de foco para o teclado
+        tabIndex={0}
+        className="flex min-h-0 flex-1 gap-2 overflow-x-auto p-2 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+      >
         {view.columns.map((column) => {
           const cards: CardView[] = columns.get(column.id) ?? [];
           const all = view.cards.filter((c) => c.columnId === column.id).length;
@@ -256,7 +262,7 @@ export function BoardScreen({ teamId }: { teamId: TeamId }) {
             </section>
           );
         })}
-      </div>
+      </section>
 
       {detailId && (
         <CardDetailPanel

@@ -16,7 +16,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, Pencil, Play, Plus, Square, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { IconButton, ScrollArea, StatusDot, Tooltip } from '@/components/ui';
+import { formatShortcut, IconButton, ScrollArea, StatusDot, Tooltip } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import type { Agent } from '@/types/generated/Agent';
 import type { AgentColor } from '@/types/generated/AgentColor';
@@ -76,7 +76,9 @@ export function AgentSidebar(props: AgentSidebarProps) {
             Agentes
           </h2>
           {agents.length === 0 && (
-            <p className="px-2.5 py-1.5 text-caption text-muted">Nenhum agente ainda.</p>
+            <p className="px-2.5 py-1.5 text-caption text-muted">
+              Nenhum agente ainda. Crie um com {formatShortcut('⌘T')}.
+            </p>
           )}
           <DndContext
             sensors={sensors}
@@ -169,7 +171,7 @@ function SidebarRow({
                 <StatusDot state={state} confidence={confidenceOf(agent.id)} withLabel />
                 {pending && pending.count > 0 && <PendingCount pending={pending} />}
               </span>
-              <span className="truncate text-caption text-muted">· {agent.adapterId}</span>
+              <span className="truncate text-caption text-secondary">· {agent.adapterId}</span>
             </span>
           </span>
         </button>

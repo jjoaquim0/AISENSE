@@ -12,5 +12,6 @@ export default defineConfig({
   server: { port: 5173, strictPort: true },
   // O Tauri empacota o dist; sourcemap só em dev.
   build: { target: 'es2022', sourcemap: false },
-  test: { environment: 'jsdom', globals: true },
+  // Os `e2e/*.spec.ts` são do Playwright (`pnpm e2e`), não do Vitest.
+  test: { environment: 'jsdom', globals: true, include: ['src/**/*.test.{ts,tsx}'] },
 });

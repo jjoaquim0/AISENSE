@@ -4,8 +4,8 @@
 > Toda sessão de desenvolvimento começa lendo isto e termina atualizando isto.
 > Se estiver desatualizado, o próximo agente se perde. Mantenha-o honesto.
 
-**Última atualização:** 2026-09-24
-**Fase atual:** `FASE 08 — Acabamento`, ainda não iniciada (0/9). Fases 06 e 07 mergeadas no PR #21; a F07-01 está parcial (falta o CU-2 com um coordenador real)
+**Última atualização:** 2026-09-24 (Fase 08)
+**Fase atual:** `FASE 08 — Acabamento`, em código (7 feitas, 2 parciais de 9), em lote no branch `claude/fase-08-implementation-fvgh8n`. Fases 06 e 07 mergeadas no PR #21; a F07-01 está parcial (falta o CU-2 com um coordenador real)
 **Fluxo de trabalho atual:** várias tarefas seguidas no mesmo branch `claude/...`, **um commit por
 tarefa** (ID no título) e um PR só ao fim do lote, com o CI verde nos 3 SOs antes do merge (o
 usuário mergeia). Pedido do usuário em 2026-09-23 para acelerar.
@@ -18,13 +18,25 @@ Fundação, terminal, equipes/agentes, Sala da Equipe, skills, barramento e **o 
 (Fase 06: claim atômico, WIP, dependências, automações, avisos pelo barramento, gate de revisão,
 CLI/MCP e a vista Quadro) estão em código e testados. O que falta nas fases feitas é conferência
 numa máquina com tela e runtimes reais (claude/codex). A Fase 07 (canais, propostas, Fluxo, paleta)
-também está em código. Próximo trabalho: **Fase 08 — Acabamento**.
+também está em código, e a **Fase 08 — Acabamento** (configurações com calibração ao vivo,
+onboarding, sessão restaurada, notificações, estados vazios/erro, acessibilidade, E2E, polimento)
+também. Próximo trabalho: fechar as parciais da Fase 08 numa máquina com GPU e o CI dos 3 SOs, e
+então a **Fase 09 — Distribuição**.
 
 ## Para quem chega agora (retomada)
 
 1. Leia `AGENTS.md` e este arquivo inteiro; depois `docs/fases/FASE-03-sala-da-equipe.md` — cada
    tarefa feita tem uma nota `> Feito:` dizendo onde está o código e o que ficou de fora.
-2. **Próxima: Fase 08 — Acabamento** (`docs/fases/FASE-08-*.md`). Plano levantado (ainda sem código):
+2. **Fase 08 em código** (`docs/fases/FASE-08-acabamento.md`, uma nota `> Feito:` por tarefa).
+   Onde está: preferências em `aisense-core/src/settings.rs` + `commands/settings.rs` +
+   `features/settings/` (calibração: `state::calibrate`, `StateDetector::set_rules`,
+   `AgentSupervisor::refresh_state_rules`, `adapter::save_state_rules`); onboarding em
+   `features/onboarding/`; sessão em `features/session/` e `useTeamLayout` (`focused`, `timeline`);
+   notificações em `aisense-core/src/notify.rs` + `commands/notify.rs` (bandeja); E2E em
+   `apps/desktop/e2e/` com o core falso `src/e2e/fakeCore.ts` (`pnpm e2e`); auditoria de
+   performance do app real em `scripts/perf-audit.py`. O que ficou parcial: F08-01 (RAM/CPU fora da
+   meta sem GPU; latências não medidas) e F08-08 (falta o CI dos 3 SOs rodar 10 vezes). O plano
+   original da fase, para referência:
    - F08-05 Configurações: um `AppSettings` no core salvo em `~/.aisense/settings.json` (escrita
      atômica), com `onboarding_done`, sessão, notificações, limites do barramento (`GuardConfig`,
      `ASK_DEFAULT`, retenção, hoje constantes) e aparência. **Modo calibração:** o detector compila
@@ -80,12 +92,50 @@ também está em código. Próximo trabalho: **Fase 08 — Acabamento**.
 | 05 — Barramento | 🟨 Código completo | 13 de 13 — falta conferir com claude/codex/opencode de verdade |
 | 06 — Quadro Kanban | 🟨 Código completo | 11 de 11 — falta a demonstração com agentes reais |
 | 07 — Coordenação | 🟨 Código quase completo | 5 feitas, 1 parcial de 6 — falta o CU-2 com runtime real |
-| 08 — Acabamento | ⬜ Não iniciada | 0/9 |
+| 08 — Acabamento | 🟨 Código quase completo | 7 feitas, 2 parciais de 9 — faltam GPU e o CI dos 3 SOs |
 | 09 — Distribuição | ⬜ Não iniciada | 0/7 |
 
 Legenda: ⬜ não iniciada · 🟨 em andamento · ✅ concluída · 🟥 bloqueada
 
 ## Em andamento agora
+
+**Fase 08 — Acabamento** (2026-09-24, em lote, um commit por tarefa, PR só ao fim).
+
+| Tarefa | Situação |
+|---|---|
+| F08-05 Configurações | ✅ T9 inteira; calibração troca o `idle_regex` de sessões vivas sem reiniciar (teste com processo real); segredos no keychain (`keyring`); limites do barramento ao vivo; atalhos remapeáveis |
+| F08-04 Onboarding | ✅ 3 passos; o último cria e inicia a equipe (runtime ausente vira shell) |
+| F08-06 Sessão | ✅ equipe, vista, grade, agente em foco, rolagem da linha do tempo, larguras; religar agentes |
+| F08-07 Notificações | ✅ regra pura no core (nunca para a equipe na tela com a janela em foco), bandeja com resumo e silenciar |
+| F08-03 Estados | ✅ esqueletos, `ErrorNotice` com causa e "Tentar de novo", vazios com ação |
+| F08-02 Acessibilidade | ✅ axe sem violações nos dois temas; fluxos só com teclado; painéis cedem com zoom 150% |
+| F08-08 E2E | 🟨 25 testes (5 fluxos + sessão, estados, a11y, teclado) com core falso; 250/250 em 10 execuções seguidas em Linux; job no CI dos 3 SOs ainda sem histórico |
+| F08-09 Polimento | ✅ 20 telas × 2 temas em `docs/screenshots/fase-08/`; 6 inconsistências achadas e corrigidas |
+| F08-01 Performance | 🟨 medido com o app real sob Xvfb **sem GPU**; animações em passos (88% → 17% de CPU); RAM e CPU com 12 ativos fora da meta aqui |
+
+**Números da F08-01** (release empacotado, WebKitGTK sob Xvfb, 4 núcleos, **sem GPU** — Mesa
+llvmpipe; PSS, que divide as bibliotecas compartilhadas; `scripts/perf-audit.py`):
+
+| Cenário | Cold start até a Sala | Memória (PSS) | CPU |
+|---|---|---|---|
+| 0 agentes | 1.25 s | 407.7 MB (core+UI 105.5, página 281.1, rede 21.1) | core 0.1% · página 0.1% |
+| 6 agentes ociosos | 1.2 s | 660.6 MB (core+UI 107.4, página 532.1, rede 21.1) | core 0.8% · página 23.8% |
+| 12 agentes ativos | 1.32 s | 660.6 MB (core+UI 107.6, página 531.9, rede 21.0) | core 10.2% · página 193.2% |
+
+Contra o orçamento (`docs/03`): cold start ❌ por pouco (1,2–1,3 s; meta < 1,2 s, sem GPU); CPU ociosa com
+agentes parados ✅ (0,1%); instalador ✅ (`.deb` de 6,1 MB, sem os binários `aisense`/`aisense-mcp`,
+que a Fase 09 empacota); RAM ❌ (meta 150 MB com 6 ociosos — só o processo da página do WebKit
+passa de 250 MB sem GPU; com `WEBKIT_DISABLE_COMPOSITING_MODE=1`, 6 ociosos ficam em ~410 MB e 3%
+de CPU); CPU com 12 ativos ❌ fora de qualquer meta razoável aqui (xterm desenhando 240 linhas/s em
+GL por software). Latência tecla→eco, `aisense send`→linha do tempo e reidratação: **não medidas**.
+Repetir numa máquina com GPU nos 3 SOs antes de decidir otimizações de RAM (ex.: desligar o WebGL
+quando o GL é por software).
+
+Descoberta de processo: `cargo build --release -p aisense-app` **sem** a feature
+`tauri/custom-protocol` gera um binário que carrega o `devUrl` (localhost:5173) — janela em branco
+sem o servidor de dev. O pacote de verdade vem do `tauri build`, que liga a feature. O app agora
+registra `página url=… event=…` no log a cada carregamento, para a próxima janela em branco não
+ser um mistério.
 
 **Fase 05 — Barramento** (2026-09-23/24, em lote no PR #20). Todas as 13 tarefas em código e
 testadas; o marco da fase — um agente num PTY real rodando `aisense send` e a mensagem chegando —

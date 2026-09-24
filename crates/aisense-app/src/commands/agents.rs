@@ -49,6 +49,7 @@ impl SupervisorObserver for TauriObserver {
             tracing::warn!(agent = %agent_id, %error, "falha ao emitir o estado do agente");
         }
         self.push.state(agent_id, state, confidence);
+        super::notify::state_changed(&self.app, agent_id, state);
     }
 
     fn boot_changed(&self, agent_id: &AgentId, boot: &BootDelivery) {

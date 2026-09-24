@@ -8,7 +8,7 @@ import {
   SquareTerminal,
 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Dialog, EmptyState, IconButton } from '@/components/ui';
+import { Button, Dialog, EmptyState, formatShortcut, IconButton, Skeleton } from '@/components/ui';
 import { AgentFormDialog } from '@/features/agents/AgentFormDialog';
 import { agentsApi } from '@/features/agents/api';
 import { boardApi } from '@/features/board/api';
@@ -30,7 +30,7 @@ import { PresetPicker } from '@/features/team-room/components/PresetPicker';
 import { TeamControls } from '@/features/team-room/components/TeamControls';
 import { ViewPicker } from '@/features/team-room/components/ViewPicker';
 import { useLiveStates } from '@/features/team-room/hooks/useLiveStates';
-import { useTeamLayout } from '@/features/team-room/hooks/useTeamLayout';
+import { readFocused, useTeamLayout } from '@/features/team-room/hooks/useTeamLayout';
 import type { PaneAction } from '@/features/team-room/paneMenu';
 import { roomShortcuts } from '@/features/team-room/shortcuts';
 import { isRunning } from '@/features/team-room/sidebar';
@@ -63,18 +63,34 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
   const { team } = summary;
   const { selectTeam, load } = useTeams();
   const [agents, setAgents] = useState<Agent[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Até a primeira lista chegar, "nenhum agente" seria mentira: mostra esqueleto (F08-03).
+  const [agentsLoaded, setAgentsLoaded] = useState(false);
+  // Reabrir a equipe volta para o agente que estava em foco (F08-06).
+  const [selectedId, setSelectedId] = useState<string | null>(() => readFocused(team.layout));
   const [form, setForm] = useState<{ open: boolean; agent?: Agent }>({ open: false });
   const [deleting, setDeleting] = useState<Agent | null>(null);
   const [notice, setNotice] = useState<{ text: string; restart?: Agent } | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [commandsOpen, setCommandsOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
-  const { grid, setGrid, view, setView, flowPositions, setFlowPositions } = useTeamLayout(
+  const {
+    grid,
+    setGrid,
+    view,
+    setView,
+    flowPositions,
+    setFlowPositions,
+    setFocused,
+    initialTimeline,
+    setTimelineScroll,
+  } = useTeamLayout(
     team,
     agents.map((a) => a.id),
     setProblem,
   );
+  useEffect(() => {
+    if (selectedId) setFocused(selectedId);
+  }, [selectedId, setFocused]);
 
   const { stateOf, confidenceOf, eventsOf } = useLiveStates(summary.agents);
   const { pendingOf } = useUnread(team.id, agents);
@@ -83,6 +99,7 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
   const reloadAgents = useCallback(async () => {
     const list = await agentsApi.list(team.id);
     setAgents(list);
+    setAgentsLoaded(true);
     setSelectedId((current) =>
       current && list.some((a) => a.id === current) ? current : (list[0]?.id ?? null),
     );
@@ -376,7 +393,9 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
           onSaved={agentSaved}
         />
       </ShellSlot>
-      <header className="flex items-center gap-3 border-b border-subtle px-4 py-2.5">
+      {/* Quebra de linha em vez de cortar: com zoom de 150% os controles não cabem numa só
+          (F08-02). */}
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-subtle px-4 py-2.5">
         <IconButton label="Voltar para as equipes" onClick={() => selectTeam(null)}>
           <ArrowLeft size={15} />
         </IconButton>
@@ -385,7 +404,7 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
           className="size-3 shrink-0 rounded-sm"
           style={{ background: `var(--agent-${team.color})` }}
         />
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 basis-48">
           <h1 className="truncate text-heading text-primary">{team.name}</h1>
           <p className="flex items-center gap-1 truncate text-caption text-muted">
             <Folder size={11} /> <span className="font-mono">{team.workdir}</span>
@@ -395,26 +414,29 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
         {view === 'grid' && (
           <PresetPicker value={grid.preset} onChange={(preset) => setGrid({ ...grid, preset })} />
         )}
-        <Button onClick={() => setNotesOpen(true)}>
-          <NotebookPen size={13} /> Notas
-        </Button>
-        <Button onClick={() => setCommandsOpen(true)}>
-          <FileCode size={13} /> Comandos
-        </Button>
-        <TeamControls
-          teamId={team.id}
-          running={agents.filter((a) => isRunning(stateOf(a.id))).length}
-          handleOf={handleOf}
-          onReport={(report) => {
-            const lines = describeStartReport(report, handleOf);
-            if (lines.length > 0) setNotice({ text: lines.join(' · ') });
-            void load();
-          }}
-          onError={setProblem}
-        />
-        <Button variant="primary" onClick={() => setForm({ open: true })}>
-          <Plus size={14} /> Novo agente
-        </Button>
+        {/* As ações quebram de linha juntas, nunca uma sozinha. */}
+        <div className="ml-auto flex items-center gap-2">
+          <Button size="sm" onClick={() => setNotesOpen(true)}>
+            <NotebookPen size={13} /> Notas
+          </Button>
+          <Button size="sm" onClick={() => setCommandsOpen(true)}>
+            <FileCode size={13} /> Comandos
+          </Button>
+          <TeamControls
+            teamId={team.id}
+            running={agents.filter((a) => isRunning(stateOf(a.id))).length}
+            handleOf={handleOf}
+            onReport={(report) => {
+              const lines = describeStartReport(report, handleOf);
+              if (lines.length > 0) setNotice({ text: lines.join(' · ') });
+              void load();
+            }}
+            onError={setProblem}
+          />
+          <Button size="sm" variant="primary" onClick={() => setForm({ open: true })}>
+            <Plus size={14} /> Novo agente
+          </Button>
+        </div>
       </header>
 
       <GuardBanner teamId={team.id} />
@@ -477,7 +499,12 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
               <BoardScreen teamId={team.id} />
             </Suspense>
           ) : view === 'timeline' ? (
-            <TimelineView teamId={team.id} agents={agents} />
+            <TimelineView
+              teamId={team.id}
+              agents={agents}
+              initialScroll={initialTimeline}
+              onScrollChange={setTimelineScroll}
+            />
           ) : agents.length > 0 && view === 'focus' ? (
             <FocusView
               order={grid.order}
@@ -496,11 +523,27 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
               labelOf={(id) => `@${handleOf(id)}`}
               renderPane={renderPane}
             />
+          ) : !agentsLoaded ? (
+            <div
+              role="status"
+              aria-busy="true"
+              aria-label="Carregando os agentes"
+              className="grid h-full grid-cols-2 gap-2 p-2"
+            >
+              <Skeleton className="h-full rounded-lg" />
+              <Skeleton className="h-full rounded-lg" />
+            </div>
           ) : (
             <EmptyState
               icon={<SquareTerminal size={22} />}
               title="Nenhum agente ainda"
-              description="Crie um agente em “Novo agente” para ver o terminal dele aqui."
+              description="Cada agente é um terminal com uma IA (ou um shell) que conversa com os outros."
+              action={
+                <Button variant="primary" onClick={() => setForm({ open: true })}>
+                  Novo agente
+                </Button>
+              }
+              note={`Atalho: ${formatShortcut('⌘T')}`}
             />
           )}
         </section>

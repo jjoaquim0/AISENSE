@@ -281,3 +281,58 @@ fn last_lines_are_what_a_thumbnail_shows() {
     assert_eq!(d.last_lines(2), ["três", "$"]);
     assert_eq!(d.last_lines(10), ["um", "dois", "três", "$"]);
 }
+
+#[test]
+fn set_rules_takes_effect_on_the_live_screen_without_new_output() {
+    // Modo calibração (F08-05): o prompt não casava; trocar o regex resolve sem reiniciar.
+    let mut r = rules("shell");
+    r.idle_regex = Some("nunca-casa".into());
+    let t0 = Instant::now();
+    let mut d = StateDetector::new(&r, 24, 80, t0);
+    d.feed(b"pronto >>> ", t0);
+    assert_eq!(d.tick(t0 + Duration::from_secs(1)), None);
+    assert_eq!(d.state(), Starting);
+
+    r.idle_regex = Some(">>>\\s*$".into());
+    d.set_rules(&r);
+    assert!(d
+        .next_deadline()
+        .is_some_and(|at| at <= t0 + Duration::from_secs(1)));
+    let got = d.tick(t0 + Duration::from_secs(2)).unwrap();
+    assert_eq!((got.state, got.confidence), (Idle, StateConfidence::High));
+}
+
+#[test]
+fn calibrate_explains_the_decision_like_the_detector() {
+    let r = rules("shell");
+    let screen = "Continuar? (s/n) s\ncompilando...\n\n$ ";
+    let c = super::calibrate(&r, screen);
+    assert_eq!(c.lines, ["Continuar? (s/n) s", "compilando...", "$"]);
+    assert_eq!(c.decided, Some(Idle));
+    assert_eq!(c.decided_line, Some(2));
+    let idle = c.patterns.iter().find(|p| p.field == "idle_regex").unwrap();
+    assert_eq!(idle.matches, [2]);
+    assert!(!c.has_errors());
+}
+
+#[test]
+fn calibrate_reports_a_broken_regex_instead_of_ignoring_it() {
+    let mut r = rules("shell");
+    r.busy_regex = Some("(sem fechar".into());
+    let c = super::calibrate(&r, "$ ");
+    assert!(c.has_errors());
+    let busy = c.patterns.iter().find(|p| p.field == "busy_regex").unwrap();
+    assert!(busy.error.is_some());
+    // O resto continua valendo, como no detector.
+    assert_eq!(c.decided, Some(Idle));
+}
+
+#[test]
+fn calibrate_sees_only_the_tail() {
+    let r = rules("shell");
+    let many: String = (0..40).map(|i| format!("linha {i}\n")).collect();
+    let c = super::calibrate(&r, &many);
+    assert_eq!(c.lines.len(), super::TAIL_LINES);
+    assert_eq!(c.lines.last().map(String::as_str), Some("linha 39"));
+    assert_eq!(c.decided, None);
+}

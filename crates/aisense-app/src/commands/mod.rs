@@ -9,11 +9,13 @@ pub mod agents;
 pub mod board;
 pub mod bus;
 pub mod notes;
+pub mod notify;
 pub mod project;
 pub mod proposals;
 pub mod pty;
 pub mod push;
 pub mod runtimes;
+pub mod settings;
 pub mod skills;
 pub mod teams;
 
