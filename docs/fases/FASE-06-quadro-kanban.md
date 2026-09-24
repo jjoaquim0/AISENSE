@@ -78,7 +78,7 @@ LLM, conforme [13](../13-quadro-kanban.md#leitura).
 > comando. O texto (`render_board`, `render_card`...) vem pronto do servidor. `aisense board` com
 > 20 cartões: ~30 linhas (teto de 8 por coluna, 3 na terminal, `--full` tira).
 
-### [ ] F06-06 — Motor de automações
+### [x] F06-06 — Motor de automações
 Gatilhos (`card_created`, `card_enters`, `card_leaves`, `card_stale`, `checklist_complete`,
 `comment_added`) e ações (`assign`, `notify`, `move`, `add_label`, `unblock_dependents`,
 `create_card`) — conjunto **fechado**, sem execução de comando arbitrário.
@@ -86,11 +86,27 @@ Automações padrão da equipe já configuradas na criação.
 **Aceite:** cartão entrando em `review` notifica o revisor; `card_stale` dispara depois do prazo;
 automação em laço é detectada e interrompida. Depende de F06-04, F05-01.
 
-### [ ] F06-07 — Notificações pelo barramento
+> Feito: `board/automation.rs` (tipos fechados, TOML de `docs/13` de ida e volta, `validate`
+> contra as colunas, padrões da equipe: Fazendo → `assign actor` e `card_stale` 4 h; Revisão →
+> avisa `@revisor` se existir, senão você; Feita → `unblock_dependents`) e o motor em
+> `BoardService::automate`: `card_enters`/`card_leaves`/`checklist_complete` saem da própria
+> gravação, `card_created` e `comment_added` das operações, `card_stale` do `tick` (o app chama a
+> cada minuto; cada passagem pela coluna dispara uma vez). Laço: corte em
+> `AUTOMATION_MAX_DEPTH` (5) com aviso na linha do tempo para você. Ação que falha vira aviso,
+> nunca desfaz a operação que a disparou.
+
+### [x] F06-07 — Notificações pelo barramento
 Toda mudança relevante vira mensagem de sistema respeitando o `delivery_mode` do destinatário,
 conforme a tabela de [13](../13-quadro-kanban.md#integração-com-o-barramento).
 **Aceite:** atribuir cartão a um agente em modo `hook` faz ele descobrir sozinho no fim do turno.
 Depende de F06-06, F05-07.
+
+> Feito: os avisos saem como mensagem de sistema (`subject: quadro`) pelo `BusService::dispatch`
+> — a mesma máquina de entrega, então respeitam `pull`/`push`/`hook` sem código novo. Atribuição
+> (quem se atribui não é avisado), comentário (responsável + criador + quem já comentou, e você
+> se estiver na conversa), dependência concluída, revisão (automação), parado (automação),
+> rejeição com motivo e gate reprovado. Teste com agentes em modo `hook`: o aviso está na caixa
+> que o hook `Stop` drena no fim do turno. Falta conferir com o Claude Code de verdade.
 
 ### [ ] F06-08 — Tela do quadro (T8)
 Kanban com colunas configuráveis, cartões com cor do responsável, ícones de prioridade,
