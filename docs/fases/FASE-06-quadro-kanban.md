@@ -108,24 +108,46 @@ Depende de F06-06, F05-07.
 > rejeição com motivo e gate reprovado. Teste com agentes em modo `hook`: o aviso está na caixa
 > que o hook `Stop` drena no fim do turno. Falta conferir com o Claude Code de verdade.
 
-### [ ] F06-08 — Tela do quadro (T8)
+### [x] F06-08 — Tela do quadro (T8)
 Kanban com colunas configuráveis, cartões com cor do responsável, ícones de prioridade,
 dependência, checklist, comentários e bloqueio; arrastar aplicando as mesmas regras da API;
 realce de 400 ms em cartão que mudou; contador de "mudou desde que você saiu".
 **Aceite:** arrastar para coluna cheia mostra o mesmo erro da CLI e desfaz o movimento.
 Depende de F06-05.
 
-### [ ] F06-09 — Detalhe do cartão
+> Feito: `features/board/BoardScreen.tsx` como vista `board` da Sala (ViewPicker, `⌘G`),
+> carregada sob demanda. Cartão com borda na cor do responsável, prioridade, dependências
+> abertas, checklist, comentários e bloqueio; filtros por responsável e label; arrastar é
+> otimista e chama `card_move` — recusado, o cartão volta e o erro do core aparece como na CLI
+> (teste com `wip_exceeded`). `board:changed` relê e realça o cartão por 400 ms; o contador
+> "N cartões mudaram desde que você saiu" usa `board_changes` com a última visita guardada no
+> navegador. Amostra dos cartões em `#/dev` (conferida nos dois temas). Falta conferir na janela
+> real com agentes trabalhando.
+
+### [x] F06-09 — Detalhe do cartão
 Painel com corpo em Markdown, checklist, thread de comentários com avatar do agente, dependências
 navegáveis, links para PR/commit/arquivo e histórico completo.
 **Aceite:** comentar pela UI chega ao agente responsável como mensagem. Depende de F06-08.
 
-### [ ] F06-10 — Editor de colunas e automações
+> Feito: `CardDetailPanel.tsx` — corpo em Markdown (o mesmo preview das skills), coluna,
+> responsável e prioridade editáveis, checklist marcável, dependências/dependentes/subtarefas
+> navegáveis, links, comentários com avatar na cor do agente e histórico. Comentar chama
+> `card_comment`; o core avisa responsável, criador e participantes pelo barramento (teste de
+> UI + teste do core).
+
+### [x] F06-10 — Editor de colunas e automações
 UI para criar, renomear, reordenar e remover colunas, definir `kind` e WIP, e editar as automações
 com validação (sem TOML na mão, mas com visualização do TOML gerado).
 **Aceite:** remover uma coluna com cartões exige escolher para onde movê-los. Depende de F06-08.
 
-### [ ] F06-11 — Gate de revisão
+> Feito: `ColumnsEditor.tsx` (nome, slug, tipo, WIP total e por agente, aprovação,
+> reordenar, remover; coluna removida com cartões pede o destino e "Salvar" só habilita com ele)
+> e `AutomationsEditor.tsx` (gatilhos e ações do conjunto fechado, TOML gerado à vista por
+> `board_automations_toml`). O core revalida tudo: slug, tipos obrigatórios (`ready` e
+> `terminal`), WIP zero, automações que apontam para coluna inexistente; renomear slug leva as
+> automações junto.
+
+### [x] F06-11 — Gate de revisão
 `requires_approval`, `approver_must_differ` e `requires_commands` por coluna;
 `aisense task approve|reject` com motivo obrigatório na rejeição; execução dos comandos do projeto
 na bancada do responsável, com a saída anexada ao cartão quando falha.
@@ -134,14 +156,25 @@ Ver [13 — Quadro Kanban](../13-quadro-kanban.md#gate-de-revisão).
 `test` falhando impede a passagem e o agente consegue ler o erro sem reproduzir.
 Depende de F06-06, F05-13.
 
+> Feito: no core, `requires_approval`/`approver_must_differ`/`requires_commands` por coluna;
+> `approve` leva à próxima coluna com aprovação (ou à terminal), recusa o responsável com
+> `self_approval` sugerindo revisores pelo handle/papel; `reject` exige motivo, volta para a
+> coluna de onde o cartão veio e avisa o responsável. Mover para coluna só com
+> `requires_commands` também roda o gate. No app, `ProjectGate` roda os comandos nomeados do
+> `aisense.toml` (`run_named`) na bancada do responsável (ou na pasta da equipe); falhou, a saída
+> vira comentário do sistema no cartão e entra no `task show`. Botões Aprovar/Rejeitar no
+> detalhe. Os comandos do gate vêm da coluna (editor); o `gates.review` do `aisense.toml` ainda
+> não é aplicado automaticamente.
+
 ## Critérios de saída
-- [ ] Toda equipe nasce com quadro funcional
-- [ ] Agente cria, lê, atualiza e conclui cartões por CLI e por MCP
-- [ ] `claim` atômico comprovado sob concorrência
-- [ ] WIP, dependências e bloqueio com motivo aplicados de verdade
-- [ ] Automações movendo trabalho sem intervenção humana
-- [ ] UI e CLI sempre consistentes (mesma fonte, mesmas regras)
-- [ ] Gate de revisão impedindo autoaprovação e barrando cartão com teste vermelho
+- [x] Toda equipe nasce com quadro funcional
+- [x] Agente cria, lê, atualiza e conclui cartões por CLI e por MCP
+- [x] `claim` atômico comprovado sob concorrência
+- [x] WIP, dependências e bloqueio com motivo aplicados de verdade
+- [x] Automações movendo trabalho sem intervenção humana
+- [x] UI e CLI sempre consistentes (mesma fonte, mesmas regras)
+- [x] Gate de revisão impedindo autoaprovação e barrando cartão com teste vermelho
+- [ ] Demonstração da fase com agentes reais (claude/codex) — depende de máquina com tela
 
 ## Riscos
 | Risco | Mitigação |

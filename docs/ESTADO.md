@@ -4,8 +4,8 @@
 > Toda sessão de desenvolvimento começa lendo isto e termina atualizando isto.
 > Se estiver desatualizado, o próximo agente se perde. Mantenha-o honesto.
 
-**Última atualização:** 2026-09-23
-**Fase atual:** `FASE 05 — Barramento` com as 13 tarefas em código (as Fases 02–04 também; o que falta nelas é conferência numa máquina com tela e runtimes reais)
+**Última atualização:** 2026-09-24
+**Fase atual:** `FASE 06 — Quadro Kanban` com as 11 tarefas em código (as Fases 02–05 também; o que falta nelas é conferência numa máquina com tela e runtimes reais)
 **Fluxo de trabalho atual:** várias tarefas seguidas no mesmo branch `claude/...`, **um commit por
 tarefa** (ID no título) e um PR só ao fim do lote, com o CI verde nos 3 SOs antes do merge (o
 usuário mergeia). Pedido do usuário em 2026-09-23 para acelerar.
@@ -14,20 +14,22 @@ usuário mergeia). Pedido do usuário em 2026-09-23 para acelerar.
 
 ## Situação em uma frase
 
-Fundação, terminal, equipes/agentes persistidos e **as 9 tarefas da Sala da Equipe** estão em
-código e testados; a Fase 03 ainda tem conferência na janela e dois critérios de saída abertos
-(9 terminais com GPU; calibrar o detector com sessões reais). O trabalho corrente é a
-**Fase 04 — Skills**, iniciada a pedido do usuário.
+Fundação, terminal, equipes/agentes, Sala da Equipe, skills, barramento e **o quadro Kanban**
+(Fase 06: claim atômico, WIP, dependências, automações, avisos pelo barramento, gate de revisão,
+CLI/MCP e a vista Quadro) estão em código e testados. O que falta nas fases feitas é conferência
+numa máquina com tela e runtimes reais (claude/codex). Próximo trabalho: **Fase 07 — Coordenação**.
 
 ## Para quem chega agora (retomada)
 
 1. Leia `AGENTS.md` e este arquivo inteiro; depois `docs/fases/FASE-03-sala-da-equipe.md` — cada
    tarefa feita tem uma nota `> Feito:` dizendo onde está o código e o que ficou de fora.
-2. **Próxima: Fase 06 — Quadro Kanban** (`docs/fases/FASE-06-*.md`). O barramento está pronto:
-   `aisense-core/src/bus/` (roteamento, serviço, guardas, push, hook), `aisense-ipc` (protocolo,
-   socket, handler, parser e renderização da CLI), `aisense-cli`, `aisense-mcp`, e no app
-   `commands/{bus,push}.rs`. As ferramentas MCP de tarefa (`aisense_create_task`,
-   `aisense_update_task`) e `aisense task ...` entram com o quadro. Pendência da Fase 04: F04-08
+2. **Próxima: Fase 07 — Coordenação** (`docs/fases/FASE-07-*.md`). O quadro está pronto:
+   `aisense-core/src/board/` (modelo, regras, automações, `BoardService`, texto do
+   `aisense board`), migração `0005_board.sql` + `aisense-store/src/board.rs`, frames
+   `board`/`task` no `aisense-ipc`, 7 ferramentas MCP, `commands/board.rs` no app (serviço único
+   para UI e socket, gate de revisão, tick do `card_stale`) e `features/board/` no front (vista
+   Quadro da Sala). O barramento: `aisense-core/src/bus/`, `aisense-ipc`, `aisense-cli`,
+   `aisense-mcp`, `commands/{bus,push}.rs`. Pendência da Fase 04: F04-08
    (agente descartável e `.zip`). Mapa da Fase 04 em
    `docs/fases/FASE-04-skills.md`. Skills em `aisense-core/src/skill/` (parser, catálogo,
    `SkillLibrary`, hot-reload); atribuições por `SkillRepository`; aba Skills do inspetor em
@@ -55,7 +57,7 @@ código e testados; a Fase 03 ainda tem conferência na janela e dois critérios
 | 03 — Sala da Equipe | 🟨 Código completo | 9 de 9 feitas — faltam conferência na janela e dois critérios de saída |
 | 04 — Sistema de Skills | 🟨 Código quase completo | 8 feitas, 1 parcial de 9 |
 | 05 — Barramento | 🟨 Código completo | 13 de 13 — falta conferir com claude/codex/opencode de verdade |
-| 06 — Quadro Kanban | ⬜ Não iniciada | 0/11 |
+| 06 — Quadro Kanban | 🟨 Código completo | 11 de 11 — falta a demonstração com agentes reais |
 | 07 — Coordenação | ⬜ Não iniciada | 0/6 |
 | 08 — Acabamento | ⬜ Não iniciada | 0/9 |
 | 09 — Distribuição | ⬜ Não iniciada | 0/7 |
