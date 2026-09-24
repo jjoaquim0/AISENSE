@@ -131,11 +131,20 @@ impl<S: BusStore + 'static> BusHandler<S> {
                 let routed = self.bus.note(me, &body).await.map_err(err)?;
                 Response::ok(json!({ "id": routed.message.id }))
             }
-            Request::Ask { .. } | Request::Reply { .. } => Response::error(
-                codes::INVALID_REQUEST,
-                "ask/reply are not available yet",
-                None,
-            ),
+            Request::Ask {
+                to,
+                body,
+                timeout_s,
+            } => {
+                let timeout = timeout_s.map(|s| Duration::from_secs(s.into()));
+                let answer = self.bus.ask(me, &to, &body, timeout).await.map_err(err)?;
+                let dir = self.bus.directory(&me.team_id).await.map_err(err)?;
+                Response::ok(dir.view(&answer))
+            }
+            Request::Reply { reply_to, body } => {
+                let routed = self.bus.reply(me, &reply_to, &body).await.map_err(err)?;
+                Response::ok(json!({ "id": routed.message.id }))
+            }
             Request::Notes(op) => self.notes(me, op).await?,
         })
     }

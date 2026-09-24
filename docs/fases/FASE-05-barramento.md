@@ -93,11 +93,20 @@ UI em <50 ms. **Este é o marco que prova o produto.** Depende de F05-04.
 > caixa do destinatário e ao hub que alimenta a UI (o `bus:message` sai do mesmo hub); o
 > teste inteiro roda em ~70 ms. A medida "<50 ms na janela" só uma máquina com tela confere.
 
-### [ ] F05-06 — Pergunta e resposta (`ask`/`reply`)
+### [x] F05-06 — Pergunta e resposta (`ask`/`reply`)
 Conexão persistente bloqueante com correlação por `reply_to`, timeout configurável, erro imediato
 quando o destinatário está parado, detecção de deadlock por ciclo no grafo de `ask` pendentes.
 **Aceite:** `ask` mútuo entre dois agentes é recusado com `would_deadlock`; timeout retorna exit 2
 com mensagem acionável. Depende de F05-05.
+> Feito: `BusService::ask`/`reply` no core, `ask`/`reply` no IPC e na CLI. A conexão fica
+> aberta e a resposta é casada pelo `reply_to` no hub de mensagens (sem polling); padrão 300 s,
+> teto 1800 s; destinatário parado falha na hora. Deadlock: um grafo de esperas em memória
+> (quem pergunta → quem precisa responder) — perguntar a quem já espera por você, direta ou
+> indiretamente, é `would_deadlock` com o ciclo por extenso (`@backend → @frontend →
+> @revisor`); a aresta sai quando o `ask` termina de qualquer jeito (resposta, timeout,
+> conexão caída). `reply` só responde o que foi entregue a você; responder conta como leitura.
+> Aceite: testes de ciclo direto e de três agentes, timeout com dica (exit 2 na CLI) e o
+> caminho completo pergunta → resposta.
 
 ### [ ] F05-07 — Entrega em modo `push`
 Fila por agente, gatilho por `idle` com confiança alta, bloqueio absoluto em `awaiting_input`,

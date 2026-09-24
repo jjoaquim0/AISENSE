@@ -348,3 +348,215 @@ async fn linha_do_tempo_pagina_por_cursor_do_mais_novo_para_o_mais_velho() {
         [(s.id("frontend"), 5)]
     );
 }
+
+// ───────────────────────── ask / reply (F05-06) ─────────────────────────
+
+mod ask {
+    use std::sync::Arc;
+    use std::time::Duration;
+
+    use super::*;
+    use crate::agent::AgentState;
+
+    fn service(s: Squad, stopped: Option<AgentId>) -> (BusService<InMemoryStore>, Squad) {
+        // O serviço fica com o store da equipe; o `Squad` devolvido só serve para achar ids.
+        let shared = Arc::new(s.store);
+        let s = Squad {
+            store: InMemoryStore::new(),
+            team: s.team,
+            ids: s.ids,
+        };
+        let bus = BusService::new(
+            Arc::clone(&shared),
+            Arc::new(move |id: &AgentId| {
+                if Some(id) == stopped.as_ref() {
+                    AgentState::Stopped
+                } else {
+                    AgentState::Idle
+                }
+            }),
+            Arc::new(NoObserver),
+        );
+        (bus, s)
+    }
+
+    async fn me(bus: &BusService<InMemoryStore>, s: &Squad, handle: &str) -> Identity {
+        let agent = bus.store().get_agent(&s.id(handle)).await.unwrap().unwrap();
+        Identity {
+            agent_id: agent.id,
+            team_id: s.team.clone(),
+            handle: agent.handle,
+            team_name: "Squad".into(),
+            session_id: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn pergunta_bloqueia_ate_a_resposta_e_destrava() {
+        let (bus, s) = service(squad().await, None);
+        let backend = me(&bus, &s, "backend").await;
+        let revisor = me(&bus, &s, "revisor").await;
+
+        let asking = {
+            let (bus, backend) = (bus.clone(), backend.clone());
+            tokio::spawn(async move {
+                bus.ask(
+                    &backend,
+                    "@revisor",
+                    "revisa o diff?",
+                    Some(Duration::from_secs(5)),
+                )
+                .await
+            })
+        };
+        // O revisor vê a pergunta e responde.
+        let question = loop {
+            let inbox = bus.inbox(&revisor.agent_id, false).await.unwrap();
+            if let Some(item) = inbox.into_iter().next() {
+                break item.message;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        };
+        assert_eq!(question.kind, MessageKind::Request);
+        assert_eq!(question.meta.timeout_s, Some(5));
+        bus.reply(&revisor, question.id.as_str(), "aprovado, pode subir")
+            .await
+            .unwrap();
+
+        let answer = asking.await.unwrap().unwrap();
+        assert_eq!(answer.body, "aprovado, pode subir");
+        assert_eq!(answer.kind, MessageKind::Response);
+        assert_eq!(answer.reply_to, Some(question.id.clone()));
+        // Pergunta respondida e resposta recebida contam como lidas.
+        assert!(bus
+            .inbox(&revisor.agent_id, false)
+            .await
+            .unwrap()
+            .is_empty());
+        assert!(bus
+            .inbox(&backend.agent_id, false)
+            .await
+            .unwrap()
+            .is_empty());
+    }
+
+    #[tokio::test]
+    async fn sem_resposta_no_prazo_e_timeout_com_dica() {
+        let (bus, s) = service(squad().await, None);
+        let backend = me(&bus, &s, "backend").await;
+        let err = bus
+            .ask(
+                &backend,
+                "@revisor",
+                "está aí?",
+                Some(Duration::from_millis(50)),
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(err.code(), "timeout");
+        assert!(err.to_string().contains("@revisor"));
+        assert!(err.hint().unwrap().contains("aisense send"));
+    }
+
+    #[tokio::test]
+    async fn ask_mutuo_e_recusado_com_would_deadlock() {
+        let (bus, s) = service(squad().await, None);
+        let backend = me(&bus, &s, "backend").await;
+        let frontend = me(&bus, &s, "frontend").await;
+        let revisor = me(&bus, &s, "revisor").await;
+        // backend → frontend → revisor esperando; revisor perguntar ao backend fecha o ciclo.
+        let first = {
+            let (bus, backend) = (bus.clone(), backend.clone());
+            tokio::spawn(async move {
+                bus.ask(&backend, "@frontend", "a", Some(Duration::from_secs(5)))
+                    .await
+            })
+        };
+        let second = {
+            let (bus, frontend) = (bus.clone(), frontend.clone());
+            tokio::spawn(async move {
+                bus.ask(&frontend, "@revisor", "b", Some(Duration::from_secs(5)))
+                    .await
+            })
+        };
+        // Espera as duas perguntas estarem registradas.
+        while bus.store().timeline(&s.team, None, 10).await.unwrap().len() < 2 {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        let err = bus
+            .ask(&revisor, "@backend", "c", Some(Duration::from_secs(1)))
+            .await
+            .unwrap_err();
+        assert_eq!(err.code(), "would_deadlock");
+        assert!(
+            err.to_string().contains("@backend → @frontend → @revisor"),
+            "{err}"
+        );
+        // Mútuo direto também.
+        let err = bus
+            .ask(&frontend, "@backend", "d", Some(Duration::from_secs(1)))
+            .await
+            .unwrap_err();
+        assert_eq!(err.code(), "would_deadlock");
+        first.abort();
+        second.abort();
+        let _ = (first.await, second.await);
+        // Com as esperas encerradas, perguntar volta a valer.
+        let third = bus
+            .ask(&revisor, "@backend", "e", Some(Duration::from_millis(20)))
+            .await
+            .unwrap_err();
+        assert_eq!(
+            third.code(),
+            "timeout",
+            "sem ciclo agora: só não teve resposta"
+        );
+    }
+
+    #[tokio::test]
+    async fn perguntar_a_quem_esta_parado_falha_na_hora() {
+        let s = squad().await;
+        let stopped = s.id("frontend");
+        let (bus, s) = service(s, Some(stopped));
+        let backend = me(&bus, &s, "backend").await;
+        let started = std::time::Instant::now();
+        let err = bus
+            .ask(&backend, "@frontend", "oi?", Some(Duration::from_secs(30)))
+            .await
+            .unwrap_err();
+        assert_eq!(err.code(), "agent_stopped");
+        assert!(started.elapsed() < Duration::from_secs(1));
+    }
+
+    #[tokio::test]
+    async fn so_responde_o_que_recebeu() {
+        let (bus, s) = service(squad().await, None);
+        let backend = me(&bus, &s, "backend").await;
+        let revisor = me(&bus, &s, "revisor").await;
+        let sent = bus
+            .send(
+                &s.team,
+                Sender::Agent {
+                    agent_id: backend.agent_id.clone(),
+                },
+                &["@frontend".into()],
+                "p/ frontend",
+                None,
+                MessageMeta::default(),
+            )
+            .await
+            .unwrap();
+        let err = bus
+            .reply(&revisor, sent[0].message.id.as_str(), "intrometido")
+            .await
+            .unwrap_err();
+        assert_eq!(err.code(), "invalid_request");
+        assert_eq!(
+            bus.reply(&revisor, "msg_nao_existe", "x")
+                .await
+                .unwrap_err()
+                .code(),
+            "unknown_message"
+        );
+    }
+}

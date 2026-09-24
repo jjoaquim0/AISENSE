@@ -15,8 +15,8 @@ pub use model::{
 pub use repo::{BusRepository, InboxQuery};
 pub use service::{
     AgentInfo, BusMessageEvent, BusObserver, BusService, BusStore, Directory, Identity,
-    MessageView, NoObserver, StateFn, UnreadCount, INBOX_LIMIT, REMOVED_AGENT_LABEL, SYSTEM_LABEL,
-    WAIT_MAX,
+    MessageView, NoObserver, StateFn, UnreadCount, ASK_DEFAULT, ASK_MAX, INBOX_LIMIT,
+    REMOVED_AGENT_LABEL, SYSTEM_LABEL, WAIT_MAX,
 };
 
 use crate::agent::{Agent, Handle};
@@ -36,6 +36,10 @@ pub enum BusError {
     UnknownMessage(MessageId),
     #[error("{0}")]
     InvalidRequest(String),
+    #[error("no answer from @{handle} in {secs} s")]
+    Timeout { handle: String, secs: u64 },
+    #[error("@{target} is waiting for an answer from you: asking back would lock both ({cycle})")]
+    WouldDeadlock { target: String, cycle: String },
     #[error(transparent)]
     Repo(#[from] RepoError),
 }
@@ -49,6 +53,8 @@ impl BusError {
             Self::AgentStopped(_) => "agent_stopped",
             Self::UnknownMessage(_) => "unknown_message",
             Self::InvalidRequest(_) => "invalid_request",
+            Self::Timeout { .. } => "timeout",
+            Self::WouldDeadlock { .. } => "would_deadlock",
             Self::Repo(_) => "internal",
         }
     }
@@ -60,6 +66,12 @@ impl BusError {
                 "Rode o comando de dentro de um terminal de agente aberto pelo AISENSE.".into(),
             ),
             Self::UnknownAgent(_) => Some("Veja quem está na equipe com: aisense agents".into()),
+            Self::Timeout { .. } => {
+                Some("Siga sem a resposta ou tente de novo; um recado com aisense send não bloqueia.".into())
+            }
+            Self::WouldDeadlock { target, .. } => Some(format!(
+                "Responda a pergunta de @{target} primeiro (aisense inbox) ou mande um recado com aisense send."
+            )),
             Self::AgentStopped(handle) => Some(format!(
                 "Deixe um recado que @{handle} lê ao voltar: aisense send @{handle} \"...\""
             )),

@@ -66,12 +66,70 @@ impl BusObserver for NoObserver {}
 
 pub type StateFn = Arc<dyn Fn(&AgentId) -> AgentState + Send + Sync>;
 
+/// `ask` sem timeout informado (`docs/07`).
+pub const ASK_DEFAULT: Duration = Duration::from_secs(300);
+/// Teto de `ask`.
+pub const ASK_MAX: Duration = Duration::from_secs(1800);
+
+/// Quem está bloqueado esperando quem: o grafo onde um ciclo é deadlock (F05-06).
+#[derive(Default)]
+struct WaitGraph {
+    /// Uma aresta por `ask` em andamento: quem pergunta → quem precisa responder.
+    edges: Vec<(AgentId, AgentId)>,
+}
+
+impl WaitGraph {
+    /// O caminho de `from` até `to` seguindo as esperas, se existir.
+    fn path(&self, from: &AgentId, to: &AgentId) -> Option<Vec<AgentId>> {
+        let mut stack = vec![vec![from.clone()]];
+        let mut seen = std::collections::HashSet::new();
+        while let Some(path) = stack.pop() {
+            let last = path.last()?.clone();
+            if &last == to {
+                return Some(path);
+            }
+            if !seen.insert(last.clone()) {
+                continue;
+            }
+            for (_, next) in self.edges.iter().filter(|(a, _)| a == &last) {
+                let mut longer = path.clone();
+                longer.push(next.clone());
+                stack.push(longer);
+            }
+        }
+        None
+    }
+
+    fn remove(&mut self, edge: &(AgentId, AgentId)) {
+        if let Some(at) = self.edges.iter().position(|e| e == edge) {
+            self.edges.swap_remove(at);
+        }
+    }
+}
+
+/// Tira a aresta do grafo quando o `ask` termina, do jeito que for (resposta, timeout,
+/// conexão caída).
+struct Waiting {
+    graph: Arc<std::sync::Mutex<WaitGraph>>,
+    edge: (AgentId, AgentId),
+}
+
+impl Drop for Waiting {
+    fn drop(&mut self) {
+        self.graph
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .remove(&self.edge);
+    }
+}
+
 pub struct BusService<S> {
     store: Arc<S>,
     state: StateFn,
     observer: Arc<dyn BusObserver>,
     /// Toda mensagem roteada: acorda `wait` e `ask` sem polling.
     hub: broadcast::Sender<Arc<Routed>>,
+    waits: Arc<std::sync::Mutex<WaitGraph>>,
 }
 
 impl<S> Clone for BusService<S> {
@@ -81,6 +139,7 @@ impl<S> Clone for BusService<S> {
             state: Arc::clone(&self.state),
             observer: Arc::clone(&self.observer),
             hub: self.hub.clone(),
+            waits: Arc::clone(&self.waits),
         }
     }
 }
@@ -93,6 +152,7 @@ impl<S: BusStore> BusService<S> {
             state,
             observer,
             hub,
+            waits: Arc::default(),
         }
     }
 
@@ -464,5 +524,188 @@ impl<S: BusStore> BusService<S> {
             message: dir.view(&routed.message),
             recipients: u32::try_from(routed.deliveries.len()).unwrap_or(u32::MAX),
         })
+    }
+}
+
+impl<S: BusStore> BusService<S> {
+    /// `ask`: manda a pergunta e bloqueia até a resposta (`reply_to` = a pergunta) ou o
+    /// timeout. Recusa na hora: destinatário parado (`agent_stopped`) e pergunta que fecharia
+    /// um ciclo de esperas (`would_deadlock`).
+    pub async fn ask(
+        &self,
+        me: &Identity,
+        to: &str,
+        body: &str,
+        timeout: Option<Duration>,
+    ) -> BusResult<Message> {
+        let timeout = timeout.unwrap_or(ASK_DEFAULT).min(ASK_MAX);
+        let address = Address::parse(to).map_err(BusError::InvalidRequest)?;
+        let Address::Agent(handle) = &address else {
+            return Err(BusError::InvalidRequest(
+                "a question (ask) goes to one agent: aisense ask @alguem \"...\"".into(),
+            ));
+        };
+        let target = self
+            .store
+            .list_agents(&me.team_id)
+            .await?
+            .into_iter()
+            .find(|a| &a.handle == handle)
+            .ok_or_else(|| BusError::UnknownAgent(handle.as_str().to_owned()))?;
+
+        // Registra a espera antes de mandar: dois `ask` cruzados no mesmo instante também
+        // são pegos (o segundo vê a aresta do primeiro).
+        let edge = (me.agent_id.clone(), target.id.clone());
+        let registered = {
+            let mut graph = self
+                .waits
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            match graph.path(&target.id, &me.agent_id) {
+                Some(cycle) => Err(cycle),
+                None => {
+                    graph.edges.push(edge.clone());
+                    Ok(Waiting {
+                        graph: Arc::clone(&self.waits),
+                        edge,
+                    })
+                }
+            }
+        };
+        let waiting = match registered {
+            Ok(waiting) => waiting,
+            Err(cycle) => {
+                // Nomes montados fora do lock (consulta ao banco).
+                let names = match self.directory(&me.team_id).await {
+                    Ok(dir) => cycle
+                        .iter()
+                        .chain(std::iter::once(&target.id))
+                        .map(|id| {
+                            dir.target(&super::model::Target::Agent {
+                                agent_id: id.clone(),
+                            })
+                        })
+                        .collect::<Vec<_>>()
+                        .join(" → "),
+                    Err(_) => String::new(),
+                };
+                return Err(BusError::WouldDeadlock {
+                    target: handle.as_str().to_owned(),
+                    cycle: names,
+                });
+            }
+        };
+
+        let mut rx = self.subscribe();
+        let out = Outgoing {
+            kind: MessageKind::Request,
+            meta: MessageMeta {
+                timeout_s: Some(u32::try_from(timeout.as_secs()).unwrap_or(u32::MAX)),
+                ..MessageMeta::default()
+            },
+            ..Outgoing::message(
+                Sender::Agent {
+                    agent_id: me.agent_id.clone(),
+                },
+                address.clone(),
+                body,
+            )
+        };
+        let question = self.dispatch(&me.team_id, out).await?;
+        let question_id = question.message.id.clone();
+        let deadline = tokio::time::Instant::now() + timeout;
+        let answer = loop {
+            match tokio::time::timeout_at(deadline, rx.recv()).await {
+                Err(_) => {
+                    drop(waiting);
+                    return Err(BusError::Timeout {
+                        handle: handle.as_str().to_owned(),
+                        secs: timeout.as_secs(),
+                    });
+                }
+                Ok(Ok(routed)) if routed.message.reply_to.as_ref() == Some(&question_id) => {
+                    break routed.message.clone();
+                }
+                Ok(Ok(_)) => {}
+                Ok(Err(broadcast::error::RecvError::Lagged(_))) => {
+                    // Perdeu eventos: a resposta pode já estar no banco.
+                    if let Some(found) = self
+                        .store
+                        .replies_to(&question_id)
+                        .await?
+                        .into_iter()
+                        .next()
+                    {
+                        break found;
+                    }
+                }
+                Ok(Err(broadcast::error::RecvError::Closed)) => {
+                    return Err(BusError::Timeout {
+                        handle: handle.as_str().to_owned(),
+                        secs: timeout.as_secs(),
+                    })
+                }
+            }
+        };
+        drop(waiting);
+        // A resposta foi entregue a quem perguntou na própria chamada: conta como lida.
+        let _ = self
+            .store
+            .mark_read(&me.agent_id, std::slice::from_ref(&answer.id), now_ms())
+            .await;
+        self.observer
+            .deliveries_changed(std::slice::from_ref(&answer.id), &me.agent_id);
+        Ok(answer)
+    }
+
+    /// `reply`: responde uma pergunta (`request`) feita a você. Destrava quem perguntou.
+    pub async fn reply(&self, me: &Identity, reply_to: &str, body: &str) -> BusResult<Routed> {
+        let id = crate::ids::MessageId::from_raw(reply_to.trim());
+        let original = self
+            .store
+            .get_message(&id)
+            .await?
+            .filter(|m| m.team_id == me.team_id)
+            .ok_or_else(|| BusError::UnknownMessage(id.clone()))?;
+        let to_me = self
+            .store
+            .deliveries_of(&id)
+            .await?
+            .iter()
+            .any(|d| d.agent_id == me.agent_id);
+        if !to_me {
+            return Err(BusError::InvalidRequest(format!(
+                "message {id} was not sent to you; answer only what you received"
+            )));
+        }
+        let address = super::reply_address(&*self.store, &original).await?;
+        let kind = if original.kind == MessageKind::Request {
+            MessageKind::Response
+        } else {
+            MessageKind::Message
+        };
+        let out = Outgoing {
+            kind,
+            reply_to: Some(id.clone()),
+            ..Outgoing::message(
+                Sender::Agent {
+                    agent_id: me.agent_id.clone(),
+                },
+                address,
+                body,
+            )
+        };
+        let routed = self.dispatch(&me.team_id, out).await?;
+        // Respondida = lida.
+        if self
+            .store
+            .mark_read(&me.agent_id, std::slice::from_ref(&id), now_ms())
+            .await?
+            > 0
+        {
+            self.observer
+                .deliveries_changed(std::slice::from_ref(&id), &me.agent_id);
+        }
+        Ok(routed)
     }
 }
