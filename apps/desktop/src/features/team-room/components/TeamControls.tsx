@@ -70,7 +70,7 @@ export function TeamControls({ teamId, running, handleOf, onReport, onError }: T
           </span>
         </div>
       )}
-      <Button onClick={() => void run('start')} disabled={busy}>
+      <Button size="sm" onClick={() => void run('start')} disabled={busy}>
         <Play size={13} /> Iniciar equipe
       </Button>
       <Tooltip content="Parar tudo">

@@ -404,7 +404,7 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
           className="size-3 shrink-0 rounded-sm"
           style={{ background: `var(--agent-${team.color})` }}
         />
-        <div className="min-w-40 flex-1">
+        <div className="min-w-0 flex-1 basis-48">
           <h1 className="truncate text-heading text-primary">{team.name}</h1>
           <p className="flex items-center gap-1 truncate text-caption text-muted">
             <Folder size={11} /> <span className="font-mono">{team.workdir}</span>
@@ -414,26 +414,29 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
         {view === 'grid' && (
           <PresetPicker value={grid.preset} onChange={(preset) => setGrid({ ...grid, preset })} />
         )}
-        <Button onClick={() => setNotesOpen(true)}>
-          <NotebookPen size={13} /> Notas
-        </Button>
-        <Button onClick={() => setCommandsOpen(true)}>
-          <FileCode size={13} /> Comandos
-        </Button>
-        <TeamControls
-          teamId={team.id}
-          running={agents.filter((a) => isRunning(stateOf(a.id))).length}
-          handleOf={handleOf}
-          onReport={(report) => {
-            const lines = describeStartReport(report, handleOf);
-            if (lines.length > 0) setNotice({ text: lines.join(' · ') });
-            void load();
-          }}
-          onError={setProblem}
-        />
-        <Button variant="primary" onClick={() => setForm({ open: true })}>
-          <Plus size={14} /> Novo agente
-        </Button>
+        {/* As ações quebram de linha juntas, nunca uma sozinha. */}
+        <div className="ml-auto flex items-center gap-2">
+          <Button size="sm" onClick={() => setNotesOpen(true)}>
+            <NotebookPen size={13} /> Notas
+          </Button>
+          <Button size="sm" onClick={() => setCommandsOpen(true)}>
+            <FileCode size={13} /> Comandos
+          </Button>
+          <TeamControls
+            teamId={team.id}
+            running={agents.filter((a) => isRunning(stateOf(a.id))).length}
+            handleOf={handleOf}
+            onReport={(report) => {
+              const lines = describeStartReport(report, handleOf);
+              if (lines.length > 0) setNotice({ text: lines.join(' · ') });
+              void load();
+            }}
+            onError={setProblem}
+          />
+          <Button size="sm" variant="primary" onClick={() => setForm({ open: true })}>
+            <Plus size={14} /> Novo agente
+          </Button>
+        </div>
       </header>
 
       <GuardBanner teamId={team.id} />

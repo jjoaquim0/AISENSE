@@ -33,12 +33,26 @@ export interface TerminalFont {
   lineHeight: number;
 }
 
-export function terminalFontOf(settings: AppSettings | null | undefined): TerminalFont {
+/**
+ * A pilha de fontes mono do design system, já resolvida. O xterm desenha num canvas, e
+ * `ctx.font` não entende `var(--font-mono)`: com a variável, ele mede os caracteres numa
+ * fonte e desenha em outra, e o terminal sai com as letras espaçadas (F08-09).
+ */
+export function monoStack(): string {
+  if (typeof document === 'undefined') return 'monospace';
+  const value = getComputedStyle(document.documentElement).getPropertyValue('--font-mono').trim();
+  return value || 'monospace';
+}
+
+export function terminalFontOf(
+  settings: AppSettings | null | undefined,
+  mono: string = monoStack(),
+): TerminalFont {
   const a = settings?.appearance;
   const family = a?.terminalFontFamily.trim();
   return {
     // A do design system continua como reserva: fonte digitada errada não quebra a tela.
-    fontFamily: family ? `"${family.replace(/"/g, '')}", var(--font-mono)` : 'var(--font-mono)',
+    fontFamily: family ? `"${family.replace(/"/g, '')}", ${mono}` : mono,
     fontSize: a?.terminalFontSize ?? 13,
     lineHeight: a?.density === 'compact' ? 1.2 : 1.4,
   };

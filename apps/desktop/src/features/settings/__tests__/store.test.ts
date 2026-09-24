@@ -14,20 +14,23 @@ const base = {
 
 describe('terminalFontOf', () => {
   it('usa os padrões sem preferências carregadas', () => {
-    expect(terminalFontOf(null)).toEqual({
-      fontFamily: 'var(--font-mono)',
+    expect(terminalFontOf(null, 'Mono')).toEqual({
+      fontFamily: 'Mono',
       fontSize: 13,
       lineHeight: 1.4,
     });
   });
 
   it('fonte escolhida vem antes da do AISENSE, que fica de reserva', () => {
-    const font = terminalFontOf({
-      ...base,
-      appearance: { ...base.appearance, terminalFontFamily: 'Fira "Code"', density: 'compact' },
-    });
+    const font = terminalFontOf(
+      {
+        ...base,
+        appearance: { ...base.appearance, terminalFontFamily: 'Fira "Code"', density: 'compact' },
+      },
+      'Mono',
+    );
     expect(font).toEqual({
-      fontFamily: '"Fira Code", var(--font-mono)',
+      fontFamily: '"Fira Code", Mono',
       fontSize: 15,
       lineHeight: 1.2,
     });

@@ -37,6 +37,10 @@ export function AppShell({ children }: { children: ReactNode }) {
     sidebarVisible,
     inspectorVisible,
   });
+  // Skills e Configurações ocupam a área toda: a sidebar e o inspetor falam da equipe
+  // aberta, que não é o assunto dessas telas (F08-09).
+  const screen = useNav((s) => s.screen);
+  const teamScreen = screen === 'teams';
   const { toggle: toggleTheme } = useTheme();
   const setPaletteOpen = usePalette((s) => s.setOpen);
   const go = useNav((s) => s.go);
@@ -130,12 +134,13 @@ export function AppShell({ children }: { children: ReactNode }) {
       <CommandPalette global={globalActions} />
       <TitleBar
         onToggleInspector={toggleInspector}
-        inspectorVisible={fit.inspector}
-        inspectorSqueezed={inspectorVisible && !fit.inspector}
+        inspectorVisible={fit.inspector && teamScreen}
+        inspectorSqueezed={teamScreen && inspectorVisible && !fit.inspector}
+        showInspectorToggle={teamScreen}
       />
       <div className="flex min-h-0 flex-1">
         <TeamRail />
-        {fit.sidebar && (
+        {fit.sidebar && teamScreen && (
           <>
             <Sidebar width={sidebarWidth} />
             <ResizeHandle
@@ -149,7 +154,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </>
         )}
         <main className="min-w-0 flex-1 overflow-auto">{children}</main>
-        {fit.inspector && (
+        {fit.inspector && teamScreen && (
           <>
             <ResizeHandle
               value={inspectorWidth}
@@ -171,11 +176,13 @@ function TitleBar({
   onToggleInspector,
   inspectorVisible,
   inspectorSqueezed,
+  showInspectorToggle,
 }: {
   onToggleInspector: () => void;
   inspectorVisible: boolean;
   /** Ligado, mas sem espaço na janela: o botão explica em vez de parecer quebrado. */
   inspectorSqueezed: boolean;
+  showInspectorToggle: boolean;
 }) {
   const { theme, toggle } = useTheme();
   const dark = isDark(theme);
@@ -187,21 +194,23 @@ function TitleBar({
     >
       <span className="text-label text-secondary">AISENSE</span>
       <div className="flex items-center gap-0.5">
-        <Tooltip
-          content={
-            inspectorSqueezed
-              ? 'Sem espaço para o inspetor: aumente a janela ou diminua o zoom'
-              : `${inspectorVisible ? 'Ocultar' : 'Mostrar'} inspetor · ${formatShortcut('⌘I')}`
-          }
-        >
-          <IconButton
-            label={inspectorVisible ? 'Ocultar inspetor' : 'Mostrar inspetor'}
-            onClick={onToggleInspector}
-            className={inspectorVisible ? 'text-primary' : undefined}
+        {showInspectorToggle && (
+          <Tooltip
+            content={
+              inspectorSqueezed
+                ? 'Sem espaço para o inspetor: aumente a janela ou diminua o zoom'
+                : `${inspectorVisible ? 'Ocultar' : 'Mostrar'} inspetor · ${formatShortcut('⌘I')}`
+            }
           >
-            <PanelRight size={15} />
-          </IconButton>
-        </Tooltip>
+            <IconButton
+              label={inspectorVisible ? 'Ocultar inspetor' : 'Mostrar inspetor'}
+              onClick={onToggleInspector}
+              className={inspectorVisible ? 'text-primary' : undefined}
+            >
+              <PanelRight size={15} />
+            </IconButton>
+          </Tooltip>
+        )}
         <Tooltip content={`Tema ${dark ? 'claro' : 'escuro'} · ${formatShortcut('⌘⇧D')}`}>
           <IconButton label={dark ? 'Usar tema claro' : 'Usar tema escuro'} onClick={toggle}>
             {dark ? <Sun size={15} /> : <Moon size={15} />}

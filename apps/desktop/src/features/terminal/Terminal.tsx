@@ -109,6 +109,18 @@ export function Terminal({
     fitAddon.fit();
     void terminalApi.resize(agentId, xterm.rows, xterm.cols).catch(reportError);
 
+    // A fonte mono chega depois do primeiro desenho: o xterm mediu os caracteres com a
+    // reserva e ficaria com espaçamento errado até a próxima troca de fonte. Trocar e
+    // voltar força a medição de novo.
+    let disposed = false;
+    void document.fonts?.ready.then(() => {
+      if (disposed) return;
+      const family = xterm.options.fontFamily;
+      xterm.options.fontFamily = 'monospace';
+      xterm.options.fontFamily = family;
+      fitAddon.fit();
+    });
+
     // A saída ao vivo passa pelo portão: durante uma reidratação ela espera o
     // histórico ser escrito, para não aparecer acima dele.
     const hydration = new HydrationGate((data) => xterm.write(data));
@@ -126,6 +138,7 @@ export function Terminal({
     });
 
     return () => {
+      disposed = true;
       unregisterFocus();
       stopData();
       stopExit();
@@ -228,7 +241,8 @@ export function Terminal({
         ref={host}
         role="application"
         aria-label={`${label}. Esc duas vezes volta para a interface.`}
-        className="size-full"
+        // Respiro para o texto não encostar na borda; o FitAddon desconta o padding.
+        className="size-full px-2 pt-1.5"
       />
     </div>
   );
