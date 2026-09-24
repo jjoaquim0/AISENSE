@@ -25,6 +25,21 @@ async function tabTo(page: Page, name: RegExp, max = 40): Promise<void> {
   throw new Error(`Tab não chegou em ${name}: ${path.join(' → ')}`);
 }
 
+/**
+ * `Esc Esc` sai do terminal. As duas teclas precisam cair em 400 ms (`DOUBLE_ESCAPE_MS`):
+ * numa máquina de CI carregada o intervalo entre dois `press` pode passar disso, e aí o
+ * gesto é refeito — como uma pessoa faria. O que se exige é sair, não o tempo do robô.
+ */
+async function leaveTerminal(page: Page): Promise<void> {
+  const inTerminal = () => page.evaluate(() => Boolean(document.activeElement?.closest('.xterm')));
+  await expect.poll(inTerminal).toBe(true);
+  for (let i = 0; i < 3 && (await inTerminal()); i++) {
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+  }
+  expect(await inTerminal()).toBe(false);
+}
+
 test('F1 pelo teclado: onboarding até a equipe rodando', async ({ page }) => {
   await openApp(page);
   await expect(page.getByText('Bem-vindo ao AISENSE')).toBeVisible();
@@ -99,8 +114,7 @@ test('F4 pelo teclado: agente que caiu volta pelo menu do painel', async ({ page
   await expect(pane.getByText('Erro')).toBeVisible();
   // ⌘1 leva ao painel; Esc Esc devolve o teclado à interface.
   await page.keyboard.press('Control+1');
-  await page.keyboard.press('Escape');
-  await page.keyboard.press('Escape');
+  await leaveTerminal(page);
   await tabTo(page, /Ações de @backend/);
   await page.keyboard.press('Enter');
   await expect(page.getByRole('menu')).toBeVisible();
