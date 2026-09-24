@@ -7,18 +7,43 @@
 
 mod commands;
 
+use std::path::Path;
+
 use tauri::Manager;
+use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use tracing_subscriber::EnvFilter;
 
-/// Abre o banco e aplica as migrações antes da janela existir: se falhar, o app
+/// Abre o banco e aplica as migrações antes de o core subir: se falhar, o app
 /// não deve subir pela metade, com a UI mostrando dados que não persistem.
 fn open_store(
     data: &aisense_core::DataDir,
-) -> Result<aisense_store::Store, Box<dyn std::error::Error>> {
-    let path = data.database();
-    Ok(tauri::async_runtime::block_on(aisense_store::Store::open(
-        &path,
-    ))?)
+) -> Result<aisense_store::Store, aisense_store::StoreError> {
+    tauri::async_runtime::block_on(aisense_store::Store::open(&data.database()))
+}
+
+/// O que dizer quando o banco não abre (F09-04). O caminho do backup vai inteiro:
+/// é com ele que a pessoa recupera os dados se precisar.
+fn store_failure_message(error: &aisense_store::StoreError, database: &Path) -> String {
+    use aisense_store::StoreError;
+    match error {
+        StoreError::MigrationRolledBack { backup, .. } => format!(
+            "A atualização do banco de dados desta versão falhou e ele foi restaurado do backup. \
+             Nenhum dado foi perdido.\n\nBackup: {}\n\nEsta versão não consegue usar o banco. \
+             Volte para a versão anterior do AISENSE e relate o problema com o log abaixo.\n\n{error}",
+            backup.display()
+        ),
+        StoreError::RestoreFailed { backup, .. } => format!(
+            "A atualização do banco de dados falhou e não foi possível restaurar o backup \
+             automaticamente. Seus dados estão intactos no backup.\n\nPara recuperar, com o \
+             AISENSE fechado, copie\n{}\npara\n{}\n\n{error}",
+            backup.display(),
+            database.display()
+        ),
+        _ => format!(
+            "O AISENSE não conseguiu abrir o banco de dados em {}.\n\n{error}",
+            database.display()
+        ),
+    }
 }
 
 fn main() {
@@ -44,7 +69,23 @@ fn main() {
         .setup(move |app| {
             let data = aisense_core::DataDir::resolve()
                 .ok_or("could not find the user's home directory; set AISENSE_HOME")?;
-            let store = open_store(&data)?;
+            let store = match open_store(&data) {
+                Ok(store) => store,
+                Err(error) => {
+                    tracing::error!(%error, "o banco não abriu; o app não sobe");
+                    // Sem banco não há o que mostrar: esconde a janela, avisa e sai.
+                    if let Some(window) = app.get_webview_window("main") {
+                        let _ = window.hide();
+                    }
+                    let handle = app.handle().clone();
+                    app.dialog()
+                        .message(store_failure_message(&error, &data.database()))
+                        .title("AISENSE não pôde abrir os seus dados")
+                        .kind(MessageDialogKind::Error)
+                        .show(move |_| handle.exit(1));
+                    return Ok(());
+                }
+            };
             let settings = commands::settings::setup(&data);
             let (registry, watcher) = commands::runtimes::setup(app.handle(), &data);
             let (library, skill_watcher) = commands::skills::setup(app.handle(), &data, &store);

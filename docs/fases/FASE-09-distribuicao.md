@@ -23,9 +23,19 @@ Tauri updater com verificação de assinatura, canal estável, UI de "atualizaç
 opção de desligar.
 **Aceite:** atualizar da versão N para N+1 preserva banco, configurações e skills do usuário.
 
-### [ ] F09-04 — Migração de dados entre versões
+### [x] F09-04 — Migração de dados entre versões
 Runner de migração com backup automático do `.db` antes de aplicar, e rollback em caso de falha.
 **Aceite:** migração que falha no meio restaura o backup e avisa o usuário sem perder dados.
+
+> Feito: `Store::open` (`aisense-store/src/db.rs`) faz o backup (`VACUUM INTO`
+> `aisense.db.bak-v<N>`) e migra numa **conexão única**; se a migração falhar, fecha a conexão,
+> apaga `-wal`/`-shm` e copia o backup de volta (o backup fica, para uma segunda tentativa). Erros
+> `MigrationRolledBack` e `RestoreFailed` (este diz onde está a cópia boa). O app
+> (`main.rs`) esconde a janela, mostra um diálogo em pt-BR com o caminho do backup e sai.
+> Teste: v1 com dados + migração 2 real + migração quebrada → volta à v1 com os dados e sem as
+> tabelas da 2; depois a versão corrigida migra normalmente. A primeira versão usava o pool e
+> falhava ~1 em 10: uma conexão ainda se fechando fazia checkpoint do WAL por cima do backup
+> recolocado. O diálogo não foi visto numa janela real.
 
 ### [ ] F09-05 — Diagnóstico exportável
 "Exportar diagnóstico" gerando `.zip` com logs redigidos (tokens, chaves e caminho de home

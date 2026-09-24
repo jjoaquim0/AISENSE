@@ -4,8 +4,10 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use sqlx::migrate::Migrator;
-use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
-use sqlx::SqlitePool;
+use sqlx::sqlite::{
+    SqliteConnectOptions, SqliteConnection, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous,
+};
+use sqlx::{Connection, SqlitePool};
 
 use crate::StoreError;
 
@@ -22,8 +24,14 @@ pub struct Store {
 
 impl Store {
     /// Abre (ou cria) o banco em `path`, faz backup se houver migração pendente
-    /// num banco que já tem dados, e migra.
+    /// num banco que já tem dados, e migra. Se uma migração falhar no meio, o
+    /// backup volta para o lugar do banco e o erro é
+    /// [`StoreError::MigrationRolledBack`]: o banco fica como estava antes (F09-04).
     pub async fn open(path: &Path) -> Result<Self, StoreError> {
+        Self::open_with(path, &MIGRATOR).await
+    }
+
+    async fn open_with(path: &Path, migrator: &Migrator) -> Result<Self, StoreError> {
         if let Some(dir) = path.parent() {
             // Falhar aqui vira um erro de `connect` logo abaixo, com o caminho.
             let _ = std::fs::create_dir_all(dir);
@@ -37,19 +45,57 @@ impl Store {
             .synchronous(SqliteSynchronous::Normal)
             .foreign_keys(true)
             .busy_timeout(std::time::Duration::from_secs(5));
+        let open_error = |source| StoreError::Open {
+            path: path.to_owned(),
+            source,
+        };
+
+        // Backup e migração numa conexão só, fechada antes de qualquer restauração:
+        // com um pool, uma conexão ainda se fechando fazia checkpoint do WAL por cima
+        // do backup recolocado, trazendo de volta a migração desfeita.
+        let mut conn = SqliteConnection::connect_with(&options)
+            .await
+            .map_err(open_error)?;
+        let backup = match backup_before_migrating(&mut conn, path, migrator).await {
+            Ok(backup) => backup,
+            Err(error) => {
+                let _ = conn.close().await;
+                return Err(error);
+            }
+        };
+        let migrated = migrator.run(&mut conn).await;
+        conn.close().await?;
+        if let Err(error) = migrated {
+            let Some(backup) = backup else {
+                // Banco novo: não havia dado a proteger.
+                return Err(error.into());
+            };
+            return Err(match restore(&backup, path) {
+                Ok(()) => {
+                    tracing::error!(%error, backup = %backup.display(), "migration failed; database restored from backup");
+                    StoreError::MigrationRolledBack {
+                        backup,
+                        source: error,
+                    }
+                }
+                Err(io) => {
+                    tracing::error!(%error, restore = %io, backup = %backup.display(), "migration failed and the backup could not be restored");
+                    StoreError::RestoreFailed {
+                        backup,
+                        migration: error,
+                        source: io,
+                    }
+                }
+            });
+        }
+
         let pool = SqlitePoolOptions::new()
             .max_connections(4)
             .connect_with(options)
             .await
-            .map_err(|source| StoreError::Open {
-                path: path.to_owned(),
-                source,
-            })?;
-        let store = Self { pool };
-        store.backup_before_migrating(path).await?;
-        store.migrate().await?;
+            .map_err(open_error)?;
         tracing::info!(path = %path.display(), "database ready");
-        Ok(store)
+        Ok(Self { pool })
     }
 
     /// Banco em memória, já migrado. Para testes.
@@ -86,49 +132,74 @@ impl Store {
 
     /// Versões já aplicadas neste banco (vazio num banco novo).
     pub async fn applied_versions(&self) -> Result<Vec<i64>, StoreError> {
-        let exists: Option<(String,)> = sqlx::query_as(
-            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = '_sqlx_migrations'",
-        )
-        .fetch_optional(&self.pool)
-        .await?;
-        if exists.is_none() {
-            return Ok(Vec::new());
-        }
-        let rows: Vec<(i64,)> = sqlx::query_as(
-            "SELECT version FROM _sqlx_migrations WHERE success = 1 ORDER BY version",
-        )
-        .fetch_all(&self.pool)
-        .await?;
-        Ok(rows.into_iter().map(|(v,)| v).collect())
+        let mut conn = self.pool.acquire().await?;
+        applied_versions(&mut conn).await
     }
+}
 
-    /// Mitigação do risco "migração futura quebrar banco de usuário" (Fase 02):
-    /// antes de migrar um banco que já tem dados, copia-o para
-    /// `<arquivo>.bak-v<versão atual>`. Banco novo não tem o que proteger.
-    async fn backup_before_migrating(&self, path: &Path) -> Result<(), StoreError> {
-        let applied = self.applied_versions().await?;
-        let Some(current) = applied.last().copied() else {
-            return Ok(());
-        };
-        let pending = MIGRATOR.iter().any(|m| !applied.contains(&m.version));
-        if !pending {
-            return Ok(());
-        }
-        let backup = backup_path(path, current);
-        // VACUUM INTO falha se o destino existe; um backup antigo da mesma versão
-        // é substituído pelo estado atual.
-        let _ = std::fs::remove_file(&backup);
-        sqlx::query("VACUUM INTO ?")
-            .bind(backup.to_string_lossy().into_owned())
-            .execute(&self.pool)
-            .await
-            .map_err(|source| StoreError::Backup {
-                path: backup.clone(),
-                source,
-            })?;
-        tracing::info!(backup = %backup.display(), from_version = current, "database backed up before migrating");
-        Ok(())
+async fn applied_versions(conn: &mut SqliteConnection) -> Result<Vec<i64>, StoreError> {
+    let exists: Option<(String,)> = sqlx::query_as(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = '_sqlx_migrations'",
+    )
+    .fetch_optional(&mut *conn)
+    .await?;
+    if exists.is_none() {
+        return Ok(Vec::new());
     }
+    let rows: Vec<(i64,)> =
+        sqlx::query_as("SELECT version FROM _sqlx_migrations WHERE success = 1 ORDER BY version")
+            .fetch_all(&mut *conn)
+            .await?;
+    Ok(rows.into_iter().map(|(v,)| v).collect())
+}
+
+/// Mitigação do risco "migração futura quebrar banco de usuário" (Fase 02):
+/// antes de migrar um banco que já tem dados, copia-o para
+/// `<arquivo>.bak-v<versão atual>`. Banco novo não tem o que proteger.
+/// Devolve o backup feito, se houve.
+async fn backup_before_migrating(
+    conn: &mut SqliteConnection,
+    path: &Path,
+    migrator: &Migrator,
+) -> Result<Option<PathBuf>, StoreError> {
+    let applied = applied_versions(conn).await?;
+    let Some(current) = applied.last().copied() else {
+        return Ok(None);
+    };
+    let pending = migrator.iter().any(|m| !applied.contains(&m.version));
+    if !pending {
+        return Ok(None);
+    }
+    let backup = backup_path(path, current);
+    // VACUUM INTO falha se o destino existe; um backup antigo da mesma versão
+    // é substituído pelo estado atual.
+    let _ = std::fs::remove_file(&backup);
+    sqlx::query("VACUUM INTO ?")
+        .bind(backup.to_string_lossy().into_owned())
+        .execute(&mut *conn)
+        .await
+        .map_err(|source| StoreError::Backup {
+            path: backup.clone(),
+            source,
+        })?;
+    tracing::info!(backup = %backup.display(), from_version = current, "database backed up before migrating");
+    Ok(Some(backup))
+}
+
+/// Põe o backup no lugar do banco. O pool já está fechado; os arquivos `-wal` e
+/// `-shm` são do banco que falhou e reaplicariam o que a migração deixou pela metade.
+fn restore(backup: &Path, path: &Path) -> std::io::Result<()> {
+    for suffix in ["-wal", "-shm"] {
+        let mut name = path.as_os_str().to_os_string();
+        name.push(suffix);
+        match std::fs::remove_file(PathBuf::from(name)) {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(e),
+            _ => {}
+        }
+    }
+    // Copia (não move): o backup continua lá para uma segunda tentativa.
+    std::fs::copy(backup, path)?;
+    Ok(())
 }
 
 fn backup_path(path: &Path, version: i64) -> PathBuf {
@@ -263,5 +334,100 @@ mod tests {
         let all: Vec<i64> = MIGRATOR.iter().map(|m| m.version).collect();
         assert_eq!(store.applied_versions().await.unwrap(), all);
         assert!(backup_path(&path, 1).exists(), "backup of v1 must exist");
+    }
+
+    /// Um usuário na versão 1 com dados; devolve o caminho do banco.
+    async fn database_at_v1_with_a_team(dir: &Path) -> PathBuf {
+        let path = dir.join("aisense.db");
+        let options = SqliteConnectOptions::new()
+            .filename(&path)
+            .create_if_missing(true)
+            .journal_mode(SqliteJournalMode::Wal);
+        let pool = SqlitePoolOptions::new()
+            .connect_with(options)
+            .await
+            .unwrap();
+        first_n(1).run(&pool).await.unwrap();
+        sqlx::query(
+            "INSERT INTO teams (id, name, workdir, created_at, updated_at) VALUES ('tem_1', 'Squad', '/tmp', 0, 0)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        pool.close().await;
+        path
+    }
+
+    fn first_n(n: usize) -> Migrator {
+        Migrator {
+            migrations: std::borrow::Cow::Owned(MIGRATOR.iter().take(n).cloned().collect()),
+            ..Migrator::DEFAULT
+        }
+    }
+
+    /// As migrações reais até a 2 e, depois, uma que quebra no meio: a 2 já terá
+    /// sido gravada quando a 3 falhar.
+    fn breaks_after_the_second() -> Migrator {
+        let mut migrations: Vec<_> = MIGRATOR.iter().take(2).cloned().collect();
+        migrations.push(sqlx::migrate::Migration::new(
+            9_999,
+            "broken".into(),
+            sqlx::migrate::MigrationType::Simple,
+            "CREATE TABLE half_done (id TEXT); INSERT INTO nowhere VALUES (1);".into(),
+            false,
+        ));
+        Migrator {
+            migrations: std::borrow::Cow::Owned(migrations),
+            ..Migrator::DEFAULT
+        }
+    }
+
+    #[tokio::test]
+    async fn a_migration_that_fails_midway_restores_the_backup() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = database_at_v1_with_a_team(dir.path()).await;
+
+        let err = Store::open_with(&path, &breaks_after_the_second())
+            .await
+            .unwrap_err();
+        let StoreError::MigrationRolledBack { backup, .. } = &err else {
+            panic!("expected a rollback, got {err:?}");
+        };
+        assert_eq!(backup, &backup_path(&path, 1));
+        assert!(backup.exists(), "the backup stays for a second attempt");
+        assert!(err.to_string().contains("restored"), "{err}");
+
+        // O banco voltou à versão 1, com os dados, e nada da migração 2 ficou.
+        let store = Store::open_with(&path, &first_n(1)).await.unwrap();
+        assert_eq!(store.applied_versions().await.unwrap(), [1]);
+        let names: Vec<String> = sqlx::query_scalar("SELECT name FROM teams")
+            .fetch_all(store.pool())
+            .await
+            .unwrap();
+        assert_eq!(names, ["Squad"]);
+        let second = MIGRATOR.iter().nth(1).unwrap();
+        let leftovers = tables(&store).await;
+        assert!(
+            !leftovers.contains(&"workbenches".to_owned())
+                && !leftovers.contains(&"half_done".to_owned()),
+            "migration {} must be undone: {leftovers:?}",
+            second.version
+        );
+        store.close().await;
+
+        // E a versão corrigida migra normalmente a partir dele.
+        let fixed = Store::open(&path).await.unwrap();
+        let all: Vec<i64> = MIGRATOR.iter().map(|m| m.version).collect();
+        assert_eq!(fixed.applied_versions().await.unwrap(), all);
+    }
+
+    #[tokio::test]
+    async fn a_new_database_has_no_backup_to_restore() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("aisense.db");
+        let err = Store::open_with(&path, &breaks_after_the_second())
+            .await
+            .unwrap_err();
+        assert!(matches!(err, StoreError::Migrate(_)), "{err:?}");
     }
 }
