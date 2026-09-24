@@ -5,7 +5,7 @@
 > Se estiver desatualizado, o próximo agente se perde. Mantenha-o honesto.
 
 **Última atualização:** 2026-09-24 (Fase 09)
-**Fase atual:** `FASE 09 — Distribuição`, iniciada a pedido do usuário, em lote no branch `claude/fase-9-2uslmm` (2 feitas, 5 parciais de 7 — o que falta é o que só o dono do projeto tem: certificados, chave do updater e a primeira tag). Fase 08 mergeada no PR #22 com a F08-01 e a F08-08 parciais
+**Fase atual:** `FASE 09 — Distribuição`, iniciada a pedido do usuário, em lote no branch `claude/fase-9-2uslmm` (2 feitas, 5 parciais e 2 novas de 9 — o que falta nas parciais é o que só o dono do projeto tem: certificados, chave do updater e a primeira tag). Fase 08 mergeada no PR #22 com a F08-01 e a F08-08 parciais
 **Fluxo de trabalho atual:** várias tarefas seguidas no mesmo branch `claude/...`, **um commit por
 tarefa** (ID no título) e um PR só ao fim do lote, com o CI verde nos 3 SOs antes do merge (o
 usuário mergeia). Pedido do usuário em 2026-09-23 para acelerar.
@@ -95,7 +95,7 @@ ensaio do workflow de release nos 3 SOs e criar a tag `v0.1.0`.
 | 06 — Quadro Kanban | 🟨 Código completo | 11 de 11 — falta a demonstração com agentes reais |
 | 07 — Coordenação | 🟨 Código quase completo | 5 feitas, 1 parcial de 6 — falta o CU-2 com runtime real |
 | 08 — Acabamento | 🟨 Código quase completo | 7 feitas, 2 parciais de 9 — faltam GPU e o CI dos 3 SOs |
-| 09 — Distribuição | 🟨 Em andamento | 2 feitas, 5 parciais de 7 — faltam certificados, chave do updater e a primeira tag |
+| 09 — Distribuição | 🟨 Em andamento | 2 feitas, 5 parciais, 2 não iniciadas de 9 — faltam certificados, chave do updater e a primeira tag |
 
 Legenda: ⬜ não iniciada · 🟨 em andamento · ✅ concluída · 🟥 bloqueada
 
@@ -112,6 +112,8 @@ Legenda: ⬜ não iniciada · 🟨 em andamento · ✅ concluída · 🟥 bloque
 | F09-07 Release por tag | 🟨 `release.yml` (rascunho → 3 SOs → fumaça → publica) e notas dos commits; nunca rodou |
 | F09-02 Assinatura | 🟨 workflow pronto para Apple e Authenticode; faltam os certificados |
 | F09-06 Docs de usuário | 🟨 README e `docs/guia/`; falta alguém de fora seguir só com eles |
+| F09-08 Editor de adaptador | ⬜ pedido do usuário: Novo adaptador, Testar e Instalar integração MCP na interface (`docs/05`) |
+| F09-09 Prévia de skill | ⬜ `docs/11` exige prévia antes de importar skill; o app não tem |
 
 Para continuar: cadastrar os segredos de `docs/distribuicao.md` (no mínimo o par do updater),
 rodar **Actions → Release → Run workflow** (ensaio: pacotes e fumaça nos 3 SOs, sem publicar),

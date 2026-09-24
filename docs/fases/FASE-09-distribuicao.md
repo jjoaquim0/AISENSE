@@ -123,6 +123,23 @@ notas geradas a partir dos commits e atualiza o manifesto do updater.
 > canal estável). `workflow_dispatch` faz um **ensaio** sem publicar, com os pacotes como
 > artefatos. **Falta:** os segredos cadastrados e a primeira tag.
 
+### [ ] F09-08 — Editor de adaptador e integração MCP na interface
+Pedido do usuário (2026-09-24), especificado em [05](../05-adaptadores-runtime.md#como-adicionar-um-runtime-novo-guia-do-usuário-vira-ajuda-na-ui).
+Configurações → Runtimes → **Novo adaptador** / editar: o TOML num editor com validação ao vivo
+(erro com linha, mesmo validador do carregador), botão **Testar** que roda o `detect` e mostra a
+saída, e **Salvar** na pasta de adaptadores do usuário (embutido vira cópia do usuário). Botão
+**Instalar integração MCP** para runtimes com `capabilities.mcp = true` cuja configuração é global
+(ex.: `codex`): mostra o que vai mudar no arquivo do runtime e só grava com confirmação, sem
+apagar o que já existe.
+**Aceite:** criar um adaptador novo, testá-lo e subir um agente com ele sem sair do app; a
+integração MCP do `codex` instalada pelo botão e desfeita sem perder a configuração do usuário.
+
+### [ ] F09-09 — Prévia ao importar skill
+Exigência de [11 — Segurança](../11-seguranca.md#modelo-de-ameaça) que o app não cumpre: antes de
+importar, mostrar o `SKILL.md` (e a lista de arquivos da pasta) com o resultado da validação, e só
+importar com confirmação. Fecha também o que falta da F04-08 nesse ponto.
+**Aceite:** importar uma pasta mostra o conteúdo antes; cancelar não grava nada.
+
 ## Critérios de saída
 - [ ] Instaladores assinados para macOS, Windows e Linux
 - [ ] Auto-update funcionando de ponta a ponta

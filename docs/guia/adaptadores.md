@@ -19,6 +19,9 @@ o embutido — é assim que você corrige uma flag que mudou numa versão nova d
 O app observa a pasta: salvou o arquivo, a lista de runtimes se atualiza sozinha. Agentes que já
 estão rodando continuam com o adaptador com que subiram até você reiniciá-los.
 
+> Um editor de adaptador dentro do app (**Novo adaptador**, **Testar**, **Instalar integração MCP**)
+> está planejado (tarefa F09-08). Até lá, o adaptador é um arquivo que você cria na pasta abaixo.
+
 ## 2. O mínimo que funciona
 
 Crie `~/.aisense/adapters/minha-ia.toml`:

@@ -11,7 +11,7 @@
 | Processo local do **mesmo** usuário | Conectar no socket | Exige `AISENSE_TOKEN` válido; tokens são por sessão e expiram. Aceito como limite: quem já roda como você já pode ler seus arquivos |
 | Agente de IA comprometido / alucinando | Enviar mensagens maliciosas a outros agentes | Sanitização de corpo, limites de taxa, tudo visível na timeline |
 | Conteúdo vindo da rede (a IA leu uma página) | Tentar injeção de prompt via mensagem entre agentes | Mensagens sempre rotuladas com remetente; a skill orienta a tratar corpo como **dado, não instrução** |
-| Skill importada de terceiro | Conter instruções hostis | Preview obrigatório antes de importar; skills não executam nada sozinhas |
+| Skill importada de terceiro | Conter instruções hostis | Preview obrigatório antes de importar (tarefa F09-09: hoje o app importa sem prévia); skills não executam nada sozinhas |
 
 ## Segredos
 

@@ -177,15 +177,18 @@ inclusive a de painéis fechados, que não geram evento para a UI.
 
 **Nunca** trate detecção de estado como certeza. Toda injeção passa pela fila e é cancelável.
 
-## Como adicionar um runtime novo
+## Como adicionar um runtime novo (guia do usuário, vira ajuda na UI)
 
-O passo a passo para quem usa o app está em [guia/adaptadores.md](guia/adaptadores.md). Em resumo,
-como o app é hoje:
+> **Especificação — ainda não implementada.** Os passos 1, 2 e 4 dependem da tarefa F09-08
+> (editor de adaptador e integração MCP); o passo 3 já existe. Até lá, o caminho é criar o TOML
+> na pasta de adaptadores, como descreve o [guia de adaptadores](guia/adaptadores.md).
 
-1. Crie `<id>.toml` na pasta de adaptadores (Configurações → Runtimes mostra o caminho); o
-   observador da pasta carrega na hora e erros aparecem com arquivo e linha. Não há editor de
-   adaptador dentro do app.
-2. Confira em Configurações → Runtimes que o `detect` achou o comando (ou **Procurar de novo**).
-3. Suba um agente com ele e ajuste os regex no **modo calibração**; aplicar grava no seu arquivo.
-4. Com `capabilities.mcp` e `mcp_config`, o supervisor registra o `aisense-mcp` no arquivo do
-   projeto a cada início — não há botão de "instalar integração".
+1. Configurações → Runtimes → **Novo adaptador** (abre o TOML em um editor com validação).
+2. Preencha `command` e `detect`; clique em **Testar** — o app roda o comando e mostra a saída.
+3. Suba um agente descartável e abra o **modo calibração**; ajuste `idle_regex` até o indicador
+   ficar verde quando o prompt está esperando você.
+4. Se a CLI suportar MCP, aponte a configuração dela para o binário `aisense-mcp`
+   (o botão **Instalar integração MCP** faz isso automaticamente quando `capabilities.mcp = true`).
+   Com `mcp_config`, o supervisor já registra o `aisense-mcp` no arquivo do projeto a cada início;
+   o botão é para os runtimes cuja configuração de MCP é global do usuário (ex.: `codex`).
+5. Salve. O adaptador aparece na lista de runtimes ao criar agentes.

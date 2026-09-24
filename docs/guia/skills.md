@@ -91,5 +91,5 @@ do arquivo completo para a IA ler quando precisar, e o app avisa.
 
 - **Exportar…** (menu da skill na biblioteca) copia a pasta da skill para onde você escolher.
 - **Importar** traz uma pasta com `SKILL.md` para a sua biblioteca. O app ainda não mostra uma
-  prévia antes de importar: abra o `SKILL.md` e leia antes — uma skill de terceiros é um texto que
+  prévia antes de importar (vem na tarefa F09-09): abra o `SKILL.md` e leia antes — uma skill de terceiros é um texto que
   a IA vai seguir. Depois de importada, ela abre no editor como qualquer outra.
