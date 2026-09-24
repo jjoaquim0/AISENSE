@@ -5,10 +5,12 @@
 #![forbid(unsafe_code)]
 #![warn(clippy::unwrap_used, clippy::expect_used)]
 
+pub mod cli;
 mod client;
 mod frame;
 mod handler;
 mod protocol;
+pub mod render;
 mod transport;
 
 pub use client::{Client, ClientError};

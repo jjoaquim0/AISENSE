@@ -142,12 +142,24 @@ pré-existente do usuário é preservada. Depende de F05-05.
 > idempotente, arquivo criado quando não existe) e do formato de saída. "Checa sozinho ao fim
 > de cada turno" com o Claude Code de verdade só se confere numa máquina com ele instalado.
 
-### [ ] F05-09 — Servidor MCP `aisense-mcp`
+### [x] F05-09 — Servidor MCP `aisense-mcp`
 Binário MCP stdio expondo `aisense_list_agents`, `aisense_send_message`, `aisense_ask_agent`,
 `aisense_read_inbox`, `aisense_create_task`, `aisense_update_task`. Instalação automática na
 configuração do runtime quando `capabilities.mcp = true`.
 **Aceite:** teste de contrato garantindo que CLI e MCP produzem exatamente o mesmo efeito no core.
 Depende de F05-06.
+> Feito: `aisense-mcp` — JSON-RPC 2.0 por stdio escrito à mão (sem SDK novo): `initialize`
+> (protocolos 2025-06-18/2025-03-26/2024-11-05, e o `BOOT.md` de `AISENSE_BOOT_FILE` como
+> `instructions`), `tools/list`, `tools/call`, `ping`. Ferramentas: `aisense_list_agents`,
+> `aisense_send_message`, `aisense_ask_agent`, `aisense_reply`, `aisense_read_inbox` e
+> `aisense_notes`; as de tarefa entram com o quadro (Fase 06). É um cliente do mesmo socket da
+> CLI: o parser (`aisense_ipc::cli`) e a renderização (`aisense_ipc::render`) passaram para o
+> `aisense-ipc`, e cada ferramenta monta o mesmo `Request` do comando equivalente. Instalação:
+> campo novo `capabilities.mcp_config` (no `claude`, `.mcp.json`); no start, o `aisense` é
+> registrado em `mcpServers` e pré-aprovado em `enabledMcpjsonServers` do `settings.json`,
+> mesclando. Com isso o boot por MCP (F04-06) liga onde há `mcp_config`. Aceite: teste de
+> contrato frame a frame (CLI × MCP, 9 pares) e o binário de verdade por stdio contra um
+> socket real (mensagem chega à caixa, erro traz a dica, `instructions` = `BOOT.md`).
 
 ### [x] F05-10 — Guardas anti-laço
 Limite de taxa por agente, profundidade de cadeia de reply, detecção de mensagens repetidas,

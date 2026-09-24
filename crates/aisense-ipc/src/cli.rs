@@ -1,7 +1,7 @@
 //! Linha de comando à mão: poucos comandos, sem dependência de parser (a CLI precisa subir
 //! rápido e ser pequena). `--json` vale em qualquer posição.
 
-use aisense_ipc::NotesOp;
+use crate::protocol::{NotesOp, Request};
 
 pub const HELP: &str = "\
 aisense — fale com a sua equipe de agentes (AISENSE)
@@ -23,7 +23,7 @@ aisense — fale com a sua equipe de agentes (AISENSE)
   Saída: 0 ok · 1 erro de uso · 2 timeout · 3 destinatário ou AISENSE indisponível.
 ";
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Command {
     Help,
     Version,
@@ -62,6 +62,44 @@ pub enum Command {
         note: Option<String>,
     },
     Notes(NotesOp),
+}
+
+impl Command {
+    /// O frame que este comando manda. `Help`/`Version` são locais: `None`.
+    pub fn request(&self) -> Option<Request> {
+        Some(match self.clone() {
+            Command::Whoami => Request::Whoami,
+            Command::Agents => Request::Agents,
+            Command::Send { to, body } => Request::Send {
+                to,
+                body,
+                subject: None,
+                meta: Default::default(),
+            },
+            Command::Broadcast { body } => Request::Send {
+                to: vec!["@all".into()],
+                body,
+                subject: None,
+                meta: Default::default(),
+            },
+            Command::Inbox { drain, .. } => Request::Inbox { drain },
+            Command::Wait { timeout_s } => Request::Wait { timeout_s },
+            Command::Note { body } => Request::Note { body },
+            Command::Status { state, note } => Request::Status { state, note },
+            Command::Ask {
+                to,
+                body,
+                timeout_s,
+            } => Request::Ask {
+                to,
+                body,
+                timeout_s,
+            },
+            Command::Reply { reply_to, body } => Request::Reply { reply_to, body },
+            Command::Notes(op) => Request::Notes(op),
+            Command::Help | Command::Version => return None,
+        })
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]

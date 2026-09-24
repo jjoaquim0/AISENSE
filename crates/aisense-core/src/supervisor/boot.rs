@@ -76,7 +76,7 @@ pub fn choose_boot_channel(adapter: &Adapter, mcp_boot: bool) -> BootChannel {
     if let Some(flag) = &adapter.capabilities.system_prompt_flag {
         return BootChannel::SystemPromptFlag { flag: flag.clone() };
     }
-    if adapter.capabilities.mcp && mcp_boot {
+    if adapter.capabilities.mcp && adapter.capabilities.mcp_config.is_some() && mcp_boot {
         return BootChannel::Mcp;
     }
     if adapter.inject.mode == InjectMode::Stdin && adapter.inject.boot {
@@ -139,15 +139,20 @@ mod tests {
             choose_boot_channel(&adapter("opencode"), false),
             flag("--prompt")
         );
-        // Sem flag: MCP quando o servidor existir, terminal até lá.
+        // Sem flag: MCP só onde o AISENSE registra o servidor (`mcp_config`); o codex tem
+        // MCP, mas a configuração dele é global do usuário — segue pelo terminal.
         assert_eq!(
             choose_boot_channel(&adapter("codex"), false),
             BootChannel::Stdin
         );
         assert_eq!(
             choose_boot_channel(&adapter("codex"), true),
-            BootChannel::Mcp
+            BootChannel::Stdin
         );
+        let mut with_mcp = adapter("codex");
+        with_mcp.capabilities.mcp_config = Some(".mcp.json".into());
+        assert_eq!(choose_boot_channel(&with_mcp, true), BootChannel::Mcp);
+        assert_eq!(choose_boot_channel(&with_mcp, false), BootChannel::Stdin);
         // A flag vence o MCP.
         assert_eq!(
             choose_boot_channel(&adapter("claude"), true),

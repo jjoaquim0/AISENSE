@@ -75,6 +75,88 @@ pub fn install_inbox_hook(settings: &Path) -> Result<HookInstall, String> {
     Ok(HookInstall::Installed)
 }
 
+/// Nome do servidor MCP do AISENSE na configuração dos runtimes.
+pub const MCP_SERVER_NAME: &str = "aisense";
+
+/// Registra o `aisense-mcp` no arquivo `mcpServers` do projeto e, se houver
+/// `settings_file`, o pré-aprova (`enabledMcpjsonServers`) — senão o runtime pararia num
+/// diálogo de confiança logo na subida. Mescla; nunca sobrescreve o que é do usuário.
+pub fn install_mcp_server(config: &Path, settings: Option<&Path>) -> Result<HookInstall, String> {
+    let mut changed = merge_json(config, |root| {
+        let servers = object_at(root, "mcpServers")?;
+        if servers.contains_key(MCP_SERVER_NAME) {
+            return Ok(false);
+        }
+        servers.insert(
+            MCP_SERVER_NAME.into(),
+            json!({ "command": "aisense-mcp", "args": [] }),
+        );
+        Ok(true)
+    })?;
+    if let Some(settings) = settings {
+        changed |= merge_json(settings, |root| {
+            let list = root
+                .as_object_mut()
+                .ok_or("formato inesperado")?
+                .entry("enabledMcpjsonServers")
+                .or_insert_with(|| Value::Array(Vec::new()))
+                .as_array_mut()
+                .ok_or("formato inesperado")?;
+            if list.iter().any(|v| v.as_str() == Some(MCP_SERVER_NAME)) {
+                return Ok(false);
+            }
+            list.push(Value::String(MCP_SERVER_NAME.into()));
+            Ok(true)
+        })?;
+    }
+    Ok(if changed {
+        HookInstall::Installed
+    } else {
+        HookInstall::AlreadyThere
+    })
+}
+
+fn object_at<'a>(root: &'a mut Value, key: &str) -> Result<&'a mut Map<String, Value>, String> {
+    root.as_object_mut()
+        .ok_or("formato inesperado")?
+        .entry(key)
+        .or_insert_with(|| Value::Object(Map::new()))
+        .as_object_mut()
+        .ok_or_else(|| "formato inesperado".to_owned())
+}
+
+/// Lê (ou começa vazio), aplica `edit` e grava de forma atômica se algo mudou.
+fn merge_json(
+    path: &Path,
+    edit: impl FnOnce(&mut Value) -> Result<bool, String>,
+) -> Result<bool, String> {
+    let mut root = match fs::read_to_string(path) {
+        Ok(text) if text.trim().is_empty() => Value::Object(Map::new()),
+        Ok(text) => serde_json::from_str::<Value>(&text).map_err(|e| {
+            format!(
+                "{} não é um JSON válido ({e}); não foi alterado",
+                path.display()
+            )
+        })?,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Value::Object(Map::new()),
+        Err(e) => return Err(format!("não consegui ler {}: {e}", path.display())),
+    };
+    let changed =
+        edit(&mut root).map_err(|e| format!("{}: {e}; não foi alterado", path.display()))?;
+    if !changed {
+        return Ok(false);
+    }
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir)
+            .map_err(|e| format!("não consegui criar {}: {e}", dir.display()))?;
+    }
+    let text = serde_json::to_string_pretty(&root).map_err(|e| e.to_string())? + "\n";
+    let tmp = path.with_extension("aisense-tmp");
+    fs::write(&tmp, text).map_err(|e| format!("não consegui gravar {}: {e}", tmp.display()))?;
+    fs::rename(&tmp, path).map_err(|e| format!("não consegui gravar {}: {e}", path.display()))?;
+    Ok(true)
+}
+
 /// O que a CLI imprime no modo `--hook-json`: nada sem mensagem (o agente pode parar);
 /// com mensagem, o bloqueio com as mensagens como motivo.
 pub fn hook_output(messages_text: &str) -> Option<String> {
@@ -139,6 +221,30 @@ mod tests {
         assert_eq!(fs::read_to_string(&file).unwrap(), "{ isto não é json");
         fs::write(&file, "[1, 2]").unwrap();
         assert!(install_inbox_hook(&file).is_err());
+    }
+
+    #[test]
+    fn registra_o_servidor_mcp_e_pre_aprova_sem_perder_os_do_usuario() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = dir.path().join(".mcp.json");
+        let settings = dir.path().join(".claude").join("settings.json");
+        fs::write(&config, r#"{"mcpServers":{"github":{"command":"gh-mcp"}}}"#).unwrap();
+        assert_eq!(
+            install_mcp_server(&config, Some(&settings)).unwrap(),
+            HookInstall::Installed
+        );
+        assert_eq!(
+            install_mcp_server(&config, Some(&settings)).unwrap(),
+            HookInstall::AlreadyThere
+        );
+        let servers: Value = serde_json::from_str(&fs::read_to_string(&config).unwrap()).unwrap();
+        assert_eq!(servers["mcpServers"]["github"]["command"], "gh-mcp");
+        assert_eq!(servers["mcpServers"]["aisense"]["command"], "aisense-mcp");
+        let s: Value = serde_json::from_str(&fs::read_to_string(&settings).unwrap()).unwrap();
+        assert_eq!(s["enabledMcpjsonServers"], json!(["aisense"]));
+        fs::write(&config, "quebrado").unwrap();
+        assert!(install_mcp_server(&config, None).is_err());
+        assert_eq!(fs::read_to_string(&config).unwrap(), "quebrado");
     }
 
     #[test]

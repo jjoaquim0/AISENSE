@@ -48,6 +48,9 @@ pub struct Capabilities {
     pub model_flag: Option<String>,
     pub cwd_is_project: bool,
     pub resume_flag: Option<String>,
+    /// Arquivo de servidores MCP do projeto, no formato `mcpServers` (ex.: `.mcp.json` do
+    /// Claude Code). Com ele, o AISENSE registra o `aisense-mcp` no start (F05-09).
+    pub mcp_config: Option<String>,
 }
 
 /// Heurística do detector de estado. Os regex já foram compilados uma vez na

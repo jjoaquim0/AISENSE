@@ -15,3 +15,10 @@ path = "src/main.rs"
 aisense-core.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+aisense-ipc.workspace = true
+tokio = { workspace = true, features = ["rt", "net", "io-util", "io-std", "time"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time", "net", "process", "io-util"] }
+tokio-util.workspace = true
+tempfile = "3"

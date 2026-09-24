@@ -5,14 +5,12 @@
 //! (ver `docs/02-arquitetura.md` e ADR 0004).
 #![forbid(unsafe_code)]
 
-mod args;
-mod render;
-
 use std::process::ExitCode;
 
-use aisense_ipc::{Client, ClientError, Request, Response};
+use aisense_ipc::{Client, ClientError, Response};
 
-use crate::args::{parse, Command, Parsed};
+use aisense_ipc::cli::{self as args, parse, Command, Parsed};
+use aisense_ipc::render;
 
 /// Códigos de saída contratados com as IAs. Ver `docs/07-barramento-comunicacao.md`.
 pub mod exit {
@@ -88,12 +86,8 @@ async fn run(parsed: Parsed) -> u8 {
             ..
         }
     );
-    let request = match parsed.command.into_request() {
-        Ok(request) => request,
-        Err(message) => {
-            eprintln!("erro: {message}");
-            return exit::USAGE;
-        }
+    let Some(request) = parsed.command.request() else {
+        return exit::USAGE;
     };
     let op = request.op();
     let response = match client.call(&request).await {
@@ -144,44 +138,5 @@ fn fail(response: &Response, json: bool) -> u8 {
         Some("timeout") => exit::TIMEOUT,
         Some("agent_stopped" | "unknown_agent" | "unauthorized") => exit::UNAVAILABLE,
         _ => exit::USAGE,
-    }
-}
-
-impl Command {
-    fn into_request(self) -> Result<Request, String> {
-        Ok(match self {
-            Command::Whoami => Request::Whoami,
-            Command::Agents => Request::Agents,
-            Command::Send { to, body } => Request::Send {
-                to,
-                body,
-                subject: None,
-                meta: Default::default(),
-            },
-            Command::Inbox { drain, .. } => Request::Inbox { drain },
-            Command::Wait { timeout_s } => Request::Wait { timeout_s },
-            Command::Note { body } => Request::Note { body },
-            Command::Status { state, note } => Request::Status { state, note },
-            Command::Ask {
-                to,
-                body,
-                timeout_s,
-            } => Request::Ask {
-                to,
-                body,
-                timeout_s,
-            },
-            Command::Reply { reply_to, body } => Request::Reply { reply_to, body },
-            Command::Notes(op) => Request::Notes(op),
-            Command::Broadcast { body } => Request::Send {
-                to: vec!["@all".into()],
-                body,
-                subject: None,
-                meta: Default::default(),
-            },
-            Command::Help | Command::Version => {
-                return Err("internal: help/version are local".into())
-            }
-        })
     }
 }

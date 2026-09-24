@@ -12,7 +12,10 @@ mod repo;
 mod service;
 
 pub use guards::{BlockReason, BusBlocked, GuardConfig};
-pub use hook::{hook_output, install_inbox_hook, HookInstall, INBOX_HOOK_COMMAND};
+pub use hook::{
+    hook_output, install_inbox_hook, install_mcp_server, HookInstall, INBOX_HOOK_COMMAND,
+    MCP_SERVER_NAME,
+};
 pub use model::{
     valid_channel, Address, Channel, Delivery, DeliveryState, InboxItem, Message, MessageKind,
     MessageMeta, Priority, Sender, Target, CHANNEL_SLUG_MAX, MESSAGE_BODY_MAX,

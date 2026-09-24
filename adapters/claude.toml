@@ -16,6 +16,7 @@ hooks              = true
 model_flag         = "--model"
 cwd_is_project     = true
 resume_flag        = "--continue"
+mcp_config         = ".mcp.json"
 
 # Regex iniciais; a calibração fina é da Fase 03 (docs/05, "Calibração").
 [state]

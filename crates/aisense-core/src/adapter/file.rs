@@ -64,6 +64,7 @@ struct CapabilitiesFile {
     model_flag: Option<String>,
     cwd_is_project: bool,
     resume_flag: Option<String>,
+    mcp_config: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -239,6 +240,7 @@ fn validate(file: AdapterFile, source: AdapterSource) -> Result<Adapter, Invalid
             model_flag: caps.model_flag,
             cwd_is_project: caps.cwd_is_project,
             resume_flag: caps.resume_flag,
+            mcp_config: caps.mcp_config,
         },
         state,
         inject,

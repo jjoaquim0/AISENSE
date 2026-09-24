@@ -101,8 +101,9 @@ pub fn setup(
             },
             size: TerminalSize::default(),
             skills,
-            // O `aisense-mcp` ainda não entrega o BOOT.md (F05-09).
-            mcp_boot: false,
+            // O `aisense-mcp` entrega o BOOT.md como `instructions` (F05-09) onde o AISENSE
+            // registra o servidor (`capabilities.mcp_config`).
+            mcp_boot: true,
             stdin_boot_timeout: aisense_core::supervisor::STDIN_BOOT_TIMEOUT,
         },
     )

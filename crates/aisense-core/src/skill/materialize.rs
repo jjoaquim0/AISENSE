@@ -207,6 +207,20 @@ pub fn materialize(req: &MaterializeRequest<'_>) -> Result<Materialized, Materia
     if let Some(target) = &req.adapter.skills {
         sync_native(req, &root, &target.dir, handle, &old_handles, &mut warnings)?;
     }
+    // Ferramentas do barramento por MCP (F05-09), onde o adaptador diz o arquivo.
+    if let Some(config) = &req.adapter.capabilities.mcp_config {
+        let settings = req
+            .adapter
+            .skills
+            .as_ref()
+            .and_then(|t| t.settings_file.as_deref())
+            .map(|f| req.workdir.join(f));
+        if let Err(problem) =
+            crate::bus::install_mcp_server(&req.workdir.join(config), settings.as_deref())
+        {
+            warnings.push(format!("@{handle}: {problem}"));
+        }
+    }
     // Modo `hook` (F05-08): o runtime checa a caixa sozinho ao fim do turno.
     if req.agent.delivery_mode == crate::agent::DeliveryMode::Hook {
         let settings = req
