@@ -14,11 +14,21 @@ trabalha, responde, `@backend` destrava com a resposta — e tudo aparece na lin
 
 ## Tarefas
 
-### [ ] F05-01 — Núcleo do barramento em memória
+### [x] F05-01 — Núcleo do barramento em memória
 `core::bus`: modelo de `Message`, resolução de endereço (`@agente`, `#canal`, `@all`, `@voce`),
 roteamento, criação de `deliveries` por destinatário. Sem I/O — repositório como trait.
 **Aceite:** testes de roteamento cobrindo DM, canal, broadcast, destinatário inexistente e
 destinatário parado. Não depende de nada além do domínio.
+> Feito: `aisense-core/src/bus/` — `Address::parse` (`@handle`, `#canal`, `@all`, `@voce`),
+> `Message`/`Sender`/`Target`/`Delivery`, porta `BusRepository` (em memória no
+> `InMemoryStore`) e `route`, a única função que grava mensagem: valida corpo (não vazio, até
+> 64 KB), remetente da equipe, `reply_to` da mesma equipe; resolve o destino e cria uma entrega
+> por destinatário na mesma operação (I3). Decisões: **canal nasce no primeiro uso** e vai para
+> todos da equipe menos o remetente (não há inscrição no v1); `@all` vai para **todos** os
+> agentes da equipe menos o remetente, parados inclusive (leem ao voltar); destinatário parado
+> recebe recado (`Routed.stopped` avisa) mas `ask` a ele falha na hora com `agent_stopped`;
+> `ask` só para um agente; mandar para si mesmo é `invalid_request`. `reply_address` acha o
+> caminho de volta. 10 testes de roteamento.
 
 ### [ ] F05-02 — Persistência de mensagens
 Repositórios de `messages`, `deliveries` e `channels`; consultas de caixa de entrada e de linha do

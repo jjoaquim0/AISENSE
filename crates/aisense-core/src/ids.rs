@@ -71,6 +71,7 @@ typed_id!(TeamId, "tem");
 typed_id!(AgentId, "agt");
 typed_id!(SkillId, "skl");
 typed_id!(MessageId, "msg");
+typed_id!(ChannelId, "chn");
 typed_id!(SessionId, "ses");
 typed_id!(BoardId, "brd");
 typed_id!(CardId, "tsk");

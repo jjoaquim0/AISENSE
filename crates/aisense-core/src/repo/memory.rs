@@ -10,7 +10,8 @@ use super::{
     SESSIONS_KEPT_PER_AGENT,
 };
 use crate::agent::{Agent, Handle};
-use crate::ids::{AgentId, SessionId, SkillId, TeamId};
+use crate::bus::{BusRepository, Channel, Delivery, DeliveryState, InboxItem, InboxQuery, Message};
+use crate::ids::{AgentId, MessageId, SessionId, SkillId, TeamId};
 use crate::skill::Skill;
 use crate::team::Team;
 use crate::time::Millis;
@@ -25,6 +26,11 @@ struct Inner {
     skills: BTreeMap<String, SkillRecord>,
     /// Por agente, na ordem de injeção.
     agent_skills: BTreeMap<String, Vec<AgentSkill>>,
+    channels: Vec<Channel>,
+    /// Por id: ULID monotônico, então a ordem da chave é a ordem de criação.
+    messages: BTreeMap<String, Message>,
+    /// Por (mensagem, agente).
+    deliveries: BTreeMap<(String, String), Delivery>,
 }
 
 #[derive(Default)]
@@ -106,6 +112,17 @@ impl TeamRepository for InMemoryStore {
             return Err(RepoError::TeamNotFound(id.clone()));
         }
         inner.agents.retain(|_, a| a.team_id != *id);
+        // Cascata do barramento, como as FKs do SQLite.
+        inner.channels.retain(|c| c.team_id != *id);
+        inner.messages.retain(|_, m| m.team_id != *id);
+        let (messages, agents) = (&inner.messages, &inner.agents);
+        let kept: BTreeMap<(String, String), Delivery> = inner
+            .deliveries
+            .iter()
+            .filter(|((m, a), _)| messages.contains_key(m) && agents.contains_key(a))
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        inner.deliveries = kept;
         let alive_agents: Vec<String> = inner.agents.keys().cloned().collect();
         inner
             .agent_skills
@@ -195,6 +212,9 @@ impl AgentRepository for InMemoryStore {
             Some(_) => {
                 inner.sessions.retain(|s| s.agent_id != *id);
                 inner.agent_skills.remove(id.as_str());
+                inner
+                    .deliveries
+                    .retain(|(_, agent), _| agent != id.as_str());
                 Ok(())
             }
             None => Err(RepoError::AgentNotFound(id.clone())),
@@ -330,6 +350,212 @@ impl SkillRepository for InMemoryStore {
             .filter(|(_, list)| list.iter().any(|s| s.skill_id == *skill_id))
             .map(|(agent, _)| AgentId::from_raw(agent.clone()))
             .collect())
+    }
+}
+
+impl BusRepository for InMemoryStore {
+    async fn channel_by_slug(&self, team_id: &TeamId, slug: &str) -> RepoResult<Option<Channel>> {
+        Ok(self
+            .lock()
+            .channels
+            .iter()
+            .find(|c| &c.team_id == team_id && c.slug == slug)
+            .cloned())
+    }
+
+    async fn create_channel(&self, channel: &Channel) -> RepoResult<()> {
+        let mut inner = self.lock();
+        if !inner.teams.contains_key(channel.team_id.as_str()) {
+            return Err(RepoError::TeamNotFound(channel.team_id.clone()));
+        }
+        if inner
+            .channels
+            .iter()
+            .any(|c| c.team_id == channel.team_id && c.slug == channel.slug)
+        {
+            return Err(RepoError::AlreadyExists(format!("#{}", channel.slug)));
+        }
+        inner.channels.push(channel.clone());
+        Ok(())
+    }
+
+    async fn list_channels(&self, team_id: &TeamId) -> RepoResult<Vec<Channel>> {
+        let mut list: Vec<_> = self
+            .lock()
+            .channels
+            .iter()
+            .filter(|c| &c.team_id == team_id)
+            .cloned()
+            .collect();
+        list.sort_by(|a, b| a.slug.cmp(&b.slug));
+        Ok(list)
+    }
+
+    async fn insert_message(&self, message: &Message, deliveries: &[Delivery]) -> RepoResult<()> {
+        let mut inner = self.lock();
+        if !inner.teams.contains_key(message.team_id.as_str()) {
+            return Err(RepoError::TeamNotFound(message.team_id.clone()));
+        }
+        if inner.messages.contains_key(message.id.as_str()) {
+            return Err(RepoError::AlreadyExists(message.id.to_string()));
+        }
+        if let Some(missing) = deliveries
+            .iter()
+            .find(|d| !inner.agents.contains_key(d.agent_id.as_str()))
+        {
+            return Err(RepoError::AgentNotFound(missing.agent_id.clone()));
+        }
+        inner
+            .messages
+            .insert(message.id.as_str().to_owned(), message.clone());
+        for d in deliveries {
+            inner.deliveries.insert(
+                (
+                    d.message_id.as_str().to_owned(),
+                    d.agent_id.as_str().to_owned(),
+                ),
+                d.clone(),
+            );
+        }
+        Ok(())
+    }
+
+    async fn get_message(&self, id: &MessageId) -> RepoResult<Option<Message>> {
+        Ok(self.lock().messages.get(id.as_str()).cloned())
+    }
+
+    async fn deliveries_of(&self, message_id: &MessageId) -> RepoResult<Vec<Delivery>> {
+        Ok(self
+            .lock()
+            .deliveries
+            .values()
+            .filter(|d| &d.message_id == message_id)
+            .cloned()
+            .collect())
+    }
+
+    async fn inbox(&self, agent_id: &AgentId, query: &InboxQuery) -> RepoResult<Vec<InboxItem>> {
+        let inner = self.lock();
+        let items = inner
+            .messages
+            .values()
+            .filter(|m| {
+                query
+                    .after
+                    .as_ref()
+                    .is_none_or(|after| m.id.as_str() > after.as_str())
+            })
+            .filter_map(|m| {
+                let key = (m.id.as_str().to_owned(), agent_id.as_str().to_owned());
+                inner.deliveries.get(&key).map(|d| InboxItem {
+                    message: m.clone(),
+                    delivery: d.clone(),
+                })
+            })
+            .filter(|item| !query.unread_only || item.delivery.state.is_unread())
+            .take(query.limit as usize)
+            .collect();
+        Ok(items)
+    }
+
+    async fn mark_read(
+        &self,
+        agent_id: &AgentId,
+        ids: &[MessageId],
+        now: Millis,
+    ) -> RepoResult<u32> {
+        let mut inner = self.lock();
+        let mut changed = 0;
+        for id in ids {
+            let key = (id.as_str().to_owned(), agent_id.as_str().to_owned());
+            if let Some(d) = inner.deliveries.get_mut(&key) {
+                if d.state.is_unread() {
+                    d.state = DeliveryState::Read;
+                    d.read_at = Some(now);
+                    changed += 1;
+                }
+            }
+        }
+        Ok(changed)
+    }
+
+    async fn update_delivery(&self, delivery: &Delivery) -> RepoResult<()> {
+        let mut inner = self.lock();
+        let key = (
+            delivery.message_id.as_str().to_owned(),
+            delivery.agent_id.as_str().to_owned(),
+        );
+        match inner.deliveries.get_mut(&key) {
+            Some(d) => {
+                *d = delivery.clone();
+                Ok(())
+            }
+            None => Err(RepoError::Corrupt(format!(
+                "no delivery of {} to {}",
+                delivery.message_id, delivery.agent_id
+            ))),
+        }
+    }
+
+    async fn timeline(
+        &self,
+        team_id: &TeamId,
+        before: Option<&MessageId>,
+        limit: u32,
+    ) -> RepoResult<Vec<Message>> {
+        Ok(self
+            .lock()
+            .messages
+            .values()
+            .rev()
+            .filter(|m| &m.team_id == team_id)
+            .filter(|m| before.is_none_or(|b| m.id.as_str() < b.as_str()))
+            .take(limit as usize)
+            .cloned()
+            .collect())
+    }
+
+    async fn replies_to(&self, id: &MessageId) -> RepoResult<Vec<Message>> {
+        Ok(self
+            .lock()
+            .messages
+            .values()
+            .filter(|m| m.reply_to.as_ref() == Some(id))
+            .cloned()
+            .collect())
+    }
+
+    async fn unread_counts(&self, team_id: &TeamId) -> RepoResult<Vec<(AgentId, u32)>> {
+        let inner = self.lock();
+        let mut counts: BTreeMap<String, u32> = BTreeMap::new();
+        for d in inner.deliveries.values().filter(|d| d.state.is_unread()) {
+            let in_team = inner
+                .messages
+                .get(d.message_id.as_str())
+                .is_some_and(|m| &m.team_id == team_id);
+            if in_team {
+                *counts.entry(d.agent_id.as_str().to_owned()).or_default() += 1;
+            }
+        }
+        Ok(counts
+            .into_iter()
+            .map(|(id, n)| (AgentId::from_raw(id), n))
+            .collect())
+    }
+
+    async fn prune_messages(&self, before: Millis) -> RepoResult<u64> {
+        let mut inner = self.lock();
+        let old: Vec<String> = inner
+            .messages
+            .values()
+            .filter(|m| m.created_at < before)
+            .map(|m| m.id.as_str().to_owned())
+            .collect();
+        for id in &old {
+            inner.messages.remove(id);
+        }
+        inner.deliveries.retain(|(m, _), _| !old.contains(m));
+        Ok(old.len() as u64)
     }
 }
 
