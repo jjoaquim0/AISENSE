@@ -10,7 +10,8 @@ describe('vista da Sala da Equipe', () => {
 
   it('cicla entre as vistas', () => {
     expect(nextRoomView('grid')).toBe('focus');
-    expect(nextRoomView('focus')).toBe('grid');
+    expect(nextRoomView('focus')).toBe('timeline');
+    expect(nextRoomView('timeline')).toBe('grid');
   });
 
   it('o painel grande mostra o agente em foco, ou o primeiro', () => {

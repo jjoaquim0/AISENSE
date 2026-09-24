@@ -27,7 +27,7 @@ pub use push::{
 pub use repo::{BusRepository, InboxQuery};
 pub use service::{
     AgentInfo, BusMessageEvent, BusObserver, BusService, BusStore, Directory, Identity,
-    MessageView, NoObserver, StateFn, UnreadCount, ASK_DEFAULT, ASK_MAX, INBOX_LIMIT,
+    MessageView, NoObserver, Receipts, StateFn, UnreadCount, ASK_DEFAULT, ASK_MAX, INBOX_LIMIT,
     REMOVED_AGENT_LABEL, SYSTEM_LABEL, WAIT_MAX,
 };
 

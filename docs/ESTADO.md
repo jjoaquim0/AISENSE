@@ -5,7 +5,7 @@
 > Se estiver desatualizado, o próximo agente se perde. Mantenha-o honesto.
 
 **Última atualização:** 2026-09-23
-**Fase atual:** `FASE 04 — Sistema de Skills` (iniciada a pedido do usuário; a 03 tem código completo e dois critérios de saída abertos)
+**Fase atual:** `FASE 05 — Barramento` com as 13 tarefas em código (as Fases 02–04 também; o que falta nelas é conferência numa máquina com tela e runtimes reais)
 **Fluxo de trabalho atual:** várias tarefas seguidas no mesmo branch `claude/...`, **um commit por
 tarefa** (ID no título) e um PR só ao fim do lote, com o CI verde nos 3 SOs antes do merge (o
 usuário mergeia). Pedido do usuário em 2026-09-23 para acelerar.
@@ -23,9 +23,12 @@ código e testados; a Fase 03 ainda tem conferência na janela e dois critérios
 
 1. Leia `AGENTS.md` e este arquivo inteiro; depois `docs/fases/FASE-03-sala-da-equipe.md` — cada
    tarefa feita tem uma nota `> Feito:` dizendo onde está o código e o que ficou de fora.
-2. Fase 04 com as tarefas em código (F04-08 parcial: falta o agente descartável e o `.zip`).
-   Próxima: **Fase 05 — Barramento** (`docs/fases/FASE-05-*.md`); ela também liga o MCP do boot
-   (`mcp_boot`) e a CLI `aisense notes`. **F04-08** (biblioteca e editor, T7) está parcial, em
+2. **Próxima: Fase 06 — Quadro Kanban** (`docs/fases/FASE-06-*.md`). O barramento está pronto:
+   `aisense-core/src/bus/` (roteamento, serviço, guardas, push, hook), `aisense-ipc` (protocolo,
+   socket, handler, parser e renderização da CLI), `aisense-cli`, `aisense-mcp`, e no app
+   `commands/{bus,push}.rs`. As ferramentas MCP de tarefa (`aisense_create_task`,
+   `aisense_update_task`) e `aisense task ...` entram com o quadro. Pendência da Fase 04: F04-08
+   (agente descartável e `.zip`). Mapa da Fase 04 em
    `docs/fases/FASE-04-skills.md`. Skills em `aisense-core/src/skill/` (parser, catálogo,
    `SkillLibrary`, hot-reload); atribuições por `SkillRepository`; aba Skills do inspetor em
    `features/team-room/components/inspector/SkillsTab.tsx`. Onde a Fase 03 deixou as coisas: sidebar e inspetor entram no shell por `ShellSlot`
@@ -51,7 +54,7 @@ código e testados; a Fase 03 ainda tem conferência na janela e dois critérios
 | 02 — Equipes e Agentes | 🟨 Código completo | 11 de 11 feitas — falta a demonstração na janela |
 | 03 — Sala da Equipe | 🟨 Código completo | 9 de 9 feitas — faltam conferência na janela e dois critérios de saída |
 | 04 — Sistema de Skills | 🟨 Código quase completo | 8 feitas, 1 parcial de 9 |
-| 05 — Barramento | ⬜ Não iniciada | 0/13 |
+| 05 — Barramento | 🟨 Código completo | 13 de 13 — falta conferir com claude/codex/opencode de verdade |
 | 06 — Quadro Kanban | ⬜ Não iniciada | 0/11 |
 | 07 — Coordenação | ⬜ Não iniciada | 0/6 |
 | 08 — Acabamento | ⬜ Não iniciada | 0/9 |
@@ -60,6 +63,28 @@ código e testados; a Fase 03 ainda tem conferência na janela e dois critérios
 Legenda: ⬜ não iniciada · 🟨 em andamento · ✅ concluída · 🟥 bloqueada
 
 ## Em andamento agora
+
+**Fase 05 — Barramento** (2026-09-23/24, em lote no PR #20). Todas as 13 tarefas em código e
+testadas; o marco da fase — um agente num PTY real rodando `aisense send` e a mensagem chegando —
+tem teste de ponta a ponta. O que só uma máquina com os runtimes resolve: `hook` com o Claude Code
+de verdade, `push` num codex/claude real, e as mensagens aparecendo na janela em <50 ms.
+
+| Tarefa | Situação |
+|---|---|
+| F05-01 Núcleo | ✅ endereços, `route`, entregas; canal nasce no primeiro uso |
+| F05-02 Persistência | ✅ migração 0004 (`to_human`, sem FK para agente), 100k mensagens < 20 ms |
+| F05-03 Servidor IPC | ✅ NDJSON ≤ 1 MiB, UDS 0600/pipe, token a cada operação |
+| F05-04 Tokens | ✅ gravado com a sessão, revogado no fim, todos revogados na subida |
+| F05-05 CLI | ✅ `aisense` com `--json` e exit codes; `bus:message` para a UI; badge de não lidas |
+| F05-06 ask/reply | ✅ timeout, parado falha na hora, `would_deadlock` por ciclo |
+| F05-07 push | ✅ só `idle` com confiança alta, throttle 3 s, sanitização, chip na UI |
+| F05-08 hook | ✅ hook `Stop` mesclado; `--hook-json` faz o Claude continuar com as mensagens |
+| F05-09 MCP | ✅ `aisense-mcp` à mão, contrato frame a frame com a CLI, `BOOT.md` como `instructions` |
+| F05-10 Guardas | ✅ taxa, repetição, orçamento com Continuar, aviso de cadeia longa |
+| F05-11 Linha do tempo | ✅ vista Mensagens, lista virtual 60 fps com 10k, compositor `@voce` |
+| F05-12 notes na CLI/MCP | ✅ mesmo `TeamNotes`, append concorrente pelo socket sem perda |
+| F05-13 run/commands/bench | ✅ só nomes do `aisense.toml`, roda no terminal do agente, bancada por merge |
+
 
 **Fase 04 — Sistema de Skills** (iniciada em 2026-09-23 a pedido do usuário). Exceção consciente
 à R1: a Fase 03 tem as 9 tarefas em código, mas faltam a conferência na janela e dois critérios de
@@ -296,3 +321,4 @@ Bugs encontrados pelos próprios testes, todos corrigidos na origem:
 | 2026-09-23 | Claude | F04-07 (as 7 skills embutidas do v1); fluxo passa a ser um PR por lote |
 | 2026-09-23 | Claude | F04-06 (injeção do BOOT.md: flag, MCP preparado, terminal) |
 | 2026-09-23 | Claude | F04-09 (notas da equipe: core, índice no BOOT.md, painel) |
+| 2026-09-24 | Claude | Fase 05 inteira em código (F05-01..13), em commits por tarefa no PR #20 |

@@ -50,6 +50,7 @@ describe('useUnread', () => {
           replyTo: null,
           meta: { priority: 'normal', attachments: [] },
           createdAt: 1,
+          receipts: { recipients: 1, delivered: 0, read: 0 },
         },
       }),
     );
@@ -70,6 +71,7 @@ describe('useUnread', () => {
           replyTo: null,
           meta: { priority: 'normal', attachments: [] },
           createdAt: 1,
+          receipts: { recipients: 1, delivered: 0, read: 0 },
         },
       }),
     );

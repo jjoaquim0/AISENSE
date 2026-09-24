@@ -30,6 +30,7 @@ import type { PaneAction } from '@/features/team-room/paneMenu';
 import { roomShortcuts } from '@/features/team-room/shortcuts';
 import { isRunning } from '@/features/team-room/sidebar';
 import { focusAgentPane } from '@/features/terminal/focus';
+import { TimelineView } from '@/features/timeline/TimelineView';
 import { useShortcuts } from '@/lib/useShortcuts';
 import type { Agent } from '@/types/generated/Agent';
 import type { StartOutcome } from '@/types/generated/StartOutcome';
@@ -316,7 +317,9 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
 
       <div className="flex min-h-0 flex-1">
         <section aria-label="Terminais da equipe" className="flex min-w-0 flex-1 flex-col p-2">
-          {agents.length > 0 && view === 'focus' ? (
+          {view === 'timeline' ? (
+            <TimelineView teamId={team.id} agents={agents} />
+          ) : agents.length > 0 && view === 'focus' ? (
             <FocusView
               order={grid.order}
               agents={agents}

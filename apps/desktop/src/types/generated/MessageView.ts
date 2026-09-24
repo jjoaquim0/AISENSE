@@ -2,6 +2,7 @@
 import type { MessageId } from "./MessageId";
 import type { MessageKind } from "./MessageKind";
 import type { MessageMeta } from "./MessageMeta";
+import type { Receipts } from "./Receipts";
 
 /**
  * A mensagem como gente (e LLM) lê: nomes no lugar de ids.
@@ -14,4 +15,8 @@ from: string,
 /**
  * `@frontend`, `#geral`, `@all`, `@voce`.
  */
-to: string, subject: string | null, body: string, replyTo: MessageId | null, meta: MessageMeta, createdAt: number, };
+to: string, subject: string | null, body: string, replyTo: MessageId | null, meta: MessageMeta, createdAt: number, 
+/**
+ * Recibos: quantos receberam, quantos já foram entregues (injetados) ou lidos.
+ */
+receipts: Receipts, };

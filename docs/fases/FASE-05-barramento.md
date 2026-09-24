@@ -177,11 +177,23 @@ avisado com opção de continuar. Depende de F05-01.
 > foi barrado e o botão **Continuar** (`bus_resume`). Aceite: ping-pong com orçamento 6 para
 > na 7ª, avisa uma vez só e volta depois do Continuar.
 
-### [ ] F05-11 — Vista Timeline (T4.4)
+### [x] F05-11 — Vista Timeline (T4.4)
 Lista virtualizada de mensagens com cor do remetente, recibos de entrega/leitura, `ask` pendente com
 contagem regressiva, eventos de sistema com ação, filtros e compositor do humano (`@voce`).
 **Aceite:** 10.000 mensagens rolam a 60 fps; mensagem nova entra sem saltar o scroll quando o
 usuário está lendo histórico. Depende de F05-02.
+> Feito: vista **Mensagens** (`features/timeline/`), terceira do seletor e do `⌘G`. Mensagens
+> na cor de quem mandou; recibos (`MessageView.receipts`: na caixa / entregue / lida por N de
+> M); pergunta pendente com contagem regressiva que some quando chega a resposta; avisos de
+> sistema com ação (**Continuar** da equipe pausada); filtros por agente e "só conversa";
+> compositor do `@voce` (Enter manda, Shift+Enter quebra linha) para `@all`, cada agente e os
+> canais já usados; "Carregar anteriores" por cursor mantendo a posição. Lista virtual própria
+> (`useVirtualList`: alturas medidas com `ResizeObserver`, busca binária do trecho visível,
+> sem dependência nova). Mensagem nova só rola a tela se você estava no fim. Aceite: 10.000
+> mensagens, rolagem medida no Chromium headless **sem GPU**: 60 fps (16,7 ms/quadro, p95
+> 16,8 ms) com 25 itens no DOM — a primeira tentativa, só com `content-visibility`, dava 19 fps
+> e foi trocada. Testes das regras (junção, pergunta pendente, filtros, recibos, janela) e do
+> componente (ordem, ao vivo, outra equipe ignorada, compositor).
 
 ### [x] F05-12 — `aisense notes` na CLI e no MCP
 `list`, `read` (com `--section`), `append`, `write --expect-hash`, `search`, `new`.
@@ -216,13 +228,13 @@ code real do comando. Depende de F02-10, F02-11, F05-05.
 > verdade (merge em vez de rebase, conflito desfeito).
 
 ## Critérios de saída
-- [ ] Dois agentes trocam mensagens em qualquer combinação de runtimes, inclusive `shell` puro
-- [ ] `ask`/`reply` funciona com timeout e sem deadlock
-- [ ] Os três modos de entrega funcionam e são testados
-- [ ] Nenhuma injeção insegura é possível (corpus de sanitização verde)
-- [ ] Guardas anti-laço ativas por padrão
-- [ ] Toda comunicação é visível na linha do tempo
-- [ ] `aisense run` executa apenas comandos nomeados no `aisense.toml`
+- [~] Dois agentes trocam mensagens em qualquer combinação de runtimes, inclusive `shell` puro — provado com `shell`/processo real; claude/codex/opencode só numa máquina com eles
+- [x] `ask`/`reply` funciona com timeout e sem deadlock
+- [~] Os três modos de entrega funcionam e são testados — regras testadas; `hook` e `push` com runtime real pendentes
+- [x] Nenhuma injeção insegura é possível (corpus de sanitização verde)
+- [x] Guardas anti-laço ativas por padrão
+- [x] Toda comunicação é visível na linha do tempo
+- [x] `aisense run` executa apenas comandos nomeados no `aisense.toml`
 
 ## Riscos
 | Risco | Mitigação |

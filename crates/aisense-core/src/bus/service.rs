@@ -585,10 +585,39 @@ pub struct MessageView {
     pub meta: MessageMeta,
     #[ts(type = "number")]
     pub created_at: Millis,
+    /// Recibos: quantos receberam, quantos já foram entregues (injetados) ou lidos.
+    pub receipts: Receipts,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../apps/desktop/src/types/generated/")]
+pub struct Receipts {
+    pub recipients: u32,
+    /// Entregues ou lidas.
+    pub delivered: u32,
+    pub read: u32,
+}
+
+impl Receipts {
+    pub fn of(deliveries: &[super::model::Delivery]) -> Self {
+        let count = |f: &dyn Fn(DeliveryState) -> bool| {
+            u32::try_from(deliveries.iter().filter(|d| f(d.state)).count()).unwrap_or(u32::MAX)
+        };
+        Self {
+            recipients: u32::try_from(deliveries.len()).unwrap_or(u32::MAX),
+            delivered: count(&|s| matches!(s, DeliveryState::Delivered | DeliveryState::Read)),
+            read: count(&|s| s == DeliveryState::Read),
+        }
+    }
 }
 
 impl Directory {
     pub fn view(&self, message: &Message) -> MessageView {
+        self.view_with(message, Receipts::default())
+    }
+
+    pub fn view_with(&self, message: &Message, receipts: Receipts) -> MessageView {
         MessageView {
             id: message.id.clone(),
             kind: message.kind,
@@ -599,6 +628,7 @@ impl Directory {
             reply_to: message.reply_to.clone(),
             meta: message.meta.clone(),
             created_at: message.created_at,
+            receipts,
         }
     }
 }
@@ -643,7 +673,12 @@ impl<S: BusStore> BusService<S> {
     ) -> BusResult<Vec<MessageView>> {
         let dir = self.directory(team_id).await?;
         let messages = self.timeline(team_id, before, limit).await?;
-        Ok(messages.iter().map(|m| dir.view(m)).collect())
+        let mut views = Vec::with_capacity(messages.len());
+        for m in &messages {
+            let receipts = Receipts::of(&self.store.deliveries_of(&m.id).await?);
+            views.push(dir.view_with(m, receipts));
+        }
+        Ok(views)
     }
 
     /// O evento para a UI de uma mensagem recém-roteada.
@@ -651,7 +686,7 @@ impl<S: BusStore> BusService<S> {
         let dir = self.directory(&routed.message.team_id).await?;
         Ok(BusMessageEvent {
             team_id: routed.message.team_id.clone(),
-            message: dir.view(&routed.message),
+            message: dir.view_with(&routed.message, Receipts::of(&routed.deliveries)),
             recipients: u32::try_from(routed.deliveries.len()).unwrap_or(u32::MAX),
         })
     }
