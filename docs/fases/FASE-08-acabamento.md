@@ -16,10 +16,27 @@ Medir todas as métricas do orçamento de [03 — Stack](../03-stack.md#orçamen
 com 12 agentes ativos. Perfilar e corrigir o que estourar.
 **Aceite:** todas as métricas dentro da meta, com os números registrados em `docs/ESTADO.md`.
 
-### [ ] F08-02 — Auditoria de acessibilidade
+### [x] F08-02 — Auditoria de acessibilidade
 Navegação completa por teclado, ordem de foco, rótulos ARIA, `aria-live` na timeline, contraste,
 zoom de 80% a 150%, `prefers-reduced-motion`.
 **Aceite:** percorrer os 5 fluxos críticos usando **apenas** o teclado, sem becos sem saída.
+
+> Feito: `e2e/a11y.spec.ts` roda o axe-core (WCAG 2.1 A/AA; nova dependência de teste
+> `@axe-core/playwright`) no onboarding, na lista de equipes, nas cinco vistas da Sala, em cada
+> seção das Configurações e na biblioteca de skills, nos dois temas — zero violações. O que ele
+> achou e foi corrigido: texto `muted` sem contraste sobre o fundo de item selecionado (sidebar e
+> cabeçalho do painel), a alça de arrastar do painel envolvendo os botões dele (controles
+> aninhados — agora só a identificação arrasta), e a linha do tempo e as colunas do quadro
+> roláveis sem foco de teclado. `e2e/keyboard.spec.ts` percorre só com teclas: F1 (onboarding até
+> a equipe rodando), F5 (`⌘⇧D` com 9 terminais, sem reload), F4 na interface (agente caído volta
+> pelo menu do painel, com `⌘1` e `Esc Esc`), a paleta para qualquer tela, e Tab dando a volta nas
+> telas sem prender o foco. F2 e F3 não têm passo de interface além do que a paleta cobre (o
+> agente roda `aisense ask`; a skill é atribuída na aba Skills) — a parte deles é do core, com
+> testes de processo real em Rust. **Zoom:** com 150% numa janela de 1024 px sobram 683 px de CSS;
+> sidebar e inspetor agora cedem espaço sozinhos (`fitPanels`: o inspetor primeiro, a preferência
+> do usuário não muda) e a barra da Sala quebra linha em vez de cortar controles. Movimento: a
+> regra global de `prefers-reduced-motion` já existia; os esqueletos novos também param. Leitor de
+> tela de verdade (VoiceOver/NVDA) não foi usado.
 
 ### [x] F08-03 — Estados vazios, carregamento e erro
 Todo estado vazio com ilustração e ação; skeletons no lugar de spinners; toda mensagem de erro com

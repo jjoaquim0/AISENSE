@@ -523,6 +523,42 @@ export function installFakeCore(): void {
       return messages.slice(Math.max(0, end - limit), end).reverse();
     },
     bus_unread: () => [],
+    board_get: ({ teamId }) => {
+      const team = teams.find((t) => t.id === teamId);
+      const boardId = `board_${teamId}`;
+      const spec: [string, string, string][] = [
+        ['backlog', 'Backlog', 'intake'],
+        ['todo', 'A fazer', 'ready'],
+        ['doing', 'Fazendo', 'active'],
+        ['blocked', 'Bloqueada', 'blocked'],
+        ['review', 'Revisão', 'review'],
+        ['done', 'Feita', 'terminal'],
+      ];
+      return {
+        teamId,
+        teamName: team?.name ?? '',
+        board: { id: boardId, teamId, automations: [], createdAt: 0 },
+        columns: spec.map(([slug, name, kind], i) => ({
+          id: `col_${slug}`,
+          boardId,
+          slug,
+          name,
+          kind,
+          wipLimit: null,
+          wipPerAgent: slug === 'doing' ? 1 : null,
+          position: i,
+          requiresApproval: false,
+          approverMustDiffer: false,
+          requiresCommands: [],
+        })),
+        cards: [],
+        agents: agents
+          .filter((a) => a.teamId === teamId)
+          .map((a) => ({ id: a.id, handle: a.handle, color: a.color })),
+        now: now(),
+      };
+    },
+    board_changes: () => [],
     bus_paused: () => false,
     channels_list: () => [],
     proposals_list: () => [],

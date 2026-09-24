@@ -393,7 +393,9 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
           onSaved={agentSaved}
         />
       </ShellSlot>
-      <header className="flex items-center gap-3 border-b border-subtle px-4 py-2.5">
+      {/* Quebra de linha em vez de cortar: com zoom de 150% os controles não cabem numa só
+          (F08-02). */}
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-subtle px-4 py-2.5">
         <IconButton label="Voltar para as equipes" onClick={() => selectTeam(null)}>
           <ArrowLeft size={15} />
         </IconButton>
@@ -402,7 +404,7 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
           className="size-3 shrink-0 rounded-sm"
           style={{ background: `var(--agent-${team.color})` }}
         />
-        <div className="min-w-0 flex-1">
+        <div className="min-w-40 flex-1">
           <h1 className="truncate text-heading text-primary">{team.name}</h1>
           <p className="flex items-center gap-1 truncate text-caption text-muted">
             <Folder size={11} /> <span className="font-mono">{team.workdir}</span>

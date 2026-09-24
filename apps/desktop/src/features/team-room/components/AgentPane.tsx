@@ -78,27 +78,36 @@ export function AgentPane({
       style={{ borderLeftColor: `var(--agent-${agent.color})` }}
     >
       <div
-        ref={dragHandle?.setRef}
-        {...dragHandle?.props}
         className={cn(
           'flex items-center gap-2 border-b border-subtle px-3 py-1.5',
-          dragHandle && 'cursor-grab active:cursor-grabbing',
           focused && 'bg-hover',
         )}
       >
-        <span className="truncate text-label text-primary">@{agent.handle}</span>
-        <span className="truncate text-caption text-muted">{agent.adapterId}</span>
-        <StatusDot state={state} confidence={confidence} withLabel className="ml-1" />
+        {/* Só a identificação arrasta: com os botões dentro, a alça viraria um controle
+            com controles aninhados, que o leitor de tela não consegue anunciar (F08-02). */}
+        <div
+          ref={dragHandle?.setRef}
+          {...dragHandle?.props}
+          className={cn(
+            'flex min-w-0 flex-1 items-center gap-2 rounded-sm',
+            'focus-visible:outline-2 focus-visible:outline-ring',
+            dragHandle && 'cursor-grab active:cursor-grabbing',
+          )}
+        >
+          <span className="truncate text-label text-primary">@{agent.handle}</span>
+          <span className="truncate text-caption text-secondary">{agent.adapterId}</span>
+          <StatusDot state={state} confidence={confidence} withLabel className="ml-1" />
+        </div>
         <InjectedChip agentId={agent.id} />
         {pending > 0 && (
           <Badge variant="accent" className="tabular-nums">
             {pending}
           </Badge>
         )}
-        <span className="ml-auto flex items-center gap-2">
+        <span className="flex items-center gap-2">
           {branch && (
             <span
-              className="flex items-center gap-1 font-mono text-caption text-muted"
+              className="flex items-center gap-1 font-mono text-caption text-secondary"
               title="Bancada"
             >
               <GitBranch size={11} /> {branch}

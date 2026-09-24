@@ -11,7 +11,8 @@ import { useShortcuts } from '@/lib/useShortcuts';
 import { type Screen, useNav } from './nav';
 import { ResizeHandle } from './ResizeHandle';
 import { type SlotName, useShellSlots } from './slots';
-import { INSPECTOR_BOUNDS, SIDEBAR_BOUNDS, usePanels } from './usePanels';
+import { fitPanels, INSPECTOR_BOUNDS, SIDEBAR_BOUNDS, usePanels } from './usePanels';
+import { useWindowWidth } from './useWindowWidth';
 
 /**
  * Estrutura global da janela — docs/09-telas-e-fluxos.md:
@@ -28,6 +29,14 @@ export function AppShell({ children }: { children: ReactNode }) {
     toggleSidebar,
     toggleInspector,
   } = usePanels();
+  const windowWidth = useWindowWidth();
+  // Com zoom alto ou janela estreita os painéis cedem espaço ao terminal (F08-02).
+  const fit = fitPanels(windowWidth, {
+    sidebarWidth,
+    inspectorWidth,
+    sidebarVisible,
+    inspectorVisible,
+  });
   const { toggle: toggleTheme } = useTheme();
   const setPaletteOpen = usePalette((s) => s.setOpen);
   const go = useNav((s) => s.go);
@@ -119,10 +128,14 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-full flex-col bg-base text-primary">
       <CommandPalette global={globalActions} />
-      <TitleBar onToggleInspector={toggleInspector} inspectorVisible={inspectorVisible} />
+      <TitleBar
+        onToggleInspector={toggleInspector}
+        inspectorVisible={fit.inspector}
+        inspectorSqueezed={inspectorVisible && !fit.inspector}
+      />
       <div className="flex min-h-0 flex-1">
         <TeamRail />
-        {sidebarVisible && (
+        {fit.sidebar && (
           <>
             <Sidebar width={sidebarWidth} />
             <ResizeHandle
@@ -136,7 +149,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </>
         )}
         <main className="min-w-0 flex-1 overflow-auto">{children}</main>
-        {inspectorVisible && (
+        {fit.inspector && (
           <>
             <ResizeHandle
               value={inspectorWidth}
@@ -157,9 +170,12 @@ export function AppShell({ children }: { children: ReactNode }) {
 function TitleBar({
   onToggleInspector,
   inspectorVisible,
+  inspectorSqueezed,
 }: {
   onToggleInspector: () => void;
   inspectorVisible: boolean;
+  /** Ligado, mas sem espaço na janela: o botão explica em vez de parecer quebrado. */
+  inspectorSqueezed: boolean;
 }) {
   const { theme, toggle } = useTheme();
   const dark = isDark(theme);
@@ -172,7 +188,11 @@ function TitleBar({
       <span className="text-label text-secondary">AISENSE</span>
       <div className="flex items-center gap-0.5">
         <Tooltip
-          content={`${inspectorVisible ? 'Ocultar' : 'Mostrar'} inspetor · ${formatShortcut('⌘I')}`}
+          content={
+            inspectorSqueezed
+              ? 'Sem espaço para o inspetor: aumente a janela ou diminua o zoom'
+              : `${inspectorVisible ? 'Ocultar' : 'Mostrar'} inspetor · ${formatShortcut('⌘I')}`
+          }
         >
           <IconButton
             label={inspectorVisible ? 'Ocultar inspetor' : 'Mostrar inspetor'}

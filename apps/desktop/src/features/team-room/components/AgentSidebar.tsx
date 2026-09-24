@@ -171,7 +171,7 @@ function SidebarRow({
                 <StatusDot state={state} confidence={confidenceOf(agent.id)} withLabel />
                 {pending && pending.count > 0 && <PendingCount pending={pending} />}
               </span>
-              <span className="truncate text-caption text-muted">· {agent.adapterId}</span>
+              <span className="truncate text-caption text-secondary">· {agent.adapterId}</span>
             </span>
           </span>
         </button>

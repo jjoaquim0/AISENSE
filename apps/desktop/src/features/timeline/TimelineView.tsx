@@ -208,6 +208,9 @@ export function TimelineView({
         role="log"
         aria-label="Linha do tempo da equipe"
         aria-live="polite"
+        // Focável para rolar com as setas e Page Up/Down, sem mouse (F08-02).
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: região rolável precisa de foco para o teclado
+        tabIndex={0}
         onScroll={() => {
           const el = list.current;
           if (!el) return;
@@ -229,7 +232,7 @@ export function TimelineView({
         onKeyDown={() => {
           restore.current = null;
         }}
-        className="min-h-0 flex-1 overflow-y-auto px-3 py-2"
+        className="min-h-0 flex-1 overflow-y-auto px-3 py-2 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
       >
         {hasOlder && messages.length > 0 && (
           <div className="flex justify-center pb-2">

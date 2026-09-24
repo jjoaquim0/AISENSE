@@ -48,3 +48,27 @@ describe('usePanels', () => {
     expect(usePanels.getState().sidebarVisible).toBe(before);
   });
 });
+
+describe('fitPanels', () => {
+  const prefs = {
+    sidebarWidth: 240,
+    inspectorWidth: 320,
+    sidebarVisible: true,
+    inspectorVisible: true,
+  };
+  it('com espaço, respeita a preferência', async () => {
+    const { fitPanels } = await import('../usePanels');
+    expect(fitPanels(1440, prefs)).toEqual({ sidebar: true, inspector: true });
+    expect(fitPanels(1440, { ...prefs, inspectorVisible: false })).toEqual({
+      sidebar: true,
+      inspector: false,
+    });
+  });
+  it('sem espaço, o inspetor cede primeiro e depois a sidebar', async () => {
+    const { fitPanels } = await import('../usePanels');
+    // 1024 px com zoom de 125% ≈ 819 px de CSS.
+    expect(fitPanels(819, prefs)).toEqual({ sidebar: true, inspector: false });
+    // Com zoom de 150% ≈ 683 px.
+    expect(fitPanels(683, prefs)).toEqual({ sidebar: false, inspector: false });
+  });
+});
