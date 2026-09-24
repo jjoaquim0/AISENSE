@@ -6,6 +6,7 @@
 
 mod guards;
 mod model;
+mod push;
 mod repo;
 mod service;
 
@@ -13,6 +14,10 @@ pub use guards::{BlockReason, BusBlocked, GuardConfig};
 pub use model::{
     valid_channel, Address, Channel, Delivery, DeliveryState, InboxItem, Message, MessageKind,
     MessageMeta, Priority, Sender, Target, CHANNEL_SLUG_MAX, MESSAGE_BODY_MAX,
+};
+pub use push::{
+    compose, inject, push_item, sanitize, InjectStyle, Injection, PtyWriter, PushInjected,
+    PushItem, PushQueues, PUSH_THROTTLE,
 };
 pub use repo::{BusRepository, InboxQuery};
 pub use service::{

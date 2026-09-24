@@ -11,6 +11,7 @@ import {
   IconButton,
   StatusDot,
 } from '@/components/ui';
+import { InjectedChip } from '@/features/bus/InjectedChip';
 import { Terminal } from '@/features/terminal/Terminal';
 import { cn } from '@/lib/cn';
 import type { Agent } from '@/types/generated/Agent';
@@ -88,6 +89,7 @@ export function AgentPane({
         <span className="truncate text-label text-primary">@{agent.handle}</span>
         <span className="truncate text-caption text-muted">{agent.adapterId}</span>
         <StatusDot state={state} confidence={confidence} withLabel className="ml-1" />
+        <InjectedChip agentId={agent.id} />
         {pending > 0 && (
           <Badge variant="accent" className="tabular-nums">
             {pending}

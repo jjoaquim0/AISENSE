@@ -5,6 +5,7 @@ import type { BusBlocked } from '@/types/generated/BusBlocked';
 import type { BusMessageEvent } from '@/types/generated/BusMessageEvent';
 import type { MessageId } from '@/types/generated/MessageId';
 import type { MessageView } from '@/types/generated/MessageView';
+import type { PushInjected } from '@/types/generated/PushInjected';
 import type { TeamId } from '@/types/generated/TeamId';
 import type { UnreadCount } from '@/types/generated/UnreadCount';
 
@@ -35,4 +36,9 @@ export function onBusMessage(handler: (event: BusMessageEvent) => void): Promise
 /** Um agente leu mensagens (o badge dele muda). */
 export function onBusRead(handler: (agentId: AgentId) => void): Promise<UnlistenFn> {
   return listen<AgentId>('bus:read', ({ payload }) => handler(payload));
+}
+
+/** O AISENSE digitou mensagens no terminal de um agente em modo `push`. */
+export function onBusInjected(handler: (event: PushInjected) => void): Promise<UnlistenFn> {
+  return listen<PushInjected>('bus:injected', ({ payload }) => handler(payload));
 }

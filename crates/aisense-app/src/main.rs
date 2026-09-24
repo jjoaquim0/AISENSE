@@ -42,6 +42,8 @@ fn main() {
             let store = open_store(&data)?;
             let (registry, watcher) = commands::runtimes::setup(app.handle(), &data);
             let (library, skill_watcher) = commands::skills::setup(app.handle(), &data, &store);
+            let (push, injections) = commands::push::channel();
+            let pty_for_push = std::sync::Arc::clone(&setup_manager);
             let supervisor = commands::agents::setup(
                 app.handle(),
                 &data,
@@ -49,9 +51,19 @@ fn main() {
                 std::sync::Arc::clone(&registry),
                 setup_manager,
                 std::sync::Arc::clone(&library),
+                push.clone(),
             );
             let (bus, bus_shutdown) =
-                commands::bus::setup(app.handle(), &data, &store, &supervisor);
+                commands::bus::setup(app.handle(), &data, &store, &supervisor, push.clone());
+            commands::push::start(
+                app.handle(),
+                &push,
+                injections,
+                &bus,
+                &store,
+                &registry,
+                &pty_for_push,
+            );
             app.manage(bus);
             app.manage(bus_shutdown);
             app.manage(store);

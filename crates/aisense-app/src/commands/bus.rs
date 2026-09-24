@@ -28,6 +28,7 @@ const RETENTION_EVERY: Duration = Duration::from_secs(6 * 60 * 60);
 
 struct TauriBusObserver {
     app: AppHandle,
+    push: super::push::PushSink,
 }
 
 impl BusObserver for TauriBusObserver {
@@ -37,7 +38,9 @@ impl BusObserver for TauriBusObserver {
         }
     }
 
-    fn deliveries_changed(&self, _ids: &[MessageId], agent_id: &AgentId) {
+    fn deliveries_changed(&self, ids: &[MessageId], agent_id: &AgentId) {
+        // Lida pela caixa: não precisa mais ser digitada.
+        self.push.forget(agent_id, ids);
         if let Err(error) = self.app.emit(BUS_READ, agent_id) {
             tracing::warn!(%error, "falha ao avisar a UI sobre mensagens lidas");
         }
@@ -52,12 +55,16 @@ pub fn setup(
     data: &DataDir,
     store: &Store,
     supervisor: &Supervisor,
+    push: super::push::PushSink,
 ) -> (Bus, BusShutdown) {
     let for_state = supervisor.clone();
     let bus = BusService::new(
         Arc::new(store.clone()),
         Arc::new(move |id: &AgentId| for_state.state(id)),
-        Arc::new(TauriBusObserver { app: app.clone() }),
+        Arc::new(TauriBusObserver {
+            app: app.clone(),
+            push,
+        }),
     );
 
     // Nenhuma sessão da execução anterior está viva: os tokens dela não valem mais.
