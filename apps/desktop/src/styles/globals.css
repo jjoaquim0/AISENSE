@@ -79,6 +79,12 @@ body,
   height: 100%;
 }
 
+/* Controles nativos na cor de acento do tema, não no azul do navegador (F08-09). */
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: var(--accent);
+}
+
 body {
   margin: 0;
   background-color: var(--bg-base);

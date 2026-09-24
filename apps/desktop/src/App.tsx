@@ -4,6 +4,7 @@ import { EmptyState, TooltipProvider } from '@/components/ui';
 import { FlowBench } from '@/features/dev/FlowBench';
 import { GridBench } from '@/features/dev/GridBench';
 import { KitchenSink } from '@/features/dev/KitchenSink';
+import { Onboarding } from '@/features/onboarding/Onboarding';
 import { useSettings } from '@/features/settings/store';
 import { AppShell } from '@/features/shell/AppShell';
 import { useNav } from '@/features/shell/nav';
@@ -21,6 +22,8 @@ const SkillLibraryScreen = lazy(() =>
 export function App() {
   const screen = useNav((s) => s.screen);
   const loadSettings = useSettings((s) => s.load);
+  const settingsLoaded = useSettings((s) => s.view !== null || s.error !== null);
+  const onboarding = useSettings((s) => s.view !== null && !s.view.settings.onboardingDone);
   useEffect(() => {
     if (isDesktop()) void loadSettings();
   }, [loadSettings]);
@@ -35,6 +38,18 @@ export function App() {
     return (
       <TooltipProvider delayDuration={300}>
         <KitchenSink />
+      </TooltipProvider>
+    );
+  }
+
+  if (isDesktop() && !settingsLoaded) {
+    // Uma leitura de arquivo local: esperar evita piscar o shell antes do onboarding.
+    return <div className="h-full bg-base" aria-busy="true" />;
+  }
+  if (onboarding) {
+    return (
+      <TooltipProvider delayDuration={300}>
+        <Onboarding />
       </TooltipProvider>
     );
   }

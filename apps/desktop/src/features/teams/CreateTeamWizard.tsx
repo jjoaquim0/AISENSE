@@ -12,7 +12,7 @@ import type { TeamTemplate } from '@/types/generated/TeamTemplate';
 import { errorMessage, teamsApi } from './api';
 import { useTeams } from './store';
 
-const COLORS: AgentColor[] = [
+export const COLORS: AgentColor[] = [
   'violet',
   'cyan',
   'emerald',
@@ -23,7 +23,7 @@ const COLORS: AgentColor[] = [
   'fuchsia',
 ];
 
-const TEMPLATES: { id: TeamTemplate; title: string; agents: string }[] = [
+export const TEMPLATES: { id: TeamTemplate; title: string; agents: string }[] = [
   { id: 'empty', title: 'Vazio', agents: 'Comece sem agentes e adicione depois.' },
   { id: 'duo-dev', title: 'Dupla Dev', agents: '@dev implementa, @revisor revisa.' },
   {

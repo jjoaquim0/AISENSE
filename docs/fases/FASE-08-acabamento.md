@@ -26,9 +26,19 @@ Todo estado vazio com ilustração e ação; skeletons no lugar de spinners; tod
 causa e próximo passo acionável.
 **Aceite:** nenhuma tela mostra "algo deu errado" sem dizer o que fazer.
 
-### [ ] F08-04 — Onboarding (T1)
+### [x] F08-04 — Onboarding (T1)
 Fluxo de 3 passos com detecção de runtimes, escolha de tema e criação da primeira equipe.
 **Aceite:** usuário novo sai do onboarding com uma equipe rodando em menos de 2 minutos.
+
+> Feito: `apps/desktop/src/features/onboarding/`. Aparece enquanto `settings.onboardingDone` for
+> `false` (F08-05); pular em qualquer passo ou criar a equipe grava `true` e ele nunca mais volta.
+> Passo 1: runtimes detectados (a `RuntimeList` da T2, com dica de instalação); passo 2: tema com
+> efeito imediato; passo 3: nome (já preenchido), pasta, modelo (Dupla Dev por padrão, ou Squad
+> completo, ou Vazio) e "Iniciar os agentes ao criar" marcado. Agente cujo runtime não está
+> instalado vai para o **shell** (`withRunnableRuntimes`), com o aviso de qual trocou — a primeira
+> equipe sempre sobe. Criar abre a Sala da Equipe e dispara o ▶. Sem janela aqui, os dois
+> minutos foram conferidos só no E2E com o core falso (F08-08): o caminho é Continuar, Continuar,
+> escolher a pasta, Criar — quatro cliques. Falta cronometrar com um usuário novo de verdade.
 
 ### [x] F08-05 — Configurações (T9)
 Todas as seções de [09 — Telas](../09-telas-e-fluxos.md#t9--configurações), incluindo o modo
