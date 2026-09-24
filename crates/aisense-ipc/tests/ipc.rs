@@ -314,3 +314,68 @@ async fn socket_so_do_usuario() {
     .await;
     assert!(matches!(second, Err(aisense_ipc::BindError::InUse(_))));
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn notas_pelo_socket_append_simultaneo_nao_perde_nada() {
+    use aisense_ipc::NotesOp;
+    let w = world().await;
+    let mut setup = w.client(0).await;
+    let created = setup
+        .call(&Request::Notes(NotesOp::New {
+            slug: "log".into(),
+            title: "Log".into(),
+        }))
+        .await
+        .unwrap();
+    assert!(created.ok, "{created:?}");
+
+    // CLI e MCP mandam o mesmo frame; aqui, 8 conexões dos dois agentes ao mesmo tempo.
+    let mut tasks = Vec::new();
+    for c in 0..8 {
+        let client = w.client(c % 2).await;
+        tasks.push(tokio::spawn(async move {
+            let mut client = client;
+            for i in 0..25 {
+                let r = client
+                    .call(&Request::Notes(NotesOp::Append {
+                        slug: "log".into(),
+                        text: format!("c{c} linha {i}"),
+                    }))
+                    .await
+                    .unwrap();
+                assert!(r.ok, "{r:?}");
+            }
+        }));
+    }
+    for t in tasks {
+        t.await.unwrap();
+    }
+    let read = setup
+        .call(&Request::Notes(NotesOp::Read {
+            slug: "log".into(),
+            section: None,
+        }))
+        .await
+        .unwrap();
+    let content = data(read)["content"].as_str().unwrap().to_owned();
+    assert_eq!(content.lines().count(), 1 + 8 * 25);
+
+    // `write` com hash velho: stale_note com o diff, pelo socket também.
+    let stale = setup
+        .call(&Request::Notes(NotesOp::Write {
+            slug: "log".into(),
+            content: "# Log\n".into(),
+            expect_hash: Some("0000".into()),
+        }))
+        .await
+        .unwrap();
+    assert_eq!(stale.error.as_deref(), Some("stale_note"));
+    assert!(stale.data.unwrap()["diff"].is_array());
+    let search = setup
+        .call(&Request::Notes(NotesOp::Search {
+            query: "c3 linha 24".into(),
+        }))
+        .await
+        .unwrap();
+    assert_eq!(data(search).as_array().unwrap().len(), 1);
+}

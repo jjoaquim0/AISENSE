@@ -183,10 +183,17 @@ contagem regressiva, eventos de sistema com ação, filtros e compositor do huma
 **Aceite:** 10.000 mensagens rolam a 60 fps; mensagem nova entra sem saltar o scroll quando o
 usuário está lendo histórico. Depende de F05-02.
 
-### [ ] F05-12 — `aisense notes` na CLI e no MCP
+### [x] F05-12 — `aisense notes` na CLI e no MCP
 `list`, `read` (com `--section`), `append`, `write --expect-hash`, `search`, `new`.
 **Aceite:** teste de contrato entre CLI e MCP; `append` continua atômico quando chamado pelos dois
 caminhos ao mesmo tempo. Depende de F04-09, F05-05.
+> Feito: operação `notes` no protocolo (`list`, `read [--section]`, `append`, `write
+> [--file] [--expect-hash]`, `search`, `new [--title]`), atendida pelo mesmo `TeamNotes` da UI
+> (F04-09) no diretório da equipe, em `spawn_blocking`. `aisense notes ...` na CLI e
+> `aisense_notes` no MCP montam o mesmo frame (contrato da F05-09). `write` desatualizado volta
+> `stale_note` com `currentHash` e o diff; a leitura mostra o hash para o próximo `write`.
+> Aceite: 8 conexões dos dois agentes × 25 `append` simultâneos pelo socket, nenhuma linha
+> perdida; `stale_note` com diff e `search` pelo socket.
 
 ### [ ] F05-13 — `aisense run`, `aisense commands` e `aisense bench`
 Execução apenas de comandos **nomeados** em `aisense.toml` (nunca string arbitrária), com timeout,
