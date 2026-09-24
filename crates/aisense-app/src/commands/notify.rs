@@ -27,6 +27,11 @@ pub struct Viewing(Mutex<Option<TeamId>>);
 
 #[tauri::command]
 pub fn ui_viewing(viewing: State<'_, Viewing>, team_id: Option<TeamId>) {
+    // Também é o marco "Sala da Equipe na tela" da auditoria de cold start (F08-01).
+    tracing::info!(
+        team = team_id.as_ref().map(TeamId::as_str),
+        "tela da equipe"
+    );
     *viewing
         .0
         .lock()

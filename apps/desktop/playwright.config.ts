@@ -27,10 +27,12 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } },
     },
   ],
+  // Build de produção (com o core falso) servido estático: sem a compilação sob demanda do
+  // servidor de dev, que no primeiro teste de uma máquina lenta estoura os prazos.
   webServer: {
-    command: `pnpm exec vite --mode e2e --port ${PORT} --strictPort`,
+    command: `pnpm exec vite build --mode e2e --outDir dist-e2e --emptyOutDir && pnpm exec vite preview --outDir dist-e2e --port ${PORT} --strictPort`,
     port: PORT,
     reuseExistingServer: !process.env.CI,
-    timeout: 60_000,
+    timeout: 180_000,
   },
 });

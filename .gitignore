@@ -31,3 +31,4 @@ Thumbs.db
 # Playwright (E2E do front)
 /apps/desktop/test-results/
 /apps/desktop/playwright-report/
+/apps/desktop/dist-e2e/

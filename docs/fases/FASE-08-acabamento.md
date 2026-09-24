@@ -130,9 +130,34 @@ Notificação do SO quando um agente entra em `awaiting_input` ou `failed` com o
 > `libayatana-appindicator3`, que o CI já instala). Falta ver o aviso e o ícone numa área de
 > trabalho de verdade.
 
-### [ ] F08-08 — Testes E2E
+### [~] F08-08 — Testes E2E
 Playwright cobrindo os 5 fluxos críticos de [09 — Telas](../09-telas-e-fluxos.md#fluxos-críticos-e2e-da-fase-8).
 **Aceite:** a suíte roda no CI dos 3 SOs de forma estável (sem flake) por 10 execuções seguidas.
+
+> Parcial. **Como é:** `apps/desktop/e2e/` roda o front de verdade no Chromium com o core em Rust
+> trocado por um core falso em TypeScript (`src/e2e/fakeCore.ts`, via `mockIPC` do
+> `@tauri-apps/api/mocks`, só no build `--mode e2e`). O teste semeia o estado
+> (`window.__fakeSeed`) e dirige o core pelo `window.__fake` (derrubar um agente, rotear uma
+> mensagem, fazer um comando falhar). `pnpm e2e` sobe um build de produção com o core falso e roda
+> a suíte; o job `e2e` do CI faz o mesmo nos 3 SOs, **sem novas tentativas**. Nova dependência de
+> teste: `@playwright/test`.
+>
+> **Os 5 fluxos** — o que a interface prova aqui e o que o core prova nos testes de processo
+> real em Rust:
+>
+> | Fluxo | Interface (`e2e/`) | Core (Rust, processos reais) |
+> |---|---|---|
+> | F1 | `flows.spec.ts` F1: onboarding → Squad completo → ▶ → 4 terminais ociosos; e só com teclado em `keyboard.spec.ts` | `supervisor::tests` (start, `team_start` escalonado) |
+> | F2 | `flows.spec.ts` F2: `ask` e `reply` entram ao vivo na linha do tempo | `aisense-cli/tests/e2e.rs` (agente num PTY roda `aisense send` e a mensagem chega), `bus::tests` (`pergunta_bloqueia_ate_a_resposta_e_destrava`, `resposta_volta_para_quem_perguntou`, deadlock, timeout) |
+> | F3 | — (a parte visível é a aba Skills, sem fluxo novo) | `supervisor::tests::start_reports_the_skills_it_took_and_the_ones_it_ignored`, `skill::boot` (snapshot do `BOOT.md`), testes de entrega do boot (`boot_pela_flag…`, `boot_pelo_terminal…`) |
+> | F4 | `flows.spec.ts` F4: cai, mostra "Erro" e volta sozinho; pelo teclado em `keyboard.spec.ts` | `supervisor::tests::killing_the_process_externally_restarts_on_crash`, políticas `never`/`on-crash`; `bus::tests::destinatario_parado_recebe_recado_mas_pergunta_e_recusada` (o recado espera na caixa) |
+> | F5 | `flows.spec.ts` F5: 9 terminais, fundo do xterm muda, sem reload; `⌘⇧D` em `keyboard.spec.ts` | — |
+>
+> Além deles: `session.spec.ts` (F08-06), `states.spec.ts` (F08-03), `a11y.spec.ts` e
+> `keyboard.spec.ts` (F08-02). **Falta** para o aceite: as 10 execuções seguidas no CI dos 3 SOs
+> (aqui, em Linux, a suíte passou 10 vezes seguidas — ver `docs/ESTADO.md`), um teste de F4 que
+> junte a queda com a entrega das mensagens pendentes depois da volta, e rodar os fluxos contra o
+> app empacotado com o core real (WebDriver do Tauri), que ainda não existe.
 
 ### [ ] F08-09 — Polimento visual final
 Revisão painel a painel nos dois temas: alinhamentos, espaçamentos, pesos tipográficos, transições,

@@ -55,6 +55,41 @@ jobs:
       - name: Build do front
         run: pnpm build
 
+  # E2E do front (F08-08): o app no Chromium com o core falso (`vite --mode e2e`), nos 3
+  # SOs. Sem novas tentativas: um teste instável falha o job (R10).
+  e2e:
+    name: E2E do front (${{ matrix.os }})
+    needs: check
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Chromium do Playwright
+        working-directory: apps/desktop
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Suíte E2E
+        run: pnpm --filter @aisense/desktop e2e
+        env:
+          CI: 'true'
+      - name: Relatório (só quando falha)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ matrix.os }}
+          path: |
+            apps/desktop/playwright-report
+            apps/desktop/test-results
+          retention-days: 7
+
   # Build real do app nos 3 SOs. Só aqui entram as dependências de GUI.
   desktop:
     name: Build do app (${{ matrix.os }})

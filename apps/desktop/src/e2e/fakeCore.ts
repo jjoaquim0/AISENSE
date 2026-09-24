@@ -56,6 +56,19 @@ export interface FakeHandle {
   calls: { cmd: string; args: unknown }[];
   settings: () => AppSettings;
   notifications: { title: string; body: string }[];
+  /**
+   * O processo do agente morre com erro: `failed` e, pela política `on-crash`, a volta
+   * (`starting` → `idle`), como o supervisor faz.
+   */
+  crash: (handle: string) => Promise<void>;
+  /** Uma mensagem roteada pelo barramento, como `aisense send`/`ask`/`reply` fariam. */
+  route: (
+    from: string,
+    to: string,
+    body: string,
+    kind?: MessageView['kind'],
+    replyTo?: string,
+  ) => Promise<string>;
   /** Para de falhar `cmd` (ver `FakeSeed.failing`). */
   heal: (cmd: string) => void;
 }
@@ -207,6 +220,39 @@ export function installFakeCore(): void {
     settings: () => settings,
     notifications: [],
     heal: (cmd) => failing.delete(cmd),
+    crash: async (h) => {
+      const agent = agents.find((a) => a.handle === h);
+      if (!agent) throw new Error(`agente @${h} não existe no fake`);
+      await write(agent.id, '\r\nSegmentation fault (core dumped)\r\n');
+      await setState(agent.id, 'failed');
+      if (agent.restartPolicy !== 'never') {
+        // A primeira espera do backoff do supervisor (`FIRST_DELAY`).
+        setTimeout(() => void startAgent(agent.id), 1000);
+      }
+    },
+    route: async (from, to, body, kind = 'message', replyTo) => {
+      const team = teams[0];
+      if (!team) throw new Error('sem equipe no fake');
+      const message: MessageView = {
+        id: `msg_${String(900_000 + ++seq).padStart(6, '0')}`,
+        kind,
+        from,
+        to,
+        subject: null,
+        body,
+        replyTo: replyTo ?? null,
+        meta: {
+          priority: 'normal',
+          attachments: [],
+          ...(kind === 'request' ? { timeoutS: 300 } : {}),
+        },
+        createdAt: now(),
+        receipts: { recipients: 1, delivered: 1, read: 0, failed: 0 },
+      };
+      messages.push(message);
+      await emit('bus:message', { teamId: team.id, message, recipients: 1 });
+      return message.id;
+    },
   };
   const failing = new Set(seed.failing ?? []);
   window.__fake = handle;
