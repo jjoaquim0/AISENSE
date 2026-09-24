@@ -15,6 +15,7 @@ mod ids;
 pub mod notes;
 mod paths;
 pub mod project;
+pub mod proposal;
 pub mod repo;
 pub mod skill;
 pub mod state;
@@ -29,8 +30,8 @@ pub use app_info::AppInfo;
 pub use color::AgentColor;
 pub use command_error::CommandError;
 pub use ids::{
-    ActivityId, AgentId, BoardId, CardId, ChannelId, ColumnId, CommentId, MessageId, SessionId,
-    SkillId, TeamId,
+    ActivityId, AgentId, BoardId, CardId, ChannelId, ColumnId, CommentId, MessageId, ProposalId,
+    SessionId, SkillId, TeamId,
 };
 pub use paths::DataDir;
 pub use time::{now_ms, Millis};

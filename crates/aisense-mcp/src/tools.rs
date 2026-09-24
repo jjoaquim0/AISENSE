@@ -2,7 +2,9 @@
 //! ferramenta vira **o mesmo** `Request` que o comando equivalente da CLI — o teste de
 //! contrato em `tests/contract.rs` garante.
 
+use aisense_core::agent::Autonomy;
 use aisense_core::board::{CardFilter, CardPatch, CardPriority, LinkKind, NewCard};
+use aisense_core::proposal::ProposalAction;
 use aisense_ipc::{NotesOp, Request, TaskOp};
 use serde_json::{json, Value};
 
@@ -87,6 +89,25 @@ pub fn list() -> Value {
                     "channel": { "type": "string", "description": "#canal (join/leave)" }
                 },
                 "required": ["action"]
+            }
+        },
+        {
+            "name": "aisense_propose",
+            "description": "Ações estruturais (criar agente, mudar autonomia, editar skill, mudar colunas do quadro) NÃO são executadas por agentes: viram proposta para o humano aceitar ou recusar na UI. Você recebe a decisão como mensagem.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "kind": { "type": "string", "enum": ["agent", "autonomy", "skill", "columns"] },
+                    "handle": { "type": "string", "description": "@handle (agent, autonomy)" },
+                    "name": { "type": "string" },
+                    "role": { "type": "string" },
+                    "runtime": { "type": "string", "description": "claude, codex, shell... (agent)" },
+                    "autonomy": { "type": "string", "enum": ["ask", "trusted"] },
+                    "skill": { "type": "string" },
+                    "change": { "type": "string", "description": "O que mudar (skill, columns)" },
+                    "reason": { "type": "string", "description": "Por quê — é o que o humano lê" }
+                },
+                "required": ["kind", "reason"]
             }
         },
         {
@@ -361,6 +382,37 @@ pub fn request(name: &str, args: &Value) -> Result<Request, String> {
             },
             other => return Err(format!("ação desconhecida: {other}")),
         },
+        "aisense_propose" => {
+            let action = match text(args, "kind")?.as_str() {
+                "agent" => {
+                    let handle = text(args, "handle")?;
+                    ProposalAction::CreateAgent {
+                        name: opt(args, "name")
+                            .unwrap_or_else(|| handle.trim_start_matches('@').to_owned()),
+                        handle,
+                        role: opt(args, "role").unwrap_or_default(),
+                        adapter_id: opt(args, "runtime").unwrap_or_default(),
+                    }
+                }
+                "autonomy" => ProposalAction::SetAutonomy {
+                    handle: text(args, "handle")?,
+                    autonomy: Autonomy::parse(&text(args, "autonomy")?)
+                        .ok_or("autonomy deve ser ask ou trusted")?,
+                },
+                "skill" => ProposalAction::EditSkill {
+                    skill: text(args, "skill")?,
+                    change: text(args, "change")?,
+                },
+                "columns" => ProposalAction::ChangeColumns {
+                    change: text(args, "change")?,
+                },
+                other => return Err(format!("kind desconhecido: {other}")),
+            };
+            Request::Propose {
+                action,
+                reason: opt(args, "reason").unwrap_or_default(),
+            }
+        }
         "aisense_board" => Request::Board {
             column: opt(args, "column"),
             full: flag(args, "full"),

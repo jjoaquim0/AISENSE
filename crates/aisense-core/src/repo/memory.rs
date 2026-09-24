@@ -49,6 +49,7 @@ struct Inner {
     dependencies: std::collections::BTreeSet<(String, String)>,
     comments: Vec<Comment>,
     activity: Vec<Activity>,
+    proposals: Vec<crate::proposal::Proposal>,
 }
 
 #[derive(Default)]
@@ -169,6 +170,7 @@ impl TeamRepository for InMemoryStore {
             inner.columns.retain(|c| c.board_id != board.id);
         }
         inner.cards.retain(|_, c| c.team_id != *id);
+        inner.proposals.retain(|p| p.team_id != *id);
         inner.forget_orphans();
         // Cascata do barramento, como as FKs do SQLite.
         inner.channels.retain(|c| c.team_id != *id);
@@ -276,6 +278,11 @@ impl AgentRepository for InMemoryStore {
                     .deliveries
                     .retain(|(_, agent), _| agent != id.as_str());
                 inner.channel_members.retain(|(_, a)| a != id.as_str());
+                for p in &mut inner.proposals {
+                    if p.proposed_by.as_ref() == Some(id) {
+                        p.proposed_by = None;
+                    }
+                }
                 // ON DELETE SET NULL do quadro.
                 for card in inner.cards.values_mut() {
                     for field in [
@@ -1040,6 +1047,60 @@ impl BoardRepository for InMemoryStore {
                 .then(a.id.as_str().cmp(b.id.as_str()))
         });
         Ok(out)
+    }
+}
+
+impl crate::proposal::ProposalRepository for InMemoryStore {
+    async fn insert_proposal(&self, proposal: &crate::proposal::Proposal) -> RepoResult<()> {
+        let mut inner = self.lock();
+        if !inner.teams.contains_key(proposal.team_id.as_str()) {
+            return Err(RepoError::TeamNotFound(proposal.team_id.clone()));
+        }
+        inner.proposals.push(proposal.clone());
+        Ok(())
+    }
+
+    async fn get_proposal(
+        &self,
+        id: &crate::ids::ProposalId,
+    ) -> RepoResult<Option<crate::proposal::Proposal>> {
+        Ok(self.lock().proposals.iter().find(|p| &p.id == id).cloned())
+    }
+
+    async fn list_proposals(
+        &self,
+        team_id: &TeamId,
+        pending_only: bool,
+    ) -> RepoResult<Vec<crate::proposal::Proposal>> {
+        let mut out: Vec<_> = self
+            .lock()
+            .proposals
+            .iter()
+            .filter(|p| &p.team_id == team_id)
+            .filter(|p| !pending_only || p.state == crate::proposal::ProposalState::Pending)
+            .cloned()
+            .collect();
+        out.sort_by(|a, b| b.id.cmp(&a.id));
+        Ok(out)
+    }
+
+    async fn decide_proposal(
+        &self,
+        id: &crate::ids::ProposalId,
+        state: crate::proposal::ProposalState,
+        now: Millis,
+        note: Option<&str>,
+    ) -> RepoResult<bool> {
+        let mut inner = self.lock();
+        match inner.proposals.iter_mut().find(|p| &p.id == id) {
+            Some(p) if p.state == crate::proposal::ProposalState::Pending => {
+                p.state = state;
+                p.decided_at = Some(now);
+                p.decision_note = note.map(str::to_owned);
+                Ok(true)
+            }
+            _ => Ok(false),
+        }
     }
 }
 

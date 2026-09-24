@@ -36,6 +36,7 @@ trait Repo:
     + BusRepository
     + TokenRepository
     + BoardRepository
+    + aisense_core::proposal::ProposalRepository
 {
 }
 impl<T> Repo for T where
@@ -46,6 +47,7 @@ impl<T> Repo for T where
         + BusRepository
         + TokenRepository
         + BoardRepository
+        + aisense_core::proposal::ProposalRepository
 {
 }
 
@@ -1113,6 +1115,48 @@ async fn channel_members_follow_channel_and_agent(repo: impl Repo) {
     assert!(repo.channel_members(&ch.id).await.unwrap().is_empty());
 }
 
+async fn proposals_are_decided_once(repo: impl Repo) {
+    use aisense_core::proposal::{Proposal, ProposalAction, ProposalState};
+    let t = team("Squad", 1);
+    repo.create_team(&t).await.unwrap();
+    let a = add_agent(&repo, &t, "coordenador").await;
+    let p = Proposal {
+        id: aisense_core::ProposalId::new(),
+        team_id: t.id.clone(),
+        proposed_by: Some(a.id.clone()),
+        action: ProposalAction::ChangeColumns {
+            change: "coluna QA".into(),
+        },
+        reason: "falta QA".into(),
+        state: ProposalState::Pending,
+        created_at: 5,
+        decided_at: None,
+        decision_note: None,
+    };
+    repo.insert_proposal(&p).await.unwrap();
+    assert_eq!(repo.get_proposal(&p.id).await.unwrap(), Some(p.clone()));
+    assert_eq!(repo.list_proposals(&t.id, true).await.unwrap().len(), 1);
+    assert!(repo
+        .decide_proposal(&p.id, ProposalState::Rejected, 9, Some("não"))
+        .await
+        .unwrap());
+    assert!(!repo
+        .decide_proposal(&p.id, ProposalState::Accepted, 10, None)
+        .await
+        .unwrap());
+    let got = repo.get_proposal(&p.id).await.unwrap().unwrap();
+    assert_eq!(
+        (got.state, got.decided_at, got.decision_note.as_deref()),
+        (ProposalState::Rejected, Some(9), Some("não"))
+    );
+    assert!(repo.list_proposals(&t.id, true).await.unwrap().is_empty());
+    repo.delete_agent(&a.id).await.unwrap();
+    assert_eq!(
+        repo.get_proposal(&p.id).await.unwrap().unwrap().proposed_by,
+        None
+    );
+}
+
 macro_rules! contract {
     ($($name:ident),+ $(,)?) => {
         mod sqlite {
@@ -1154,6 +1198,7 @@ contract!(
     tokens_live_with_the_session,
     board_round_trips_and_guards_writes,
     channel_members_follow_channel_and_agent,
+    proposals_are_decided_once,
     board_columns_are_replaced_atomically,
 );
 

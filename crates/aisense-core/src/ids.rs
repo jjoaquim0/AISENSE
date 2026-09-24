@@ -80,6 +80,7 @@ typed_id!(CardId, "tsk");
 typed_id!(ColumnId, "col");
 typed_id!(CommentId, "cmt");
 typed_id!(ActivityId, "act");
+typed_id!(ProposalId, "prp");
 
 #[cfg(test)]
 mod tests {

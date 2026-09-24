@@ -99,6 +99,15 @@ CREATE TABLE channels (
   UNIQUE (team_id, slug)
 );
 
+-- 0007 (F07-02): propostas de ações estruturais (docs/11). `action` é JSON; `state`
+-- pending | accepted | rejected; decidir só vale uma vez.
+CREATE TABLE proposals (
+  id TEXT PRIMARY KEY, team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+  proposed_by TEXT REFERENCES agents(id) ON DELETE SET NULL, action TEXT NOT NULL,
+  reason TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'pending', created_at INTEGER NOT NULL,
+  decided_at INTEGER, decision_note TEXT
+);
+
 -- 0006 (F07-05): inscritos. Canal sem linhas aqui é aberto (vai para a equipe toda).
 CREATE TABLE channel_members (
   channel_id TEXT NOT NULL REFERENCES channels(id) ON DELETE CASCADE,

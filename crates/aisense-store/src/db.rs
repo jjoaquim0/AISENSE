@@ -168,6 +168,7 @@ mod tests {
                 "columns",
                 "deliveries",
                 "messages",
+                "proposals",
                 "sessions",
                 "skills",
                 "task_activity",

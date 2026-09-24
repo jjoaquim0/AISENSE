@@ -3,6 +3,9 @@
 
 use aisense_core::board::{CardFilter, CardPatch, CardPriority, LinkKind, NewCard};
 
+use aisense_core::agent::Autonomy;
+use aisense_core::proposal::ProposalAction;
+
 use crate::protocol::{NotesOp, Request, TaskOp};
 
 pub const HELP: &str = "\
@@ -22,6 +25,11 @@ aisense — fale com a sua equipe de agentes (AISENSE)
   aisense notes list|read|append|write|search|new ...   notas da equipe
   aisense channels                       canais da equipe e quem está inscrito
   aisense join #canal | leave #canal     entra ou sai de um canal
+  aisense propose agent @qa --runtime claude [--name x] [--role x] --reason \"...\"
+  aisense propose autonomy @alguem ask|trusted --reason \"...\"
+  aisense propose skill <nome> \"o que mudar\" --reason \"...\"
+  aisense propose columns \"o que mudar\" --reason \"...\"
+                                         ações estruturais viram proposta para o humano
   aisense board [--column doing] [--full]  o quadro da equipe em texto
   aisense task next                      o próximo cartão que você deveria pegar
   aisense task list [--mine] [--column c] [--unassigned] [--label l] [--all]
@@ -97,6 +105,10 @@ pub enum Command {
         channel: String,
         join: bool,
     },
+    Propose {
+        action: ProposalAction,
+        reason: String,
+    },
     /// Executado pela própria CLI, no terminal do agente (F05-13).
     Run {
         name: String,
@@ -152,6 +164,7 @@ impl Command {
             Command::Task(op) => Request::Task(op),
             Command::Channels => Request::Channels,
             Command::Subscribe { channel, join } => Request::Subscribe { channel, join },
+            Command::Propose { action, reason } => Request::Propose { action, reason },
             Command::Help
             | Command::Version
             | Command::Run { .. }
@@ -250,6 +263,7 @@ pub fn parse(argv: &[String]) -> Result<Parsed, String> {
         }
         "task" => Command::Task(task(args)?),
         "channels" => no_args(&args, Command::Channels)?,
+        "propose" => propose(args)?,
         "join" | "leave" => {
             if args.len() != 1 || !args[0].starts_with('#') {
                 return Err(format!("diga o canal: aisense {name} #canal"));
@@ -530,6 +544,61 @@ fn task(mut args: Vec<String>) -> Result<TaskOp, String> {
         }
         other => return Err(format!("ação desconhecida em task: {other}")),
     })
+}
+
+fn propose(mut args: Vec<String>) -> Result<Command, String> {
+    let reason = take_value(&mut args, "--reason")?.unwrap_or_default();
+    if args.is_empty() {
+        return Err("aisense propose agent|autonomy|skill|columns ... --reason \"...\"".into());
+    }
+    let kind = args.remove(0);
+    let action = match kind.as_str() {
+        "agent" => {
+            let adapter_id = take_value(&mut args, "--runtime")?.unwrap_or_default();
+            let name = take_value(&mut args, "--name")?;
+            let role = take_value(&mut args, "--role")?.unwrap_or_default();
+            if args.len() != 1 || !args[0].starts_with('@') {
+                return Err("diga o handle: aisense propose agent @qa --runtime claude".into());
+            }
+            let handle = args.remove(0);
+            ProposalAction::CreateAgent {
+                name: name.unwrap_or_else(|| handle.trim_start_matches('@').to_owned()),
+                handle,
+                role,
+                adapter_id,
+            }
+        }
+        "autonomy" => {
+            if args.len() != 2 {
+                return Err("aisense propose autonomy @alguem ask|trusted --reason \"...\"".into());
+            }
+            let autonomy = Autonomy::parse(&args[1])
+                .ok_or_else(|| format!("autonomia {:?}: use ask ou trusted", args[1]))?;
+            ProposalAction::SetAutonomy {
+                handle: args.remove(0),
+                autonomy,
+            }
+        }
+        "skill" => {
+            if args.len() < 2 {
+                return Err("aisense propose skill <nome> \"o que mudar\" --reason \"...\"".into());
+            }
+            let skill = args.remove(0);
+            ProposalAction::EditSkill {
+                skill,
+                change: body(args)?,
+            }
+        }
+        "columns" => ProposalAction::ChangeColumns {
+            change: body(args)?,
+        },
+        other => {
+            return Err(format!(
+                "o que propor? agent, autonomy, skill ou columns (recebi {other})"
+            ))
+        }
+    };
+    Ok(Command::Propose { action, reason })
 }
 
 fn notes(mut args: Vec<String>) -> Result<NotesOp, String> {

@@ -13,6 +13,9 @@ use aisense_core::board::{
 use aisense_core::bus::{BusError, BusService, Identity, Sender};
 use aisense_core::notes::{NoteError, NoteSave, TeamNotes};
 use aisense_core::now_ms;
+use aisense_core::proposal::{
+    NoProposalObserver, ProposalError, ProposalRepository, ProposalService,
+};
 use serde_json::json;
 
 use crate::protocol::{codes, NotesOp, Request, Response, TaskOp};
@@ -27,15 +30,23 @@ pub const WATCH_DEFAULT: Duration = Duration::from_secs(600);
 pub struct BusHandler<S> {
     bus: BusService<S>,
     board: BoardService<S>,
+    proposals: ProposalService<S>,
 }
 
-impl<S: BoardStore> BusHandler<S> {
+impl<S: BoardStore + ProposalRepository> BusHandler<S> {
     /// O quadro traz o barramento dentro: é por ele que avisa (F06-07).
     pub fn new(board: BoardService<S>) -> Self {
+        let proposals = ProposalService::new(board.bus().clone(), Arc::new(NoProposalObserver));
         Self {
             bus: board.bus().clone(),
             board,
+            proposals,
         }
+    }
+
+    /// Com o serviço de propostas do app (que avisa a UI).
+    pub fn with_proposals(self, proposals: ProposalService<S>) -> Self {
+        Self { proposals, ..self }
     }
 
     /// Sem observador do quadro nem executor de gate (testes, ferramentas).
@@ -56,6 +67,10 @@ impl<S: BoardStore> BusHandler<S> {
     }
 }
 
+pub fn proposal_error(error: &ProposalError) -> Response {
+    Response::error(error.code(), error.to_string(), error.hint())
+}
+
 pub fn board_error(error: &BoardError) -> Response {
     Response::error(error.code(), error.to_string(), error.hint())
 }
@@ -68,7 +83,7 @@ fn note_error(error: &NoteError) -> Response {
     Response::error(error.code(), error.to_string(), error.hint())
 }
 
-impl<S: BoardStore + 'static> Handler for BusHandler<S> {
+impl<S: BoardStore + ProposalRepository + 'static> Handler for BusHandler<S> {
     async fn hello(&self, token: &str) -> Result<Response, Response> {
         let identity = self
             .bus
@@ -99,7 +114,7 @@ impl<S: BoardStore + 'static> Handler for BusHandler<S> {
     }
 }
 
-impl<S: BoardStore + 'static> BusHandler<S> {
+impl<S: BoardStore + ProposalRepository + 'static> BusHandler<S> {
     async fn dispatch(&self, me: &Identity, request: Request) -> Result<Response, Response> {
         let err = |e: BusError| bus_error(&e);
         let from = Sender::Agent {
@@ -192,6 +207,27 @@ impl<S: BoardStore + 'static> BusHandler<S> {
                 Response::ok(json!({ "text": text, "board": view }))
             }
             Request::Task(op) => self.task(me, op).await.map_err(|e| board_error(&e))?,
+            Request::Propose { action, reason } => {
+                let proposal = self
+                    .proposals
+                    .propose(me, action.clone(), &reason)
+                    .await
+                    .map_err(|e| proposal_error(&e))?;
+                // A proposta foi registrada; a ação em si é recusada até o humano decidir.
+                let described = action.describe();
+                let mut chars = described.chars();
+                let refused = ProposalError::NeedsApproval {
+                    id: proposal.id.clone(),
+                    action: chars
+                        .next()
+                        .map(|c| c.to_uppercase().chain(chars).collect())
+                        .unwrap_or_default(),
+                };
+                Response {
+                    data: serde_json::to_value(&proposal).ok(),
+                    ..proposal_error(&refused)
+                }
+            }
             Request::Channels => Response::ok(self.bus.channels(&me.team_id).await.map_err(err)?),
             Request::Subscribe { channel, join } => Response::ok(
                 self.bus

@@ -14,6 +14,7 @@ import { agentsApi } from '@/features/agents/api';
 import { GuardBanner } from '@/features/bus/GuardBanner';
 import { useUnread } from '@/features/bus/useUnread';
 import { ProjectCommandsDialog } from '@/features/project/ProjectCommandsDialog';
+import { ProposalsBanner } from '@/features/proposals/ProposalsBanner';
 import { ShellSlot } from '@/features/shell/slots';
 import { usePanels } from '@/features/shell/usePanels';
 import { AgentInspector } from '@/features/team-room/components/AgentInspector';
@@ -291,6 +292,17 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
       </header>
 
       <GuardBanner teamId={team.id} />
+      <ProposalsBanner
+        teamId={team.id}
+        agents={agents}
+        onDecided={(p) => {
+          // Aceitar "criar agente" muda a lista da equipe.
+          if (p.state === 'accepted' && p.action.kind === 'createAgent') {
+            void reloadAgents();
+            void load();
+          }
+        }}
+      />
       {(problem || notice) && (
         <div className="flex flex-col gap-1 border-b border-subtle px-4 py-2">
           {problem && (

@@ -112,11 +112,15 @@ pub fn setup(
 }
 
 /// Sobe o socket com o quadro dentro (o handler atende barramento e `aisense task`).
-pub fn serve(data: &DataDir, board: super::board::BoardState) -> BusShutdown {
+pub fn serve(
+    data: &DataDir,
+    board: super::board::BoardState,
+    proposals: super::proposals::Proposals,
+) -> BusShutdown {
     let shutdown = CancellationToken::new();
     let (endpoint, handler, stop) = (
         data.socket(),
-        Arc::new(BusHandler::new(board)),
+        Arc::new(BusHandler::new(board).with_proposals(proposals)),
         shutdown.clone(),
     );
     tauri::async_runtime::spawn(async move {

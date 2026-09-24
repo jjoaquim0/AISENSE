@@ -476,3 +476,57 @@ async fn quadro_pelo_socket_com_as_regras_do_core() {
         "CLI e MCP mostram o mesmo texto"
     );
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn agente_criando_agente_recebe_erro_e_vira_proposta() {
+    // F07-02: a ação estrutural não acontece; a proposta fica para o humano.
+    use aisense_core::proposal::ProposalRepository;
+    let w = world().await;
+    let mut backend = w.client(0).await;
+    let refused = backend
+        .call(&cli_request(&[
+            "propose",
+            "agent",
+            "@qa",
+            "--runtime",
+            "shell",
+            "--reason",
+            "ninguém testa",
+        ]))
+        .await
+        .unwrap();
+    assert!(!refused.ok);
+    assert_eq!(refused.error.as_deref(), Some("needs_approval"));
+    assert!(refused
+        .message
+        .as_deref()
+        .unwrap()
+        .starts_with("Criar o agente @qa (shell) precisa do humano"));
+    let id = refused.data.as_ref().unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert!(id.starts_with("prp_"));
+    let agents = aisense_core::repo::AgentRepository::list_agents(
+        &*w.store,
+        &aisense_core::repo::AgentRepository::get_agent(&*w.store, &w.ids[0])
+            .await
+            .unwrap()
+            .unwrap()
+            .team_id,
+    )
+    .await
+    .unwrap();
+    assert_eq!(agents.len(), 2, "nenhum agente foi criado");
+    let pending = w
+        .store
+        .list_proposals(&agents[0].team_id, true)
+        .await
+        .unwrap();
+    assert_eq!(pending.len(), 1);
+    let no_reason = backend
+        .call(&cli_request(&["propose", "columns", "coluna", "QA"]))
+        .await
+        .unwrap();
+    assert_eq!(no_reason.error.as_deref(), Some("invalid_request"));
+}

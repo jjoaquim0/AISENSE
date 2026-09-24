@@ -5,6 +5,7 @@
 
 use aisense_core::board::{CardFilter, CardPatch, LinkKind, NewCard};
 use aisense_core::bus::MessageMeta;
+use aisense_core::proposal::ProposalAction;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -73,6 +74,12 @@ pub enum Request {
     Subscribe {
         channel: String,
         join: bool,
+    },
+    /// Ação estrutural (criar agente, autonomia, skill, colunas): vira proposta para o
+    /// humano, nunca execução (F07-02). A resposta é o erro `needs_approval`.
+    Propose {
+        action: ProposalAction,
+        reason: String,
     },
 }
 
@@ -204,6 +211,7 @@ impl Request {
             Self::Task(_) => "task",
             Self::Channels => "channels",
             Self::Subscribe { .. } => "subscribe",
+            Self::Propose { .. } => "propose",
         }
     }
 }

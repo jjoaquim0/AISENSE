@@ -20,11 +20,19 @@ e como escalar para o humano quando trava.
 [01 — Visão](../01-visao-produto.md#cu-2--coordenador-distribuindo-trabalho) de ponta a ponta.
 Depende de F06-05.
 
-### [ ] F07-02 — Propostas do coordenador
+### [x] F07-02 — Propostas do coordenador
 Ações estruturais (criar agente, mudar autonomia, editar skill, alterar colunas) viram **proposta**
 na UI com [Aceitar]/[Recusar] — nunca execução direta.
 **Aceite:** agente tentando criar outro agente recebe erro do barramento e a proposta aparece na UI.
 Depende de F06-05.
+
+> Feito: `aisense-core/src/proposal/` (`ProposalAction`: criar agente, autonomia, skill,
+> colunas; `ProposalService::{propose, list, decide}`), migração 0007, `aisense propose ...` e
+> `aisense_propose` respondem `needs_approval` com o id; o humano recebe aviso na linha do tempo e
+> o `ProposalsBanner` na Sala da Equipe (Aceitar/Recusar, evento `proposal:changed`). Aceitar
+> cria o agente / muda a autonomia pelo mesmo core da UI; quem propôs recebe a decisão. Teste de
+> ponta a ponta no socket: o agente pede para criar `@qa`, recebe o erro, a equipe continua com 2
+> agentes e a proposta fica pendente.
 
 ### [ ] F07-03 — Vista Fluxo (T4.3)
 Canvas com `@xyflow/react`: nós de agente e de canal, arestas animadas por mensagem, tracejado com
