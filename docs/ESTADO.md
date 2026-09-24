@@ -5,7 +5,7 @@
 > Se estiver desatualizado, o próximo agente se perde. Mantenha-o honesto.
 
 **Última atualização:** 2026-09-24
-**Fase atual:** `FASE 07 — Coordenação` com 5 de 6 tarefas em código e a F07-01 parcial (falta o CU-2 com um coordenador real); Fases 02–06 com código completo
+**Fase atual:** `FASE 08 — Acabamento`, ainda não iniciada (0/9). Fases 06 e 07 mergeadas no PR #21; a F07-01 está parcial (falta o CU-2 com um coordenador real)
 **Fluxo de trabalho atual:** várias tarefas seguidas no mesmo branch `claude/...`, **um commit por
 tarefa** (ID no título) e um PR só ao fim do lote, com o CI verde nos 3 SOs antes do merge (o
 usuário mergeia). Pedido do usuário em 2026-09-23 para acelerar.
@@ -24,7 +24,23 @@ também está em código. Próximo trabalho: **Fase 08 — Acabamento**.
 
 1. Leia `AGENTS.md` e este arquivo inteiro; depois `docs/fases/FASE-03-sala-da-equipe.md` — cada
    tarefa feita tem uma nota `> Feito:` dizendo onde está o código e o que ficou de fora.
-2. **Próxima: Fase 08 — Acabamento** (`docs/fases/FASE-08-*.md`). Fase 07 em código:
+2. **Próxima: Fase 08 — Acabamento** (`docs/fases/FASE-08-*.md`). Plano levantado (ainda sem código):
+   - F08-05 Configurações: um `AppSettings` no core salvo em `~/.aisense/settings.json` (escrita
+     atômica), com `onboarding_done`, sessão, notificações, limites do barramento (`GuardConfig`,
+     `ASK_DEFAULT`, retenção, hoje constantes) e aparência. **Modo calibração:** o detector compila
+     os regex em `StateDetector::new` (`state/detector.rs`) na subida da sessão; para valer sem
+     reiniciar, criar `StateDetector::set_rules` e fazer o supervisor atualizar as sessões vivas
+     quando o `AdapterWatcher` (`commands/runtimes.rs`) recarregar o catálogo. Segredos no keychain
+     exigem dependência nova (`keyring`): justificar (R9) ou deixar parcial.
+   - F08-04 Onboarding usa `onboarding_done`; F08-06 reabre `last_team` (vista e layout já ficam em
+     `teams.layout`; painéis em `usePanels`/localStorage).
+   - F08-07 Notificações: `tauri-plugin-notification` (dependência nova, justificar); a regra de
+     "não notificar com a janela focada na equipe" pode ser função pura no front. Bandeja (tray)
+     pode exigir libs extras no Linux do CI: testar o build antes.
+   - F08-08 E2E: sem janela aqui, dá para usar Playwright no front com `mockIPC` do
+     `@tauri-apps/api/mocks`; terminais reais (F2–F4) precisam do app empacotado.
+   - F08-01/F08-09: métricas de performance e screenshots finais precisam de máquina com tela.
+   Fase 07 em código:
    canais com inscritos (`channel_members`, `aisense join|leave|channels`), propostas
    (`aisense-core/src/proposal/`, `aisense propose`, banner na Sala), skill `coordenador` v2,
    vista Fluxo (`features/flow/`, banco `#/dev/flow`) e paleta `⌘K` (`features/palette/`).
