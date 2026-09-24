@@ -22,7 +22,10 @@ pub use model::{
     normalize_label, Activity, Actor, Board, Card, CardLink, CardPriority, ChecklistItem, Column,
     ColumnKind, Comment, LinkKind, BODY_MAX, TITLE_MAX,
 };
-pub use render::{ago, render_board, render_card, render_cards, short_id, BOARD_COLUMN_LINES};
+pub use render::{
+    ago, render_board, render_card, render_cards, render_comment, render_moved, render_next,
+    short_id, BOARD_COLUMN_LINES,
+};
 pub use repo::{BoardRepository, CardQuery, CardWrite, WriteGuard};
 pub use rules::{
     check_dependency, check_transition, check_wip, column_by_slug, default_columns,

@@ -15,6 +15,6 @@ mod transport;
 
 pub use client::{Client, ClientError};
 pub use frame::{read_frame, write_frame, FrameError, MAX_FRAME};
-pub use handler::{bus_error, BusHandler, WAIT_DEFAULT};
-pub use protocol::{codes, NotesOp, Request, Response, PROTOCOL_VERSION};
+pub use handler::{board_error, bus_error, BusHandler, WAIT_DEFAULT, WATCH_DEFAULT};
+pub use protocol::{codes, NotesOp, Request, Response, TaskOp, PROTOCOL_VERSION};
 pub use transport::{connect, serve, serve_connection, BindError, Handler, Io};

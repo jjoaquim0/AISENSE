@@ -63,12 +63,20 @@ Dependências com detecção de ciclo na criação, checklist marcável, thread 
 > Concluir libera os dependentes (avisa o responsável e tira da coluna de bloqueio quem esperava
 > só por ele).
 
-### [ ] F06-05 — Operações do quadro na CLI e no MCP
+### [x] F06-05 — Operações do quadro na CLI e no MCP
 `board`, `task next|list|show|add|claim|move|update|check|comment|link|block|done|split|watch`,
 todas com `--json`, e as ferramentas MCP equivalentes. Saída ASCII de `aisense board` pensada para
 LLM, conforme [13](../13-quadro-kanban.md#leitura).
 **Aceite:** teste de contrato garantindo que CLI e MCP produzem o mesmo efeito;
 `aisense board` de uma equipe com 20 cartões cabe em menos de 60 linhas. Depende de F06-03, F05-05.
+
+> Feito: frames `board` e `task` (`TaskOp`, uma ação por variante) em `aisense-ipc`; o handler
+> usa o mesmo `BoardService` do app (`BusHandler::new(board)`), com o agente como autor. Parser da
+> CLI com todas as opções de `docs/13` (repetíveis: `--label`, `--blocked-by`), 7 ferramentas MCP
+> (`aisense_board`, `_next_task`, `_list_tasks`, `_show_task`, `_create_task`, `_update_task` com
+> `action`, `_watch_tasks`). Teste de contrato: cada ferramenta manda o frame idêntico ao do
+> comando. O texto (`render_board`, `render_card`...) vem pronto do servidor. `aisense board` com
+> 20 cartões: ~30 linhas (teto de 8 por coluna, 3 na terminal, `--full` tira).
 
 ### [ ] F06-06 — Motor de automações
 Gatilhos (`card_created`, `card_enters`, `card_leaves`, `card_stale`, `checklist_complete`,

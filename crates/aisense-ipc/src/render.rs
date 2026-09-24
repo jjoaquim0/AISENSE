@@ -105,6 +105,8 @@ pub fn render(op: &str, data: &Value, if_any: bool) -> String {
         ),
         "status" | "note" | "reply" => format!("registrado ({})\n", s(data, "id")),
         "notes" => notes(data),
+        // O servidor já manda o texto, feito pelas funções do core (mesmo na CLI e no MCP).
+        "board" | "task" => s(data, "text").to_owned(),
         _ => format!("{data}\n"),
     }
 }

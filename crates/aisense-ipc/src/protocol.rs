@@ -3,6 +3,7 @@
 //! O cliente manda `{"op": "...", ...}`; o servidor responde `{"ok": true, "data": ...}` ou
 //! `{"ok": false, "error": "<código>", "message": "...", "hint": "..."}`.
 
+use aisense_core::board::{CardFilter, CardPatch, LinkKind, NewCard};
 use aisense_core::bus::MessageMeta;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -57,6 +58,91 @@ pub enum Request {
     },
     /// Notas da equipe (F05-12): `list`, `read`, `append`, `write`, `search`, `new`.
     Notes(NotesOp),
+    /// O quadro em texto (F06-05). `column` restringe; `full` tira o teto por coluna.
+    Board {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        column: Option<String>,
+        #[serde(default)]
+        full: bool,
+    },
+    /// Cartões do quadro (F06-05): `aisense task <ação>`.
+    Task(TaskOp),
+}
+
+/// As ações de `aisense task` (`docs/13`, "API dos agentes").
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
+pub enum TaskOp {
+    Next,
+    List {
+        #[serde(default)]
+        filter: CardFilter,
+    },
+    Show {
+        id: String,
+    },
+    Add {
+        card: NewCard,
+    },
+    Claim {
+        id: String,
+    },
+    Move {
+        id: String,
+        column: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        reason: Option<String>,
+    },
+    Update {
+        id: String,
+        patch: CardPatch,
+    },
+    Check {
+        id: String,
+        item: u32,
+        #[serde(default)]
+        undo: bool,
+    },
+    Comment {
+        id: String,
+        body: String,
+    },
+    Link {
+        id: String,
+        kind: LinkKind,
+        target: String,
+    },
+    Block {
+        id: String,
+        #[serde(default)]
+        reason: String,
+    },
+    Done {
+        id: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        note: Option<String>,
+    },
+    Split {
+        id: String,
+        titles: Vec<String>,
+    },
+    Watch {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        timeout_s: Option<u32>,
+    },
+    Approve {
+        id: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        note: Option<String>,
+    },
+    Reject {
+        id: String,
+        #[serde(default)]
+        reason: String,
+    },
+    Archive {
+        id: String,
+    },
 }
 
 fn default_version() -> u32 {
@@ -107,6 +193,8 @@ impl Request {
             Self::Status { .. } => "status",
             Self::Note { .. } => "note",
             Self::Notes(_) => "notes",
+            Self::Board { .. } => "board",
+            Self::Task(_) => "task",
         }
     }
 }

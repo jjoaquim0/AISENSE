@@ -52,11 +52,10 @@ pub struct BusShutdown(pub CancellationToken);
 
 pub fn setup(
     app: &AppHandle,
-    data: &DataDir,
     store: &Store,
     supervisor: &Supervisor,
     push: super::push::PushSink,
-) -> (Bus, BusShutdown) {
+) -> Bus {
     let for_state = supervisor.clone();
     let bus = BusService::new(
         Arc::new(store.clone()),
@@ -107,10 +106,15 @@ pub fn setup(
         }
     });
 
+    bus
+}
+
+/// Sobe o socket com o quadro dentro (o handler atende barramento e `aisense task`).
+pub fn serve(data: &DataDir, board: super::board::BoardState) -> BusShutdown {
     let shutdown = CancellationToken::new();
     let (endpoint, handler, stop) = (
         data.socket(),
-        Arc::new(BusHandler::new(bus.clone())),
+        Arc::new(BusHandler::new(board)),
         shutdown.clone(),
     );
     tauri::async_runtime::spawn(async move {
@@ -119,7 +123,7 @@ pub fn setup(
             tracing::error!(%error, "barramento indisponível");
         }
     });
-    (bus, BusShutdown(shutdown))
+    BusShutdown(shutdown)
 }
 
 fn bus_error(error: aisense_core::bus::BusError) -> CommandError {

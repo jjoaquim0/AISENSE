@@ -98,7 +98,7 @@ async fn world() -> World {
     );
     let endpoint = endpoint(&dir);
     let shutdown = CancellationToken::new();
-    let handler = Arc::new(BusHandler::new(bus));
+    let handler = Arc::new(BusHandler::from_bus(bus));
     let (ep, stop) = (endpoint.clone(), shutdown.clone());
     tokio::spawn(async move { serve(&ep, handler, stop).await.unwrap() });
     // Espera o socket existir.
@@ -308,7 +308,7 @@ async fn socket_so_do_usuario() {
     );
     let second = serve(
         &w.endpoint,
-        Arc::new(BusHandler::new(bus)),
+        Arc::new(BusHandler::from_bus(bus)),
         CancellationToken::new(),
     )
     .await;
@@ -378,4 +378,101 @@ async fn notas_pelo_socket_append_simultaneo_nao_perde_nada() {
         .await
         .unwrap();
     assert_eq!(data(search).as_array().unwrap().len(), 1);
+}
+
+fn cli_request(line: &[&str]) -> Request {
+    let argv: Vec<String> = line.iter().map(|s| (*s).to_owned()).collect();
+    aisense_ipc::cli::parse(&argv)
+        .unwrap()
+        .command
+        .request()
+        .unwrap()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn quadro_pelo_socket_com_as_regras_do_core() {
+    // F06-05: `aisense task` e `aisense board` de ponta a ponta, com texto para LLM.
+    let w = world().await;
+    let mut backend = w.client(0).await;
+    let mut frontend = w.client(1).await;
+    let added = data(
+        backend
+            .call(&cli_request(&[
+                "task",
+                "add",
+                "Migrar /users para OAuth",
+                "--priority",
+                "alta",
+                "--checklist",
+                "teste,implementar",
+            ]))
+            .await
+            .unwrap(),
+    );
+    let id = added["card"]["id"].as_str().unwrap().to_owned();
+    let short = aisense_core::board::short_id(&id);
+    assert!(added["text"].as_str().unwrap().starts_with(&short));
+
+    // Claim: um ganha; o outro recebe o erro do doc com a dica.
+    let claim = data(
+        frontend
+            .call(&cli_request(&["task", "claim", &short]))
+            .await
+            .unwrap(),
+    );
+    assert!(claim["text"]
+        .as_str()
+        .unwrap()
+        .contains("Próximo passo: aisense task move"));
+    let lost = backend
+        .call(&cli_request(&["task", "claim", &id]))
+        .await
+        .unwrap();
+    assert_eq!(lost.error.as_deref(), Some("already_claimed"));
+    assert!(lost.message.unwrap().contains("já foi pego por @frontend"));
+    assert_eq!(
+        lost.hint.as_deref(),
+        Some("Use 'aisense task next' para o próximo.")
+    );
+
+    // Bloquear sem motivo: recusado pelo core, não pela CLI.
+    let blocked = frontend
+        .call(&cli_request(&["task", "block", &short]))
+        .await
+        .unwrap();
+    assert_eq!(blocked.error.as_deref(), Some("reason_required"));
+
+    let moved = data(
+        frontend
+            .call(&cli_request(&["task", "move", &short, "doing"]))
+            .await
+            .unwrap(),
+    );
+    assert_eq!(moved["card"]["columnSlug"], "doing");
+    let board = data(backend.call(&cli_request(&["board"])).await.unwrap());
+    let text = board["text"].as_str().unwrap();
+    assert!(text.starts_with("QUADRO — Squad"), "{text}");
+    assert!(text.contains("FAZENDO (1) · doing"), "{text}");
+    assert!(text.contains("@frontend"), "{text}");
+    let unknown = backend
+        .call(&cli_request(&["board", "--column", "em-progresso"]))
+        .await
+        .unwrap();
+    assert_eq!(unknown.error.as_deref(), Some("unknown_column"));
+
+    // `task show` traz o histórico.
+    let show = data(
+        backend
+            .call(&cli_request(&["task", "show", &short]))
+            .await
+            .unwrap(),
+    );
+    let text = show["text"].as_str().unwrap();
+    assert!(text.contains("histórico:"), "{text}");
+    assert!(text.contains("1. [ ] teste"), "{text}");
+    assert_eq!(
+        aisense_ipc::render::render("task", &show, false),
+        text,
+        "CLI e MCP mostram o mesmo texto"
+    );
 }

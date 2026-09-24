@@ -1,8 +1,9 @@
 //! `aisense board` e `aisense task show` em texto (`docs/13`, "Leitura"): pensado para um
 //! modelo entender de primeira e caber no contexto. Mesma função na CLI e no MCP.
 
+use super::model::Comment;
 use super::model::{Actor, ColumnKind};
-use super::service::{AgentTag, BoardView, CardDetail, CardView};
+use super::service::{AgentTag, BoardView, CardDetail, CardView, Moved};
 use crate::time::Millis;
 
 /// Quantos cartões cada coluna mostra antes de resumir ("… e mais N"). `--full` tira o teto.
@@ -288,4 +289,59 @@ fn activity_detail(detail: &serde_json::Value) -> String {
             None => String::new(),
         },
     }
+}
+
+/// Resultado de uma operação que muda cartão: onde ficou, com quem, e os avisos.
+pub fn render_moved(moved: &Moved) -> String {
+    let view = &moved.card;
+    let c = &view.card;
+    let who = view
+        .assignee_handle
+        .as_ref()
+        .map_or_else(|| "ninguém".to_owned(), |h| format!("@{h}"));
+    let mut out = format!(
+        "{} · {}\n  coluna: {} · responsável: {who}",
+        short_id(c.id.as_str()),
+        truncate(&c.title, 80),
+        view.column_slug
+    );
+    let (done, total) = c.checklist_progress();
+    if total > 0 {
+        out.push_str(&format!(" · checklist {done}/{total}"));
+    }
+    out.push('\n');
+    for warning in &moved.warnings {
+        out.push_str(&format!("aviso: {warning}\n"));
+    }
+    out
+}
+
+/// `aisense task next`: o cartão e o próximo passo.
+pub fn render_next(card: Option<&CardView>, now: Millis) -> String {
+    match card {
+        None => "Nada pronto para você agora. Espere trabalho com: aisense task watch\n".into(),
+        Some(card) => {
+            let mut out = render_cards(std::slice::from_ref(card), now);
+            if card.card.assignee.is_none() {
+                out.push_str(&format!(
+                    "Pegue com: aisense task claim {}\n",
+                    short_id(card.card.id.as_str())
+                ));
+            } else {
+                out.push_str(&format!(
+                    "Já é seu. Comece com: aisense task move {} doing\n",
+                    short_id(card.card.id.as_str())
+                ));
+            }
+            out
+        }
+    }
+}
+
+pub fn render_comment(comment: &Comment) -> String {
+    format!(
+        "comentado em {} ({})\n",
+        short_id(comment.card_id.as_str()),
+        comment.id
+    )
 }

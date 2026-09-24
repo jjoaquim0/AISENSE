@@ -2,11 +2,11 @@
 //! ferramenta vira **o mesmo** `Request` que o comando equivalente da CLI — o teste de
 //! contrato em `tests/contract.rs` garante.
 
-use aisense_ipc::{NotesOp, Request};
+use aisense_core::board::{CardFilter, CardPatch, CardPriority, LinkKind, NewCard};
+use aisense_ipc::{NotesOp, Request, TaskOp};
 use serde_json::{json, Value};
 
-/// As ferramentas anunciadas em `tools/list`. As de tarefas (`aisense_create_task`,
-/// `aisense_update_task`) entram com o quadro, na Fase 06.
+/// As ferramentas anunciadas em `tools/list`.
 pub fn list() -> Value {
     json!([
         {
@@ -76,8 +76,198 @@ pub fn list() -> Value {
                 },
                 "required": ["action"]
             }
+        },
+        {
+            "name": "aisense_board",
+            "description": "O quadro da equipe em texto: colunas, cartões, responsáveis, bloqueios. É a memória do trabalho — leia antes de começar.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "column": { "type": "string", "description": "Só uma coluna (slug: backlog, todo, doing, blocked, review, done)" },
+                    "full": { "type": "boolean", "description": "Todos os cartões, sem resumo por coluna" }
+                }
+            }
+        },
+        {
+            "name": "aisense_next_task",
+            "description": "Sugere o próximo cartão que VOCÊ deveria pegar (os seus prontos primeiro, depois os sem dono e sem dependência aberta).",
+            "inputSchema": { "type": "object", "properties": {} }
+        },
+        {
+            "name": "aisense_list_tasks",
+            "description": "Lista cartões com filtros. Concluídos ficam de fora, a menos que all=true ou column seja dada.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "column": { "type": "string" },
+                    "assignee": { "type": "string", "description": "@handle" },
+                    "mine": { "type": "boolean" },
+                    "unassigned": { "type": "boolean" },
+                    "label": { "type": "string" },
+                    "all": { "type": "boolean" }
+                }
+            }
+        },
+        {
+            "name": "aisense_show_task",
+            "description": "Cartão completo: corpo, checklist, dependências, links, comentários e histórico.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "id": { "type": "string", "description": "tsk_... (o id curto do quadro serve)" } },
+                "required": ["id"]
+            }
+        },
+        {
+            "name": "aisense_create_task",
+            "description": "Cria um cartão. Agrupe: prefira checklist a vários cartões pequenos.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "title": { "type": "string" },
+                    "body": { "type": "string" },
+                    "assign": { "type": "string", "description": "@handle" },
+                    "column": { "type": "string", "description": "Padrão: todo" },
+                    "labels": { "type": "array", "items": { "type": "string" } },
+                    "priority": { "type": "string", "enum": ["low", "normal", "high", "urgent"] },
+                    "blocked_by": { "type": "array", "items": { "type": "string" } },
+                    "checklist": { "type": "array", "items": { "type": "string" } },
+                    "parent": { "type": "string" }
+                },
+                "required": ["title"]
+            }
+        },
+        {
+            "name": "aisense_update_task",
+            "description": "Age sobre um cartão. action: claim (pegar, atômico), move (column, reason), update (title, body, assign, unassign, add_labels, remove_labels, priority, blocked_by, unblock, checklist), check (item, undo), comment (body), link (kind: pr|commit|file|url, target), block (reason obrigatório), done (note), split (titles), approve (note), reject (reason obrigatório), archive.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "id": { "type": "string" },
+                    "action": { "type": "string", "enum": ["claim", "move", "update", "check", "comment", "link", "block", "done", "split", "approve", "reject", "archive"] },
+                    "column": { "type": "string" },
+                    "reason": { "type": "string" },
+                    "note": { "type": "string" },
+                    "body": { "type": "string" },
+                    "title": { "type": "string" },
+                    "item": { "type": "integer", "minimum": 1 },
+                    "undo": { "type": "boolean" },
+                    "kind": { "type": "string", "enum": ["pr", "commit", "file", "url"] },
+                    "target": { "type": "string" },
+                    "titles": { "type": "array", "items": { "type": "string" } },
+                    "assign": { "type": "string" },
+                    "unassign": { "type": "boolean" },
+                    "add_labels": { "type": "array", "items": { "type": "string" } },
+                    "remove_labels": { "type": "array", "items": { "type": "string" } },
+                    "priority": { "type": "string", "enum": ["low", "normal", "high", "urgent"] },
+                    "blocked_by": { "type": "array", "items": { "type": "string" } },
+                    "unblock": { "type": "array", "items": { "type": "string" } },
+                    "checklist": { "type": "array", "items": { "type": "string" } }
+                },
+                "required": ["id", "action"]
+            }
+        },
+        {
+            "name": "aisense_watch_tasks",
+            "description": "Espera (sem gastar tokens) até algo mudar nos seus cartões: atribuição, comentário, rejeição.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "timeout_s": { "type": "integer", "minimum": 1, "maximum": 1800 } }
+            }
         }
     ])
+}
+
+fn strings(args: &Value, key: &str) -> Vec<String> {
+    match args.get(key) {
+        Some(Value::Array(list)) => list
+            .iter()
+            .filter_map(Value::as_str)
+            .map(str::to_owned)
+            .collect(),
+        Some(Value::String(one)) => vec![one.clone()],
+        _ => Vec::new(),
+    }
+}
+
+fn flag(args: &Value, key: &str) -> bool {
+    args.get(key).and_then(Value::as_bool).unwrap_or(false)
+}
+
+fn priority(args: &Value) -> Result<Option<CardPriority>, String> {
+    opt(args, "priority")
+        .map(|p| CardPriority::parse(&p).ok_or_else(|| format!("prioridade desconhecida: {p}")))
+        .transpose()
+}
+
+fn task(args: &Value) -> Result<TaskOp, String> {
+    let id = text(args, "id")?;
+    Ok(match text(args, "action")?.as_str() {
+        "claim" => TaskOp::Claim { id },
+        "archive" => TaskOp::Archive { id },
+        "move" => TaskOp::Move {
+            id,
+            column: text(args, "column")?,
+            reason: opt(args, "reason"),
+        },
+        "update" => TaskOp::Update {
+            id,
+            patch: CardPatch {
+                title: opt(args, "title"),
+                body: opt(args, "body"),
+                assignee: if flag(args, "unassign") {
+                    Some(String::new())
+                } else {
+                    opt(args, "assign")
+                },
+                add_labels: strings(args, "add_labels"),
+                remove_labels: strings(args, "remove_labels"),
+                priority: priority(args)?,
+                add_checklist: strings(args, "checklist"),
+                blocked_by: strings(args, "blocked_by"),
+                unblock: strings(args, "unblock"),
+            },
+        },
+        "check" => TaskOp::Check {
+            id,
+            item: args
+                .get("item")
+                .and_then(Value::as_u64)
+                .and_then(|n| u32::try_from(n).ok())
+                .ok_or("faltou o campo \"item\" (número do item, a partir de 1)")?,
+            undo: flag(args, "undo"),
+        },
+        "comment" => TaskOp::Comment {
+            id,
+            body: text(args, "body")?,
+        },
+        "link" => TaskOp::Link {
+            id,
+            kind: LinkKind::parse(&text(args, "kind")?)
+                .ok_or("kind deve ser pr, commit, file ou url")?,
+            target: text(args, "target")?,
+        },
+        "block" => TaskOp::Block {
+            id,
+            reason: opt(args, "reason").unwrap_or_default(),
+        },
+        "reject" => TaskOp::Reject {
+            id,
+            reason: opt(args, "reason").unwrap_or_default(),
+        },
+        "done" => TaskOp::Done {
+            id,
+            note: opt(args, "note"),
+        },
+        "approve" => TaskOp::Approve {
+            id,
+            note: opt(args, "note"),
+        },
+        "split" => TaskOp::Split {
+            id,
+            titles: strings(args, "titles"),
+        },
+        other => return Err(format!("ação desconhecida: {other}")),
+    })
 }
 
 fn text(args: &Value, key: &str) -> Result<String, String> {
@@ -150,6 +340,45 @@ pub fn request(name: &str, args: &Value) -> Result<Request, String> {
                 title: opt(args, "title").unwrap_or_default(),
             },
             other => return Err(format!("ação desconhecida: {other}")),
+        }),
+        "aisense_board" => Request::Board {
+            column: opt(args, "column"),
+            full: flag(args, "full"),
+        },
+        "aisense_next_task" => Request::Task(TaskOp::Next),
+        "aisense_list_tasks" => Request::Task(TaskOp::List {
+            filter: CardFilter {
+                column: opt(args, "column"),
+                assignee: opt(args, "assignee"),
+                mine: flag(args, "mine"),
+                unassigned: flag(args, "unassigned"),
+                label: opt(args, "label"),
+                include_done: flag(args, "all"),
+            },
+        }),
+        "aisense_show_task" => Request::Task(TaskOp::Show {
+            id: text(args, "id")?,
+        }),
+        "aisense_create_task" => Request::Task(TaskOp::Add {
+            card: NewCard {
+                title: text(args, "title")?,
+                body: opt(args, "body").unwrap_or_default(),
+                column: opt(args, "column"),
+                assignee: opt(args, "assign"),
+                labels: strings(args, "labels"),
+                priority: priority(args)?,
+                blocked_by: strings(args, "blocked_by"),
+                checklist: strings(args, "checklist"),
+                parent: opt(args, "parent"),
+                reason: None,
+            },
+        }),
+        "aisense_update_task" => Request::Task(task(args)?),
+        "aisense_watch_tasks" => Request::Task(TaskOp::Watch {
+            timeout_s: args
+                .get("timeout_s")
+                .and_then(Value::as_u64)
+                .and_then(|n| u32::try_from(n).ok()),
         }),
         other => return Err(format!("ferramenta desconhecida: {other}")),
     })
@@ -230,6 +459,122 @@ mod tests {
         ];
         for (from_cli, from_mcp) in pairs {
             assert_eq!(from_cli, from_mcp);
+        }
+        // Quadro (F06-05): cada ferramenta manda o mesmo frame do comando `aisense task`.
+        let board: Vec<(Vec<&str>, &str, Value)> = vec![
+            (
+                vec!["board", "--column", "doing"],
+                "aisense_board",
+                json!({"column": "doing"}),
+            ),
+            (vec!["task", "next"], "aisense_next_task", json!({})),
+            (
+                vec!["task", "list", "--mine", "--label", "backend"],
+                "aisense_list_tasks",
+                json!({"mine": true, "label": "backend"}),
+            ),
+            (
+                vec!["task", "show", "tsk_7K2"],
+                "aisense_show_task",
+                json!({"id": "tsk_7K2"}),
+            ),
+            (
+                vec![
+                    "task",
+                    "add",
+                    "Migrar /users",
+                    "--assign",
+                    "@backend",
+                    "--label",
+                    "backend",
+                    "--priority",
+                    "high",
+                    "--blocked-by",
+                    "tsk_7K1",
+                    "--checklist",
+                    "a,b",
+                ],
+                "aisense_create_task",
+                json!({"title": "Migrar /users", "assign": "@backend", "labels": ["backend"],
+                       "priority": "high", "blocked_by": ["tsk_7K1"], "checklist": ["a,b"]}),
+            ),
+            (
+                vec!["task", "claim", "tsk_7K2"],
+                "aisense_update_task",
+                json!({"id": "tsk_7K2", "action": "claim"}),
+            ),
+            (
+                vec!["task", "move", "tsk_7K2", "blocked", "--reason", "aguarda"],
+                "aisense_update_task",
+                json!({"id": "tsk_7K2", "action": "move", "column": "blocked", "reason": "aguarda"}),
+            ),
+            (
+                vec![
+                    "task",
+                    "update",
+                    "tsk_7K2",
+                    "--assign",
+                    "@frontend",
+                    "--add-label",
+                    "urgente",
+                ],
+                "aisense_update_task",
+                json!({"id": "tsk_7K2", "action": "update", "assign": "@frontend", "add_labels": ["urgente"]}),
+            ),
+            (
+                vec!["task", "check", "tsk_7K2", "1"],
+                "aisense_update_task",
+                json!({"id": "tsk_7K2", "action": "check", "item": 1}),
+            ),
+            (
+                vec!["task", "comment", "tsk_7K2", "o contrato mudou"],
+                "aisense_update_task",
+                json!({"id": "tsk_7K2", "action": "comment", "body": "o contrato mudou"}),
+            ),
+            (
+                vec!["task", "link", "tsk_7K2", "--commit", "a1b2c3d"],
+                "aisense_update_task",
+                json!({"id": "tsk_7K2", "action": "link", "kind": "commit", "target": "a1b2c3d"}),
+            ),
+            (
+                vec!["task", "block", "tsk_7K2", "--reason", "falta decisão"],
+                "aisense_update_task",
+                json!({"id": "tsk_7K2", "action": "block", "reason": "falta decisão"}),
+            ),
+            (
+                vec!["task", "done", "tsk_7K2", "--note", "feito"],
+                "aisense_update_task",
+                json!({"id": "tsk_7K2", "action": "done", "note": "feito"}),
+            ),
+            (
+                vec!["task", "split", "tsk_7K2", "parte 1", "parte 2"],
+                "aisense_update_task",
+                json!({"id": "tsk_7K2", "action": "split", "titles": ["parte 1", "parte 2"]}),
+            ),
+            (
+                vec!["task", "approve", "tsk_7K2", "--note", "ok"],
+                "aisense_update_task",
+                json!({"id": "tsk_7K2", "action": "approve", "note": "ok"}),
+            ),
+            (
+                vec![
+                    "task",
+                    "reject",
+                    "tsk_7K2",
+                    "--reason",
+                    "não invalida o token",
+                ],
+                "aisense_update_task",
+                json!({"id": "tsk_7K2", "action": "reject", "reason": "não invalida o token"}),
+            ),
+            (
+                vec!["task", "watch", "--timeout", "60"],
+                "aisense_watch_tasks",
+                json!({"timeout_s": 60}),
+            ),
+        ];
+        for (line, tool, args) in board {
+            assert_eq!(cli(&line), request(tool, &args).unwrap(), "{tool} {args}");
         }
         // Toda ferramenta anunciada tem mapeamento.
         for tool in list().as_array().unwrap() {

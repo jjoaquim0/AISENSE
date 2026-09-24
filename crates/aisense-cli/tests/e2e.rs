@@ -130,7 +130,7 @@ async fn um_agente_shell_manda_mensagem_com_a_cli_e_ela_chega() {
     let (ep, stop, handler) = (
         socket.clone(),
         shutdown.clone(),
-        Arc::new(BusHandler::new(bus)),
+        Arc::new(BusHandler::from_bus(bus)),
     );
     tokio::spawn(async move { serve(&ep, handler, stop).await.unwrap() });
     while !Path::new(&socket).exists() {

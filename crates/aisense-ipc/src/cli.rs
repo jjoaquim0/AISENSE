@@ -1,7 +1,9 @@
 //! Linha de comando à mão: poucos comandos, sem dependência de parser (a CLI precisa subir
 //! rápido e ser pequena). `--json` vale em qualquer posição.
 
-use crate::protocol::{NotesOp, Request};
+use aisense_core::board::{CardFilter, CardPatch, CardPriority, LinkKind, NewCard};
+
+use crate::protocol::{NotesOp, Request, TaskOp};
 
 pub const HELP: &str = "\
 aisense — fale com a sua equipe de agentes (AISENSE)
@@ -18,6 +20,24 @@ aisense — fale com a sua equipe de agentes (AISENSE)
   aisense status \"estado\" [--note x]     diz o que você está fazendo
   aisense whoami                         seu endereço e equipe
   aisense notes list|read|append|write|search|new ...   notas da equipe
+  aisense board [--column doing] [--full]  o quadro da equipe em texto
+  aisense task next                      o próximo cartão que você deveria pegar
+  aisense task list [--mine] [--column c] [--unassigned] [--label l] [--all]
+  aisense task show <id>                 cartão completo: checklist, comentários, histórico
+  aisense task add \"título\" [--body x] [--assign @a] [--column c] [--label l]
+                 [--priority alta] [--blocked-by <id>] [--checklist \"a,b\"] [--parent <id>]
+  aisense task claim <id>                pega para você (atômico)
+  aisense task move <id> <coluna> [--reason x]
+  aisense task update <id> [--title x] [--body x] [--assign @a|--unassign] [--add-label l]
+                 [--remove-label l] [--priority p] [--blocked-by <id>] [--unblock <id>]
+  aisense task check <id> <n> [--undo]   marca o item n do checklist
+  aisense task comment <id> \"texto\"
+  aisense task link <id> --pr 42|--commit sha|--file caminho|--url https://...
+  aisense task block <id> --reason \"o que falta e quem destrava\"
+  aisense task done <id> [--note \"...\"]
+  aisense task split <id> \"parte 1\" \"parte 2\"
+  aisense task watch [--timeout 600]     espera algo mudar nos seus cartões
+  aisense task approve <id> [--note x] | reject <id> --reason x | archive <id>
   aisense commands                       comandos do projeto (aisense.toml)
   aisense run <nome>                     roda um comando do aisense.toml (só nomes)
   aisense bench [status|sync|diff|publish|list]   sua bancada (merge, nunca rebase)
@@ -65,6 +85,11 @@ pub enum Command {
         note: Option<String>,
     },
     Notes(NotesOp),
+    Board {
+        column: Option<String>,
+        full: bool,
+    },
+    Task(TaskOp),
     /// Executado pela própria CLI, no terminal do agente (F05-13).
     Run {
         name: String,
@@ -116,6 +141,8 @@ impl Command {
             },
             Command::Reply { reply_to, body } => Request::Reply { reply_to, body },
             Command::Notes(op) => Request::Notes(op),
+            Command::Board { column, full } => Request::Board { column, full },
+            Command::Task(op) => Request::Task(op),
             Command::Help
             | Command::Version
             | Command::Run { .. }
@@ -207,6 +234,12 @@ pub fn parse(argv: &[String]) -> Result<Parsed, String> {
             }
         }
         "notes" => Command::Notes(notes(args)?),
+        "board" => {
+            let column = take_value(&mut args, "--column")?;
+            let full = take_flag(&mut args, "--full");
+            no_args(&args, Command::Board { column, full })?
+        }
+        "task" => Command::Task(task(args)?),
         "run" => {
             if args.len() != 1 {
                 return Err(
@@ -279,6 +312,205 @@ fn take_number(args: &mut Vec<String>, flag: &str) -> Result<Option<u32>, String
                 .map_err(|_| format!("{flag} espera segundos, recebeu {v:?}"))
         })
         .transpose()
+}
+
+/// Todas as ocorrências de uma opção repetível (`--label a --label b`).
+fn take_values(args: &mut Vec<String>, flag: &str) -> Result<Vec<String>, String> {
+    let mut out = Vec::new();
+    while let Some(value) = take_value(args, flag)? {
+        out.push(value);
+    }
+    Ok(out)
+}
+
+fn priority(raw: Option<String>) -> Result<Option<CardPriority>, String> {
+    raw.map(|p| {
+        CardPriority::parse(&p)
+            .ok_or_else(|| format!("prioridade {p:?}: use baixa, media, alta ou urgente"))
+    })
+    .transpose()
+}
+
+fn task(mut args: Vec<String>) -> Result<TaskOp, String> {
+    if args.is_empty() {
+        return Err(
+            "aisense task next|list|show|add|claim|move|update|check|comment|link|block|done|split|watch|approve|reject|archive"
+                .into(),
+        );
+    }
+    let action = args.remove(0);
+    let id = |args: &mut Vec<String>| -> Result<String, String> {
+        if args.is_empty() || args[0].starts_with("--") {
+            Err(format!("diga qual cartão: aisense task {action} <id>"))
+        } else {
+            Ok(args.remove(0))
+        }
+    };
+    Ok(match action.as_str() {
+        "next" => {
+            no_args(&args, Command::Help)?;
+            TaskOp::Next
+        }
+        "list" => {
+            let filter = CardFilter {
+                column: take_value(&mut args, "--column")?,
+                assignee: take_value(&mut args, "--assignee")?,
+                mine: take_flag(&mut args, "--mine"),
+                unassigned: take_flag(&mut args, "--unassigned"),
+                label: take_value(&mut args, "--label")?,
+                include_done: take_flag(&mut args, "--all"),
+            };
+            no_args(&args, Command::Help)?;
+            TaskOp::List { filter }
+        }
+        "show" | "claim" | "archive" => {
+            let id = id(&mut args)?;
+            no_args(&args, Command::Help)?;
+            match action.as_str() {
+                "show" => TaskOp::Show { id },
+                "claim" => TaskOp::Claim { id },
+                _ => TaskOp::Archive { id },
+            }
+        }
+        "add" => {
+            let card = NewCard {
+                body: take_value(&mut args, "--body")?.unwrap_or_default(),
+                assignee: take_value(&mut args, "--assign")?,
+                column: take_value(&mut args, "--column")?,
+                labels: take_values(&mut args, "--label")?,
+                priority: priority(take_value(&mut args, "--priority")?)?,
+                blocked_by: take_values(&mut args, "--blocked-by")?,
+                checklist: take_values(&mut args, "--checklist")?,
+                parent: take_value(&mut args, "--parent")?,
+                reason: take_value(&mut args, "--reason")?,
+                title: String::new(),
+            };
+            TaskOp::Add {
+                card: NewCard {
+                    title: body(args)?,
+                    ..card
+                },
+            }
+        }
+        "move" => {
+            let reason = take_value(&mut args, "--reason")?;
+            let id = id(&mut args)?;
+            if args.len() != 1 {
+                return Err("diga a coluna: aisense task move <id> doing".into());
+            }
+            TaskOp::Move {
+                id,
+                column: args.remove(0),
+                reason,
+            }
+        }
+        "update" => {
+            let unassign = take_flag(&mut args, "--unassign");
+            let patch = CardPatch {
+                title: take_value(&mut args, "--title")?,
+                body: take_value(&mut args, "--body")?,
+                assignee: if unassign {
+                    Some(String::new())
+                } else {
+                    take_value(&mut args, "--assign")?
+                },
+                add_labels: take_values(&mut args, "--add-label")?,
+                remove_labels: take_values(&mut args, "--remove-label")?,
+                priority: priority(take_value(&mut args, "--priority")?)?,
+                add_checklist: take_values(&mut args, "--checklist")?,
+                blocked_by: take_values(&mut args, "--blocked-by")?,
+                unblock: take_values(&mut args, "--unblock")?,
+            };
+            let id = id(&mut args)?;
+            no_args(&args, Command::Help)?;
+            if patch == CardPatch::default() {
+                return Err("nada para mudar: veja as opções em aisense --help".into());
+            }
+            TaskOp::Update { id, patch }
+        }
+        "check" => {
+            let undo = take_flag(&mut args, "--undo");
+            let id = id(&mut args)?;
+            let item = args
+                .first()
+                .and_then(|n| n.parse::<u32>().ok())
+                .ok_or("diga o número do item: aisense task check <id> 1")?;
+            args.remove(0);
+            no_args(&args, Command::Help)?;
+            TaskOp::Check { id, item, undo }
+        }
+        "comment" => {
+            let id = id(&mut args)?;
+            TaskOp::Comment {
+                id,
+                body: body(args)?,
+            }
+        }
+        "link" => {
+            let mut found = Vec::new();
+            for (flag, kind) in [
+                ("--pr", LinkKind::Pr),
+                ("--commit", LinkKind::Commit),
+                ("--file", LinkKind::File),
+                ("--url", LinkKind::Url),
+            ] {
+                if let Some(target) = take_value(&mut args, flag)? {
+                    found.push((kind, target));
+                }
+            }
+            let id = id(&mut args)?;
+            no_args(&args, Command::Help)?;
+            match found.len() {
+                1 => {
+                    let (kind, target) = found.remove(0);
+                    TaskOp::Link { id, kind, target }
+                }
+                _ => {
+                    return Err(
+                        "use um de: --pr 42, --commit a1b2c3d, --file caminho, --url https://..."
+                            .into(),
+                    )
+                }
+            }
+        }
+        "block" | "reject" => {
+            let reason = take_value(&mut args, "--reason")?.unwrap_or_default();
+            let id = id(&mut args)?;
+            no_args(&args, Command::Help)?;
+            if action == "block" {
+                TaskOp::Block { id, reason }
+            } else {
+                TaskOp::Reject { id, reason }
+            }
+        }
+        "done" | "approve" => {
+            let note = take_value(&mut args, "--note")?;
+            let id = id(&mut args)?;
+            no_args(&args, Command::Help)?;
+            if action == "done" {
+                TaskOp::Done { id, note }
+            } else {
+                TaskOp::Approve { id, note }
+            }
+        }
+        "split" => {
+            let id = id(&mut args)?;
+            if args.is_empty() {
+                return Err(
+                    "diga as partes: aisense task split <id> \"parte 1\" \"parte 2\"".into(),
+                );
+            }
+            TaskOp::Split { id, titles: args }
+        }
+        "watch" => {
+            // `--mine` é o único modo: aceito para bater com o doc.
+            take_flag(&mut args, "--mine");
+            let timeout_s = take_number(&mut args, "--timeout")?;
+            no_args(&args, Command::Help)?;
+            TaskOp::Watch { timeout_s }
+        }
+        other => return Err(format!("ação desconhecida em task: {other}")),
+    })
 }
 
 fn notes(mut args: Vec<String>) -> Result<NotesOp, String> {
@@ -410,5 +642,96 @@ mod tests {
             p(&["bench", "sync"]).unwrap().command,
             Command::Bench(BenchAction::Sync)
         );
+    }
+
+    #[test]
+    fn comandos_do_quadro_do_doc() {
+        let add = p(&[
+            "task",
+            "add",
+            "Migrar /users para OAuth",
+            "--body",
+            "Manter compatibilidade.",
+            "--assign",
+            "@backend",
+            "--column",
+            "todo",
+            "--label",
+            "backend",
+            "--priority",
+            "high",
+            "--blocked-by",
+            "tsk_7K1",
+            "--checklist",
+            "escrever teste,implementar,atualizar doc",
+        ])
+        .unwrap()
+        .command;
+        let Command::Task(TaskOp::Add { card }) = add else {
+            panic!("{add:?}")
+        };
+        assert_eq!(card.title, "Migrar /users para OAuth");
+        assert_eq!(card.priority, Some(CardPriority::High));
+        assert_eq!(card.blocked_by, ["tsk_7K1"]);
+        assert_eq!(card.labels, ["backend"]);
+        assert_eq!(
+            p(&["task", "move", "tsk_7K2", "doing"]).unwrap().command,
+            Command::Task(TaskOp::Move {
+                id: "tsk_7K2".into(),
+                column: "doing".into(),
+                reason: None
+            })
+        );
+        assert_eq!(
+            p(&["task", "link", "tsk_7K2", "--pr", "42"])
+                .unwrap()
+                .command,
+            Command::Task(TaskOp::Link {
+                id: "tsk_7K2".into(),
+                kind: LinkKind::Pr,
+                target: "42".into()
+            })
+        );
+        assert_eq!(
+            p(&["task", "split", "tsk_7K2", "parte 1", "parte 2"])
+                .unwrap()
+                .command,
+            Command::Task(TaskOp::Split {
+                id: "tsk_7K2".into(),
+                titles: vec!["parte 1".into(), "parte 2".into()]
+            })
+        );
+        assert_eq!(
+            p(&["task", "watch", "--mine", "--timeout", "600"])
+                .unwrap()
+                .command,
+            Command::Task(TaskOp::Watch {
+                timeout_s: Some(600)
+            })
+        );
+        assert_eq!(
+            p(&["board", "--column", "doing"]).unwrap().command,
+            Command::Board {
+                column: Some("doing".into()),
+                full: false
+            }
+        );
+        // Motivo vazio chega ao core, que devolve `reason_required` com a mensagem do doc.
+        assert_eq!(
+            p(&["task", "block", "tsk_7K2"]).unwrap().command,
+            Command::Task(TaskOp::Block {
+                id: "tsk_7K2".into(),
+                reason: String::new()
+            })
+        );
+        assert!(p(&["task", "move", "tsk_1"])
+            .unwrap_err()
+            .contains("coluna"));
+        assert!(p(&["task", "claim"]).unwrap_err().contains("qual cartão"));
+        assert!(p(&["task", "update", "tsk_1"])
+            .unwrap_err()
+            .contains("nada para mudar"));
+        assert!(p(&["task", "link", "tsk_1"]).is_err());
+        assert!(p(&["task", "add", "x", "--priority", "altissima"]).is_err());
     }
 }

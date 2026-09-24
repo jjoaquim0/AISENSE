@@ -6,6 +6,7 @@
 //! (regra R5), senão gerar tipos passa a exigir compilar a janela.
 
 pub mod agents;
+pub mod board;
 pub mod bus;
 pub mod notes;
 pub mod project;
