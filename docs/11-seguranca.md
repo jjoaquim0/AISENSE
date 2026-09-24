@@ -17,7 +17,11 @@
 
 - Chaves de API vão no **keychain do SO** via crate `keyring` (Keychain no macOS,
   Credential Manager no Windows, Secret Service no Linux).
-- **Nunca** em `aisense.db`, `config.toml` ou log.
+- **Nunca** em `aisense.db`, `settings.json` ou log. O `settings.json` guarda só o runtime, o
+  nome da variável e a forma mascarada; a entrada do keychain é `dev.aisense.app` /
+  `<runtime>/<VARIÁVEL>`. No Linux o `keyring` fala com o Secret Service em Rust puro
+  (`async-secret-service` + `crypto-rust`), sem exigir libdbus; sem Secret Service rodando, gravar
+  falha com a explicação — o valor nunca cai em disco como alternativa.
 - Injetadas no PTY apenas no spawn, apenas para o agente que precisa.
 - A UI mostra `sk-…abcd` (mascarado) e nunca permite copiar o valor de volta.
 - `AISENSE_TOKEN` não é segredo de longa duração: dura a sessão do agente e é apagado no fim.

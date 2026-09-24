@@ -83,6 +83,10 @@ pub const ASK_DEFAULT: Duration = Duration::from_secs(300);
 /// Teto de `ask`.
 pub const ASK_MAX: Duration = Duration::from_secs(1800);
 
+fn duration_ms(d: Duration) -> u64 {
+    u64::try_from(d.as_millis()).unwrap_or(u64::MAX)
+}
+
 /// Quem está bloqueado esperando quem: o grafo onde um ciclo é deadlock (F05-06).
 #[derive(Default)]
 struct WaitGraph {
@@ -143,6 +147,8 @@ pub struct BusService<S> {
     hub: broadcast::Sender<Arc<Routed>>,
     waits: Arc<std::sync::Mutex<WaitGraph>>,
     guards: Arc<std::sync::Mutex<super::guards::GuardState>>,
+    /// Timeout de `ask` sem `--timeout`, em ms (Configurações → Barramento).
+    ask_default_ms: Arc<std::sync::atomic::AtomicU64>,
 }
 
 impl<S> Clone for BusService<S> {
@@ -154,6 +160,7 @@ impl<S> Clone for BusService<S> {
             hub: self.hub.clone(),
             waits: Arc::clone(&self.waits),
             guards: Arc::clone(&self.guards),
+            ask_default_ms: Arc::clone(&self.ask_default_ms),
         }
     }
 }
@@ -168,7 +175,25 @@ impl<S: BusStore> BusService<S> {
             hub,
             waits: Arc::default(),
             guards: Arc::default(),
+            ask_default_ms: Arc::new(std::sync::atomic::AtomicU64::new(duration_ms(ASK_DEFAULT))),
         }
+    }
+
+    /// Troca os limites em funcionamento, sem reiniciar nada (F08-05).
+    pub fn set_limits(&self, guards: super::guards::GuardConfig, ask_default: Duration) {
+        self.guards().set_config(guards);
+        self.ask_default_ms.store(
+            duration_ms(ask_default.min(ASK_MAX)),
+            std::sync::atomic::Ordering::Relaxed,
+        );
+    }
+
+    /// Timeout de `ask` quando o agente não informa um.
+    pub fn ask_default(&self) -> Duration {
+        Duration::from_millis(
+            self.ask_default_ms
+                .load(std::sync::atomic::Ordering::Relaxed),
+        )
     }
 
     /// Com limites próprios (Configurações → Equipe; testes).
@@ -847,7 +872,7 @@ impl<S: BusStore> BusService<S> {
         body: &str,
         timeout: Option<Duration>,
     ) -> BusResult<Message> {
-        let timeout = timeout.unwrap_or(ASK_DEFAULT).min(ASK_MAX);
+        let timeout = timeout.unwrap_or_else(|| self.ask_default()).min(ASK_MAX);
         let address = Address::parse(to).map_err(BusError::InvalidRequest)?;
         let Address::Agent(handle) = &address else {
             return Err(BusError::InvalidRequest(

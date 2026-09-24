@@ -14,6 +14,7 @@ pub mod proposals;
 pub mod pty;
 pub mod push;
 pub mod runtimes;
+pub mod settings;
 pub mod skills;
 pub mod teams;
 

@@ -24,8 +24,8 @@ pub const BUS_READ: &str = "bus:read";
 /// Uma guarda anti-laço barrou um agente (payload `BusBlocked`).
 pub const BUS_BLOCKED: &str = "bus:blocked";
 
-/// Retenção de mensagens (`docs/04`, "Retenção"): 90 dias, limpeza na subida e a cada 6 h.
-const RETENTION_MS: i64 = 90 * 24 * 60 * 60 * 1000;
+/// Retenção de mensagens (`docs/04`, "Retenção"): o prazo vem das Configurações (90 dias
+/// por padrão); limpeza na subida e a cada 6 h.
 const RETENTION_EVERY: Duration = Duration::from_secs(6 * 60 * 60);
 
 struct TauriBusObserver {
@@ -57,6 +57,7 @@ pub fn setup(
     store: &Store,
     supervisor: &Supervisor,
     push: super::push::PushSink,
+    settings: &super::settings::Settings,
 ) -> Bus {
     let for_state = supervisor.clone();
     let bus = BusService::new(
@@ -67,6 +68,8 @@ pub fn setup(
             push,
         }),
     );
+    let prefs = settings.get();
+    bus.set_limits(prefs.bus.guards.clone(), prefs.bus.ask_default());
 
     // Nenhuma sessão da execução anterior está viva: os tokens dela não valem mais.
     if let Err(error) = tauri::async_runtime::block_on(store.revoke_all_tokens()) {
@@ -95,11 +98,12 @@ pub fn setup(
         }
     });
 
-    let retention = store.clone();
+    let (retention, settings) = (store.clone(), std::sync::Arc::clone(settings));
     tauri::async_runtime::spawn(async move {
         loop {
             use aisense_core::bus::BusRepository;
-            match retention.prune_messages(now_ms() - RETENTION_MS).await {
+            let keep = settings.get().bus.retention_ms();
+            match retention.prune_messages(now_ms() - keep).await {
                 Ok(0) => {}
                 Ok(n) => tracing::info!(n, "mensagens antigas removidas"),
                 Err(error) => tracing::warn!(%error, "retenção de mensagens falhou"),

@@ -1,21 +1,29 @@
 import { Users } from 'lucide-react';
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { EmptyState, TooltipProvider } from '@/components/ui';
 import { FlowBench } from '@/features/dev/FlowBench';
 import { GridBench } from '@/features/dev/GridBench';
 import { KitchenSink } from '@/features/dev/KitchenSink';
+import { useSettings } from '@/features/settings/store';
 import { AppShell } from '@/features/shell/AppShell';
 import { useNav } from '@/features/shell/nav';
 import { TeamsHome } from '@/features/teams/TeamsHome';
 import { isDesktop } from '@/lib/api';
 
 // Sob demanda: o preview de Markdown do editor não entra no carregamento inicial.
+const SettingsScreen = lazy(() =>
+  import('@/features/settings/SettingsScreen').then((m) => ({ default: m.SettingsScreen })),
+);
 const SkillLibraryScreen = lazy(() =>
   import('@/features/skills/SkillLibraryScreen').then((m) => ({ default: m.SkillLibraryScreen })),
 );
 
 export function App() {
   const screen = useNav((s) => s.screen);
+  const loadSettings = useSettings((s) => s.load);
+  useEffect(() => {
+    if (isDesktop()) void loadSettings();
+  }, [loadSettings]);
   // Amostra do design system, só em desenvolvimento (F00-03 / F00-06).
   if (import.meta.env.DEV && window.location.hash.startsWith('#/dev/grid')) {
     return <GridBench />;
@@ -43,6 +51,11 @@ export function App() {
             {screen === 'skills' && (
               <Suspense fallback={null}>
                 <SkillLibraryScreen />
+              </Suspense>
+            )}
+            {screen === 'settings' && (
+              <Suspense fallback={null}>
+                <SettingsScreen />
               </Suspense>
             )}
           </>

@@ -101,6 +101,7 @@ struct Harness {
     recorder: Arc<Recorder>,
     logs: PathBuf,
     skills: Arc<crate::skill::SkillLibrary>,
+    runtimes: Arc<RuntimeRegistry>,
 }
 
 impl Drop for Harness {
@@ -126,7 +127,7 @@ fn harness() -> Harness {
     let skills = Arc::new(crate::skill::SkillLibrary::default());
     let supervisor = AgentSupervisor::new(
         Arc::clone(&store),
-        runtimes,
+        Arc::clone(&runtimes),
         Arc::clone(&pty),
         Arc::new(Silent),
         Arc::clone(&recorder) as Arc<dyn SupervisorObserver>,
@@ -151,6 +152,7 @@ fn harness() -> Harness {
         recorder,
         logs,
         skills,
+        runtimes,
     }
 }
 
@@ -553,6 +555,91 @@ async fn the_detector_drives_the_state_of_a_real_process() {
             AgentState::Idle,
         ]
     );
+}
+
+/// F08-05: ajustar o `idle_regex` (modo calibração) vale para a sessão viva, sem
+/// reiniciar o agente.
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread")]
+async fn new_state_rules_reach_a_live_session_without_restart() {
+    let h = harness();
+    let wrong = PROMPTY.replace(r"(?m)^pronto>\s*$", "nunca-casa");
+    assert_ne!(wrong, PROMPTY);
+    let mut builtins = BUILTIN_ADAPTERS.to_vec();
+    builtins.push(("prompty.toml", Box::leak(wrong.into_boxed_str())));
+    h.runtimes
+        .set_catalog(AdapterCatalog::load_from(&builtins, None));
+    let id = h
+        .agent_with(
+            "prompty",
+            vec![
+                "sh".into(),
+                "-c".into(),
+                "printf 'pronto> '; sleep 60".into(),
+            ],
+            RestartPolicy::Never,
+        )
+        .await;
+    let pid_before = {
+        h.supervisor.start(&id).await.unwrap();
+        h.pty.pid(id.as_str())
+    };
+    // Com a regra errada o prompt não é reconhecido: fica em `starting`.
+    tokio::time::sleep(Duration::from_millis(600)).await;
+    assert_eq!(h.supervisor.state(&id), AgentState::Starting);
+
+    let mut builtins = BUILTIN_ADAPTERS.to_vec();
+    builtins.push(("prompty.toml", PROMPTY));
+    h.runtimes
+        .set_catalog(AdapterCatalog::load_from(&builtins, None));
+    assert_eq!(h.supervisor.refresh_state_rules(), 1);
+    h.wait_for("ocioso com a regra nova", |h| {
+        h.supervisor.state(&id) == AgentState::Idle
+    })
+    .await;
+    assert_eq!(h.pty.pid(id.as_str()), pid_before, "o processo é o mesmo");
+    assert_eq!(h.sessions(&id).await.len(), 1);
+}
+
+/// F08-05: os segredos do keychain chegam ao ambiente do agente, e o `env` do próprio
+/// agente vence.
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread")]
+async fn secrets_reach_the_agent_environment() {
+    let h = harness();
+    h.supervisor.set_secret_env(Arc::new(|adapter: &str| {
+        if adapter == "custom" {
+            vec![
+                ("MY_KEY".into(), "segredo-42".into()),
+                ("AISENSE_AGENT_ID".into(), "nunca".into()),
+            ]
+        } else {
+            Vec::new()
+        }
+    }));
+    let id = h
+        .agent(
+            vec![
+                "sh".into(),
+                "-c".into(),
+                "echo \"k=$MY_KEY id=$AISENSE_AGENT_ID\"; sleep 60".into(),
+            ],
+            RestartPolicy::Never,
+        )
+        .await;
+    h.supervisor.start(&id).await.unwrap();
+    let id2 = id.clone();
+    h.wait_for("o eco do segredo", move |h| {
+        h.supervisor
+            .previews(std::slice::from_ref(&id2), 5)
+            .iter()
+            .any(|p| p.lines.iter().any(|l| l.contains("k=segredo-42")))
+    })
+    .await;
+    let lines = h.supervisor.previews(std::slice::from_ref(&id), 5)[0]
+        .lines
+        .join("\n");
+    assert!(lines.contains(&format!("id={id}")), "{lines}");
 }
 
 // ───────────────────── controles da equipe (F03-06) ─────────────────────

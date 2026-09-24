@@ -351,6 +351,13 @@ aqui fica só o resumo visual.
 | **Segredos** | Chaves de API por runtime (armazenadas no keychain do SO) |
 | **Avançado** | Diretório de dados, nível de log, exportar diagnóstico, resetar |
 
+Como está feito (F08-05): `features/settings/`. Cada mudança grava na hora (números ao sair do
+campo). Além das seções acima há **Notificações** (F08-07) e **Sessão** (F08-06). O modo
+calibração escolhe um runtime e a tela de um agente dele que esteja rodando (relida a cada
+segundo, ou um trecho colado), testa os regex a cada tecla mostrando qual linha decide e o erro
+de cada regex, e "Aplicar sem reiniciar" grava o adaptador e troca as regras das sessões vivas.
+Os segredos aparecem como `sk-…abcd` e nunca voltam inteiros para a interface.
+
 ---
 
 ## T10 — Paleta de comandos (⌘K)

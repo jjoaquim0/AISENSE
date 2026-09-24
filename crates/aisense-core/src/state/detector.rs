@@ -57,6 +57,34 @@ struct Rules {
     quiet: Duration,
 }
 
+impl Rules {
+    fn compile(rules: &StateRules) -> Self {
+        Self {
+            idle: compile("idle_regex", rules.idle_regex.as_deref()),
+            busy: compile("busy_regex", rules.busy_regex.as_deref()),
+            awaiting: compile("awaiting_regex", rules.awaiting_regex.as_deref()),
+            quiet: Duration::from_millis(u64::from(rules.quiet_ms)),
+        }
+    }
+
+    /// A linha mais baixa que casar decide; na mesma linha, aguardando > ocupado >
+    /// ocioso. Devolve o estado e o índice da linha em `lines`.
+    fn decide(&self, lines: &[&str]) -> Option<(AgentState, usize)> {
+        let candidates = [
+            (&self.awaiting, AgentState::AwaitingInput),
+            (&self.busy, AgentState::Busy),
+            (&self.idle, AgentState::Idle),
+        ];
+        lines.iter().enumerate().rev().find_map(|(at, line)| {
+            candidates.iter().find_map(|(re, state)| {
+                re.as_ref()
+                    .is_some_and(|re| re.is_match(line))
+                    .then_some((*state, at))
+            })
+        })
+    }
+}
+
 pub struct StateDetector {
     screen: vt100::Parser,
     rules: Rules,
@@ -76,12 +104,7 @@ impl StateDetector {
     pub fn new(rules: &StateRules, rows: u16, cols: u16, now: Instant) -> Self {
         Self {
             screen: vt100::Parser::new(rows.max(1), cols.max(1), 0),
-            rules: Rules {
-                idle: compile("idle_regex", rules.idle_regex.as_deref()),
-                busy: compile("busy_regex", rules.busy_regex.as_deref()),
-                awaiting: compile("awaiting_regex", rules.awaiting_regex.as_deref()),
-                quiet: Duration::from_millis(u64::from(rules.quiet_ms)),
-            },
+            rules: Rules::compile(rules),
             state: AgentState::Starting,
             confidence: StateConfidence::High,
             last_output: now,
@@ -92,6 +115,14 @@ impl StateDetector {
 
     pub fn state(&self) -> AgentState {
         self.state
+    }
+
+    /// Troca as regras sem reiniciar a sessão (modo calibração, F08-05). A tela atual é
+    /// reavaliada assim que o silêncio mínimo das regras novas tiver passado — em geral
+    /// no próximo `tick`, porque a tela já estava parada.
+    pub fn set_rules(&mut self, rules: &StateRules) {
+        self.rules = Rules::compile(rules);
+        self.evaluated = false;
     }
 
     pub fn confidence(&self) -> StateConfidence {
@@ -182,18 +213,7 @@ impl StateDetector {
     fn evaluate(&mut self) -> Option<Detection> {
         let tail = self.screen_tail();
         let lines: Vec<&str> = tail.lines().collect();
-        let candidates = [
-            (&self.rules.awaiting, AgentState::AwaitingInput),
-            (&self.rules.busy, AgentState::Busy),
-            (&self.rules.idle, AgentState::Idle),
-        ];
-        let decided = lines.iter().rev().find_map(|line| {
-            candidates.iter().find_map(|(re, state)| {
-                re.as_ref()
-                    .is_some_and(|re| re.is_match(line))
-                    .then_some(*state)
-            })
-        });
+        let decided = self.rules.decide(&lines).map(|(state, _)| state);
         match decided {
             Some(state) => self.set(state, StateConfidence::High),
             // Nada casou: quem estava ocupado continua (uma ferramenta demorada sem
@@ -221,6 +241,87 @@ fn compile(field: &str, pattern: Option<&str>) -> Option<Regex> {
             tracing::warn!(field, %error, "regex de estado inválido ignorado");
             None
         }
+    }
+}
+
+/// Um regex do adaptador contra a tela, no modo calibração.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../apps/desktop/src/types/generated/")]
+pub struct PatternCheck {
+    /// `idle_regex`, `busy_regex` ou `awaiting_regex`.
+    pub field: String,
+    /// Erro de compilação, pronto para mostrar. `None` quando o regex é válido ou vazio.
+    pub error: Option<String>,
+    /// Índices (em `lines`) das linhas que casam.
+    pub matches: Vec<u32>,
+}
+
+/// Resultado do modo calibração (T9 → Runtimes; F08-05): o que o detector decidiria
+/// para esta tela com estas regras, sem esperar o silêncio.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../apps/desktop/src/types/generated/")]
+pub struct Calibration {
+    /// As linhas que os regex enxergam (as [`TAIL_LINES`] últimas não vazias).
+    pub lines: Vec<String>,
+    /// `None` quando nada casou: o detector manteria o estado e esperaria o silêncio longo.
+    pub decided: Option<AgentState>,
+    /// Linha que decidiu.
+    pub decided_line: Option<u32>,
+    pub patterns: Vec<PatternCheck>,
+}
+
+impl Calibration {
+    /// Algum regex não compila? Não dá para aplicar assim.
+    pub fn has_errors(&self) -> bool {
+        self.patterns.iter().any(|p| p.error.is_some())
+    }
+}
+
+/// Avalia `rules` contra `screen` exatamente como o detector faria (mesmas linhas,
+/// mesma precedência), mas mostrando o porquê.
+pub fn calibrate(rules: &StateRules, screen: &str) -> Calibration {
+    let all: Vec<&str> = screen
+        .lines()
+        .map(str::trim_end)
+        .filter(|l| !l.trim().is_empty())
+        .collect();
+    let lines = &all[all.len().saturating_sub(TAIL_LINES)..];
+    let fields = [
+        ("awaiting_regex", rules.awaiting_regex.as_deref()),
+        ("busy_regex", rules.busy_regex.as_deref()),
+        ("idle_regex", rules.idle_regex.as_deref()),
+    ];
+    let patterns = fields
+        .iter()
+        .map(|(field, pattern)| {
+            let pattern = pattern.filter(|p| !p.is_empty());
+            let (error, matches) = match pattern.map(Regex::new) {
+                None => (None, Vec::new()),
+                Some(Err(e)) => (Some(e.to_string()), Vec::new()),
+                Some(Ok(re)) => (
+                    None,
+                    (0u32..)
+                        .zip(lines.iter())
+                        .filter(|(_, l)| re.is_match(l))
+                        .map(|(i, _)| i)
+                        .collect(),
+                ),
+            };
+            PatternCheck {
+                field: (*field).to_owned(),
+                error,
+                matches,
+            }
+        })
+        .collect();
+    let decided = Rules::compile(rules).decide(lines);
+    Calibration {
+        lines: lines.iter().map(|l| (*l).to_owned()).collect(),
+        decided: decided.map(|(state, _)| state),
+        decided_line: decided.and_then(|(_, at)| u32::try_from(at).ok()),
+        patterns,
     }
 }
 

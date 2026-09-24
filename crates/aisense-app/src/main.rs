@@ -22,9 +22,13 @@ fn open_store(
 }
 
 fn main() {
+    // O nível de log das Configurações vale na subida; `AISENSE_LOG` ainda vence.
+    let level = aisense_core::DataDir::resolve()
+        .map(|d| aisense_core::settings::SettingsFile::new(d.settings()).load())
+        .map_or("info", |loaded| loaded.settings.advanced.log_level.as_str());
     tracing_subscriber::fmt()
         .with_env_filter(
-            EnvFilter::try_from_env("AISENSE_LOG").unwrap_or_else(|_| EnvFilter::new("info")),
+            EnvFilter::try_from_env("AISENSE_LOG").unwrap_or_else(|_| EnvFilter::new(level)),
         )
         .init();
 
@@ -40,6 +44,7 @@ fn main() {
             let data = aisense_core::DataDir::resolve()
                 .ok_or("could not find the user's home directory; set AISENSE_HOME")?;
             let store = open_store(&data)?;
+            let settings = commands::settings::setup(&data);
             let (registry, watcher) = commands::runtimes::setup(app.handle(), &data);
             let (library, skill_watcher) = commands::skills::setup(app.handle(), &data, &store);
             let (push, injections) = commands::push::channel();
@@ -53,7 +58,12 @@ fn main() {
                 std::sync::Arc::clone(&library),
                 push.clone(),
             );
-            let bus = commands::bus::setup(app.handle(), &store, &supervisor, push.clone());
+            let secrets = std::sync::Arc::clone(&settings);
+            supervisor.set_secret_env(std::sync::Arc::new(move |adapter: &str| {
+                secrets.secret_env(adapter)
+            }));
+            let bus =
+                commands::bus::setup(app.handle(), &store, &supervisor, push.clone(), &settings);
             let board = commands::board::setup(app.handle(), &bus, &store, data.benches());
             let proposals = commands::proposals::setup(app.handle(), &bus);
             let bus_shutdown = commands::bus::serve(&data, board.clone(), proposals.clone());
@@ -67,6 +77,7 @@ fn main() {
                 &pty_for_push,
             );
             app.manage(bus);
+            app.manage(settings);
             app.manage(board);
             app.manage(proposals);
             app.manage(bus_shutdown);
@@ -97,6 +108,17 @@ fn main() {
             commands::pty::pty_set_visible,
             commands::pty::pty_is_running,
             commands::runtimes::runtimes_overview,
+            commands::settings::settings_get,
+            commands::settings::settings_save,
+            commands::settings::settings_reset,
+            commands::settings::settings_onboarding_done,
+            commands::settings::settings_last_team,
+            commands::settings::secret_set,
+            commands::settings::secret_delete,
+            commands::settings::calibration_screen,
+            commands::settings::calibration_test,
+            commands::settings::calibration_apply,
+            commands::settings::diagnostics_export,
             commands::agents::agent_start,
             commands::agents::agent_stop,
             commands::agents::agent_restart,

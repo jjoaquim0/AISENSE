@@ -17,6 +17,7 @@ mod paths;
 pub mod project;
 pub mod proposal;
 pub mod repo;
+pub mod settings;
 pub mod skill;
 pub mod state;
 pub mod supervisor;

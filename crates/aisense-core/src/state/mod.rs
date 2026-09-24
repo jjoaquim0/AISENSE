@@ -2,4 +2,7 @@
 
 mod detector;
 
-pub use detector::{Detection, StateConfidence, StateDetector, LOW_CONFIDENCE_SILENCE, TAIL_LINES};
+pub use detector::{
+    calibrate, Calibration, Detection, PatternCheck, StateConfidence, StateDetector,
+    LOW_CONFIDENCE_SILENCE, TAIL_LINES,
+};

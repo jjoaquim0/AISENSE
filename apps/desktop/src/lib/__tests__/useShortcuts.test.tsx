@@ -140,3 +140,21 @@ describe('camada de atalhos', () => {
     expect(shell).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('remapeamento (F08-05)', () => {
+  it('a tecla escolhida aciona o atalho padrão e a antiga deixa de valer', async () => {
+    const { buildRemap, resolveCombo } = await import('../shortcuts');
+    const remap = buildRemap({ '⌘B': '⌘⇧B', '⌘I': '⌘I' });
+    expect(resolveCombo('⌘⇧B', remap)).toBe('⌘B');
+    expect(resolveCombo('⌘B', remap)).toBeNull();
+    expect(resolveCombo('⌘I', remap)).toBe('⌘I');
+    expect(resolveCombo('⌘K', remap)).toBe('⌘K');
+  });
+
+  it('gravar só aceita combinações com ⌘', async () => {
+    const { recordCombo } = await import('../shortcuts');
+    expect(recordCombo(key({ key: 'Control', code: 'ControlLeft', ctrlKey: true }))).toBeNull();
+    expect(recordCombo(key({ key: 'x', code: 'KeyX' }))).toBeNull();
+    expect(recordCombo(key({ key: 'y', code: 'KeyY', ctrlKey: true, shiftKey: true }))).toBe('⌘⇧Y');
+  });
+});

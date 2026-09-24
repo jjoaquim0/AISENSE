@@ -163,7 +163,10 @@ A heurística de "o agente está ocioso" é a parte mais frágil do sistema. Reg
    prompts ficam no rodapé, e uma palavra como "permission" numa resposta antiga lá no alto
    não pode marcar o agente como aguardando. A tela acompanha o tamanho do painel.
 5. Cada troca de estado é registrada em `tracing` no nível `debug` — a tela Configurações → Runtimes
-   tem um "modo calibração" que mostra estado em tempo real para o usuário ajustar os regex.
+   tem um "modo calibração" que mostra a tela do agente como os regex a veem, o estado que
+   decidiriam e o erro de cada regex. Aplicar grava o adaptador (uma cópia em
+   `~/.aisense/adapters/` quando ele é embutido) e troca as regras das sessões vivas na hora,
+   sem reiniciar agente nenhum (`StateDetector::set_rules`, F08-05).
 6. Enquanto o agente está em `starting`, saída não o marca como `busy`: é o próprio boot. Ele sai
    de `starting` quando a tela casa com algum regex (inclusive `awaiting`, para diálogos de
    confiança/login na subida) ou pelo silêncio longo da regra 3.

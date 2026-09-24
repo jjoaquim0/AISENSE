@@ -5,6 +5,8 @@ import { WebglAddon } from '@xterm/addon-webgl';
 import { Terminal as Xterm } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
 import { useEffect, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
+import { terminalFontOf, useSettings } from '@/features/settings/store';
 import { cn } from '@/lib/cn';
 import { onPtyData, onPtyExit } from '@/lib/events';
 import { useTheme } from '@/lib/theme';
@@ -49,6 +51,9 @@ export function Terminal({
   const gate = useRef<HydrationGate | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const { theme } = useTheme();
+  const font = useSettings(useShallow((s) => terminalFontOf(s.view?.settings)));
+  const fontAtMount = useRef(font);
+  fontAtMount.current = font;
   // O efeito de montagem lê o tema uma vez; colocá-lo nas dependências recriaria o
   // terminal (e apagaria o conteúdo) a cada troca de tema.
   const themeAtMount = useRef(theme);
@@ -62,9 +67,7 @@ export function Terminal({
     const xterm = new Xterm({
       allowProposedApi: true,
       cursorBlink: true,
-      fontFamily: 'var(--font-mono)',
-      fontSize: 13,
-      lineHeight: 1.4,
+      ...fontAtMount.current,
       scrollback: 10_000,
       theme: readTerminalTheme(themeAtMount.current),
       // O histórico vive no core; o xterm é só a tela.
@@ -163,6 +166,25 @@ export function Terminal({
   useEffect(() => {
     if (term.current) term.current.options.theme = readTerminalTheme(theme);
   }, [theme]);
+
+  // ── Fonte e densidade (Configurações): muda a métrica, então refaz o encaixe ──
+  useEffect(() => {
+    const xterm = term.current;
+    if (!xterm) return;
+    const { fontFamily, fontSize, lineHeight } = font;
+    if (
+      xterm.options.fontFamily === fontFamily &&
+      xterm.options.fontSize === fontSize &&
+      xterm.options.lineHeight === lineHeight
+    ) {
+      return;
+    }
+    xterm.options.fontFamily = fontFamily;
+    xterm.options.fontSize = fontSize;
+    xterm.options.lineHeight = lineHeight;
+    fit.current?.fit();
+    void terminalApi.resize(agentId, xterm.rows, xterm.cols).catch(reportError);
+  }, [agentId, font]);
 
   // ── Limpar: tela do xterm e histórico do core juntos, senão a próxima reidratação
   //    traria de volta o que o usuário acabou de apagar ──

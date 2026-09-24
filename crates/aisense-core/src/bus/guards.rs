@@ -99,6 +99,12 @@ impl GuardState {
         &self.config
     }
 
+    /// Limites novos (Configurações → Barramento). As contagens em curso ficam: baixar o
+    /// teto de uma equipe já perto dele pausa na próxima mensagem, como deve.
+    pub fn set_config(&mut self, config: GuardConfig) {
+        self.config = config;
+    }
+
     /// Checa e, se passar, conta a mensagem.
     pub fn admit(
         &mut self,

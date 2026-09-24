@@ -138,6 +138,8 @@ pub const MAX_PREVIEW_LINES: usize = 20;
 enum DetectorInput {
     Output(Vec<u8>),
     Resize(TerminalSize),
+    /// Regras novas do adaptador (modo calibração, F08-05).
+    Rules(crate::adapter::StateRules),
 }
 
 /// As portas de que o supervisor precisa, juntas.
@@ -268,6 +270,8 @@ struct Supervised {
     screen: Option<Arc<Mutex<StateDetector>>>,
     /// Entrega do `BOOT.md` na sessão atual.
     boot: Option<BootDelivery>,
+    /// Runtime da sessão atual: as regras do detector vêm dele.
+    adapter_id: Option<String>,
     /// O que digitar no primeiro prompt, enquanto o caminho pelo terminal espera.
     pending_boot: Option<PendingBoot>,
 }
@@ -292,6 +296,7 @@ impl Supervised {
             detector: None,
             screen: None,
             boot: None,
+            adapter_id: None,
             pending_boot: None,
         }
     }
@@ -305,7 +310,12 @@ struct Shared<S> {
     observer: Arc<dyn SupervisorObserver>,
     config: SupervisorConfig,
     agents: Mutex<HashMap<AgentId, Supervised>>,
+    /// Segredos do runtime (keychain) a pôr no ambiente do agente (F08-05).
+    secrets: Mutex<Option<SecretEnvFn>>,
 }
+
+/// Dado o `id` do adaptador, as variáveis secretas que os agentes dele recebem.
+pub type SecretEnvFn = Arc<dyn Fn(&str) -> Vec<(String, String)> + Send + Sync>;
 
 pub struct AgentSupervisor<S> {
     shared: Arc<Shared<S>>,
@@ -337,7 +347,34 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
                 observer,
                 config,
                 agents: Mutex::new(HashMap::new()),
+                secrets: Mutex::new(None),
             }),
+        }
+    }
+
+    /// Liga a fonte de segredos (o app passa o keychain). Vale para os próximos starts.
+    pub fn set_secret_env(&self, source: SecretEnvFn) {
+        *self
+            .shared
+            .secrets
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = Some(source);
+    }
+
+    /// Os segredos entram só onde o agente e o adaptador não definiram a mesma
+    /// variável: o que foi escrito para um agente específico vence o geral do runtime.
+    fn add_secrets(&self, adapter_id: &str, env: &mut Vec<(String, String)>) {
+        let source = self
+            .shared
+            .secrets
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone();
+        let Some(source) = source else { return };
+        for (key, value) in source(adapter_id) {
+            if !env.iter().any(|(k, _)| k == &key) {
+                env.push((key, value));
+            }
         }
     }
 
@@ -432,6 +469,7 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
                 return Err(error.into());
             }
         };
+        self.add_secrets(&adapter.id, &mut plan.env);
         let (boot, pending_boot) =
             self.prepare_boot(&agent, &adapter, materialized.as_ref(), &mut plan);
         tracing::info!(agent = %agent_id, channel = ?boot.channel, status = ?boot.status, "boot");
@@ -468,6 +506,7 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
             entry.state = AgentState::Starting;
             entry.detector = Some(detector_tx.clone());
             entry.boot = Some(boot.clone());
+            entry.adapter_id = Some(adapter.id.clone());
             entry.pending_boot = pending_boot;
         }
         self.notify(agent_id, AgentState::Starting);
@@ -919,6 +958,22 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
 
     /// O painel do agente mudou de tamanho: a tela do detector precisa acompanhar,
     /// senão uma TUI desenhada para outra largura vira texto quebrado.
+    /// Passa as regras de estado do catálogo atual para as sessões vivas. Chamado quando
+    /// o catálogo recarrega (hot-reload ou modo calibração): o `idle_regex` novo vale
+    /// sem reiniciar agente nenhum (F08-05). Devolve quantas sessões foram atualizadas.
+    pub fn refresh_state_rules(&self) -> usize {
+        let catalog = self.shared.runtimes.catalog();
+        let agents = self.agents();
+        agents
+            .values()
+            .filter_map(|entry| {
+                let adapter = catalog.get(entry.adapter_id.as_deref()?)?;
+                let tx = entry.detector.as_ref()?;
+                tx.send(DetectorInput::Rules(adapter.state.clone())).ok()
+            })
+            .count()
+    }
+
     pub fn resized(&self, agent_id: &AgentId, size: TerminalSize) {
         if let Some(tx) = self.agents().get(agent_id).and_then(|e| e.detector.clone()) {
             let _ = tx.send(DetectorInput::Resize(size));
@@ -1019,6 +1074,10 @@ async fn run_detector<S: SupervisorStore>(
                 Some(DetectorInput::Output(chunk)) => with(&mut |d| d.feed(&chunk, Instant::now())),
                 Some(DetectorInput::Resize(size)) => with(&mut |d| {
                     d.resize(size.rows, size.cols);
+                    None
+                }),
+                Some(DetectorInput::Rules(rules)) => with(&mut |d| {
+                    d.set_rules(&rules);
                     None
                 }),
                 None => return,

@@ -30,10 +30,32 @@ causa e próximo passo acionável.
 Fluxo de 3 passos com detecção de runtimes, escolha de tema e criação da primeira equipe.
 **Aceite:** usuário novo sai do onboarding com uma equipe rodando em menos de 2 minutos.
 
-### [ ] F08-05 — Configurações (T9)
+### [x] F08-05 — Configurações (T9)
 Todas as seções de [09 — Telas](../09-telas-e-fluxos.md#t9--configurações), incluindo o modo
 calibração de estado e o gerenciamento de segredos via keychain.
 **Aceite:** ajustar `idle_regex` no modo calibração reflete no detector sem reiniciar o app.
+
+> Feito: preferências em `aisense-core/src/settings.rs` (`AppSettings`, gravado em
+> `~/.aisense/settings.json` com escrita atômica; arquivo ilegível vira os padrões e é guardado
+> como `settings.json.corrupt`; valores fora da faixa são trazidos para dentro). Comandos em
+> `aisense-app/src/commands/settings.rs`; tela em `apps/desktop/src/features/settings/`
+> (⚙ no trilho, `⌘,`, paleta). **Calibração:** `StateDetector::set_rules` troca as regras de uma
+> sessão viva; `AgentSupervisor::refresh_state_rules` manda as do catálogo atual para todas —
+> chamado pelo `calibration_apply` e pelo hot-reload dos adaptadores. `state::calibrate` diz o que
+> o detector decidiria para uma tela, com a linha e o erro de cada regex; `adapter::save_state_rules`
+> grava no arquivo do usuário ou numa cópia do embutido em `~/.aisense/adapters/`, validando antes
+> de escrever. Aceite coberto por `new_state_rules_reach_a_live_session_without_restart` (processo
+> real, mesmo PID, uma sessão só). **Barramento:** limites anti-laço, timeout do `ask` e retenção
+> saíram de constantes e valem sem reiniciar (`BusService::set_limits`). **Segredos:** crate
+> `keyring` (nova dependência, justificada em `docs/11`); o valor vai ao keychain, o
+> `settings.json` guarda só runtime, variável e a forma `sk-…abcd`; o supervisor põe no ambiente
+> do agente no start, sem sobrescrever o `env` do próprio agente. **Atalhos:** remapeamento na
+> camada única (`buildRemap`/`resolveCombo`); ⌘1..9 e Esc Esc ficam fixos. Aparência: tema,
+> densidade (altura de linha do terminal), fonte e tamanho do terminal ao vivo. Avançado: nível
+> de log (na próxima subida), exportar diagnóstico (sem segredos), resetar preferências.
+> Fora: "instalar integração MCP" (o AISENSE já registra o `aisense-mcp` no start onde o
+> adaptador tem `mcp_config`, F05-09) e o editor de TOML dentro do app (os adaptadores são
+> editados na pasta, com hot-reload).
 
 ### [ ] F08-06 — Persistência de sessão
 Restaurar equipe aberta, vista, layout, painel focado e tamanhos ao reabrir o app.

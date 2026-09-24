@@ -1,4 +1,4 @@
-import { BookOpen, Moon, PanelRight, Plus, Sun, Users } from 'lucide-react';
+import { BookOpen, Moon, PanelRight, Plus, Settings, Sun, Users } from 'lucide-react';
 import { type ReactNode, useCallback, useMemo } from 'react';
 import { IconButton, Tooltip } from '@/components/ui';
 import { formatShortcut } from '@/components/ui/Kbd';
@@ -41,8 +41,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       '⌘I': toggleInspector,
       '⌘⇧D': toggleTheme,
       '⌘K': () => setPaletteOpen(true),
+      '⌘,': () => go('settings'),
     }),
-    [toggleSidebar, toggleInspector, toggleTheme, setPaletteOpen],
+    [toggleSidebar, toggleInspector, toggleTheme, setPaletteOpen, go],
   );
   useShortcuts(shortcuts);
 
@@ -80,6 +81,14 @@ export function AppShell({ children }: { children: ReactNode }) {
           go('teams');
           openWizard(true);
         },
+      },
+      {
+        id: 'go:settings',
+        label: 'Configurações',
+        group: 'Ir para',
+        shortcut: '⌘,',
+        keywords: ['preferências', 'ajustes', 'calibração', 'segredos', 'atalhos'],
+        run: () => go('settings'),
       },
       {
         id: 'settings:theme',
@@ -205,8 +214,9 @@ function TeamRail() {
           <Plus size={16} />
         </button>
       </Tooltip>
-      <div className="mt-auto">
+      <div className="mt-auto flex flex-col gap-2">
         <RailButton screen="skills" label="Biblioteca de skills" icon={<BookOpen size={16} />} />
+        <RailButton screen="settings" label="Configurações" icon={<Settings size={16} />} />
       </div>
     </nav>
   );

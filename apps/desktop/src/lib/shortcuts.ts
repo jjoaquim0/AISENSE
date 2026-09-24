@@ -53,3 +53,54 @@ export function applies(shortcut: Shortcut, inTerminal: boolean, mac: boolean): 
   if (!inTerminal) return true;
   return mac || shortcut.inTerminal === 'always';
 }
+
+/**
+ * Atalhos remapeáveis (T9 → Atalhos; F08-05). A chave é o atalho padrão, que é como
+ * cada tela registra seus `Bindings`; o remapeamento traduz a tecla na entrada.
+ */
+export const SHORTCUT_CATALOG: { combo: string; label: string; group: string }[] = [
+  { combo: '⌘K', label: 'Paleta de comandos', group: 'Geral' },
+  { combo: '⌘B', label: 'Mostrar/ocultar lista de agentes', group: 'Geral' },
+  { combo: '⌘I', label: 'Mostrar/ocultar inspetor', group: 'Geral' },
+  { combo: '⌘⇧D', label: 'Alternar tema claro/escuro', group: 'Geral' },
+  { combo: '⌘,', label: 'Configurações', group: 'Geral' },
+  { combo: '⌘G', label: 'Trocar a vista da Sala da Equipe', group: 'Sala da Equipe' },
+  { combo: '⌘T', label: 'Novo agente', group: 'Sala da Equipe' },
+  { combo: '⌘W', label: 'Fechar o painel (não para o agente)', group: 'Sala da Equipe' },
+  { combo: '⌘\\', label: 'Dividir / voltar para a grade', group: 'Sala da Equipe' },
+];
+
+/**
+ * Tradução de um remapeamento `{padrão: escolhido}` para a direção da tecla:
+ * `escolhido → padrão`, e o padrão remapeado deixa de valer (senão a mesma ação teria
+ * duas teclas e a antiga ficaria "ocupada" à toa).
+ */
+export interface Remap {
+  toDefault: Map<string, string>;
+  disabled: Set<string>;
+}
+
+export function buildRemap(overrides: Record<string, string>): Remap {
+  const toDefault = new Map<string, string>();
+  const disabled = new Set<string>();
+  for (const [from, to] of Object.entries(overrides)) {
+    if (!to || from === to) continue;
+    toDefault.set(to, from);
+    disabled.add(from);
+  }
+  return { toDefault, disabled };
+}
+
+/** O atalho padrão que a tecla `combo` aciona, ou `null` se ela foi remapeada para longe. */
+export function resolveCombo(combo: string, remap: Remap): string | null {
+  const mapped = remap.toDefault.get(combo);
+  if (mapped) return mapped;
+  return remap.disabled.has(combo) ? null : combo;
+}
+
+/** Texto `⌘⇧X` de um evento, para gravar um atalho novo. `null` para teclas soltas. */
+export function recordCombo(event: KeyLike): string | null {
+  if (['Meta', 'Control', 'Shift', 'Alt'].includes(event.key)) return null;
+  const combo = comboOf(event);
+  return combo?.startsWith('⌘') ? combo : null;
+}
