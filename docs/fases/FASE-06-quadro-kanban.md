@@ -12,30 +12,56 @@ Revisão. `@revisor` é notificado pela automação, revisa e conclui. Você ass
 
 ## Tarefas
 
-### [ ] F06-01 — Domínio do quadro
+### [x] F06-01 — Domínio do quadro
 `Board`, `Column` (com `kind` semântico e `wip_limit`), `Card`, `Label`, `ChecklistItem`,
 `Dependency`, transições válidas entre colunas. Quadro criado automaticamente junto com a equipe,
 com as 6 colunas padrão.
 **Aceite:** criar equipe cria quadro com colunas padrão; transição inválida devolve erro tipado.
 Depende de F02-01.
 
-### [ ] F06-02 — Persistência e migração
+> Feito: `aisense-core/src/board/` — `model.rs` (`Board`, `Column` com `kind` e dois limites,
+> `wip_limit` total e `wip_per_agent`, `Card` com prioridade, labels, checklist, links, versão e
+> `column_since`, `Comment`, `Activity`, `Actor` humano/agente/sistema), `rules.rs` (6 colunas
+> padrão, `check_transition`, `check_wip`, ciclo de dependência) e `BoardError` com os códigos e
+> mensagens da tabela de `docs/13`. `create_team_with_agents` cria o quadro (`ensure_board`,
+> idempotente; equipe antiga ganha o quadro na primeira leitura).
+
+### [x] F06-02 — Persistência e migração
 Migração com `boards`, `columns`, `task_dependencies`, `task_comments`, `task_activity` e as colunas
 novas de `tasks`, conforme [13](../13-quadro-kanban.md#esquema-adendo-a-04--modelo-de-dados).
 Repositórios com consultas por coluna, responsável, label e estado.
 **Aceite:** quadro com 1.000 cartões carrega em <20 ms; migração roda em banco já existente.
 Depende de F06-01.
 
-### [ ] F06-03 — `claim` atômico e limite de WIP
+> Feito: migração `0005_board.sql` (adendo de `docs/13` + `wip_per_agent`, `column_since` e
+> `author_kind`) e `aisense-store/src/board.rs`. `list_cards` filtra por coluna, responsável, label
+> e arquivado; o SQLite monta um JSON só com os cartões (decodificar 1.000 linhas pelo driver
+> custava mais que o SELECT): ~7 ms com 1.000 cartões no binário otimizado. Tarefas de antes do
+> quadro vão para a coluna do seu `status` quando o quadro nasce (teste com banco na versão 4).
+> Contrato rodando contra SQLite e `InMemoryStore`.
+
+### [x] F06-03 — `claim` atômico e limite de WIP
 `UPDATE ... WHERE assignee IS NULL AND version = ?` em transação; `wip_limit` verificado na
 movimentação; erros `already_claimed` e `wip_exceeded` com mensagem acionável.
 **Aceite:** teste de concorrência com 8 threads disputando o mesmo cartão — exatamente uma ganha.
 **Esta tarefa não é opcional: sem ela há trabalho duplicado garantido.** Depende de F06-02.
 
-### [ ] F06-04 — Dependências, checklist, comentários e histórico
+> Feito: `update_card` confere versão, "ninguém pegou" e os dois limites de WIP **na mesma
+> instrução** `UPDATE` que grava; `BoardService::claim` repete só quando a versão mudou por outro
+> motivo. Testes: 8 tarefas disputando o mesmo cartão no serviço e 8 conexões no SQLite em WAL —
+> exatamente uma ganha, as outras recebem `already_claimed` com quem pegou e a dica de
+> `aisense task next`.
+
+### [x] F06-04 — Dependências, checklist, comentários e histórico
 Dependências com detecção de ciclo na criação, checklist marcável, thread de comentários com autor
 (agente ou humano), `task_activity` imutável registrando toda mudança com diff.
 **Aceite:** ciclo `A→B→A` é recusado; concluir um cartão libera os dependentes. Depende de F06-02.
+
+> Feito: dependências com ciclo recusado (`A→B→A`), aviso `blocked_by_open` (não bloqueio) ao
+> começar com dependência aberta, `task next` pulando cartão preso, checklist por índice,
+> comentários com autor e aviso aos envolvidos, `task_activity` só com inserção e diff por campo.
+> Concluir libera os dependentes (avisa o responsável e tira da coluna de bloqueio quem esperava
+> só por ele).
 
 ### [ ] F06-05 — Operações do quadro na CLI e no MCP
 `board`, `task next|list|show|add|claim|move|update|check|comment|link|block|done|split|watch`,

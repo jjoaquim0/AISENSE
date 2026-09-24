@@ -30,7 +30,9 @@ fn next_ulid() -> ulid::Ulid {
 
 macro_rules! typed_id {
     ($name:ident, $prefix:literal) => {
-        #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
+        #[derive(
+            Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, TS,
+        )]
         #[ts(export, export_to = "../../../apps/desktop/src/types/generated/")]
         pub struct $name(String);
 
@@ -75,6 +77,9 @@ typed_id!(ChannelId, "chn");
 typed_id!(SessionId, "ses");
 typed_id!(BoardId, "brd");
 typed_id!(CardId, "tsk");
+typed_id!(ColumnId, "col");
+typed_id!(CommentId, "cmt");
+typed_id!(ActivityId, "act");
 
 #[cfg(test)]
 mod tests {

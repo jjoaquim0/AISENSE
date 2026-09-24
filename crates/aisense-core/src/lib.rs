@@ -6,6 +6,7 @@ pub mod adapter;
 pub mod agent;
 mod app_info;
 pub mod bench;
+pub mod board;
 pub mod bus;
 mod color;
 mod command_error;
@@ -27,7 +28,10 @@ mod validation;
 pub use app_info::AppInfo;
 pub use color::AgentColor;
 pub use command_error::CommandError;
-pub use ids::{AgentId, BoardId, CardId, ChannelId, MessageId, SessionId, SkillId, TeamId};
+pub use ids::{
+    ActivityId, AgentId, BoardId, CardId, ChannelId, ColumnId, CommentId, MessageId, SessionId,
+    SkillId, TeamId,
+};
 pub use paths::DataDir;
 pub use time::{now_ms, Millis};
 pub use validation::ValidationError;
