@@ -37,9 +37,17 @@ Nó de agente mostra o cartão em que ele está trabalhando; clicar abre o detal
 Aresta pontilhada liga agente ao cartão.
 **Aceite:** mover um cartão no quadro atualiza o canvas em <300 ms. Depende de F07-03, F06-08.
 
-### [ ] F07-05 — Canais
+### [x] F07-05 — Canais
 CRUD de canais, inscrição de agentes, `aisense send #canal`, filtro na timeline, nó no canvas.
 **Aceite:** o caso CU-3 (pesquisa paralela com síntese) funciona via canal. Depende de F05-02.
+
+> Feito: `channel_members` (migração 0006) e regra de roteamento: com inscritos, só eles
+> recebem; sem inscritos, a equipe toda (como antes). `BusService::{channels, save_channel,
+> delete_channel, subscribe_channel}`; CLI `aisense channels|join|leave`, MCP `aisense_channels`,
+> comandos `channels_list|channel_save|channel_delete` e o diálogo "Canais" na linha do tempo
+> (tópico, inscritos, apagar); canais entram no filtro De/para e nos destinos do compositor.
+> Teste do CU-3: quatro pesquisadores publicam em `#pesquisa`, o sintetizador recebe os 4 e quem
+> está fora não recebe nada. O nó de canal no canvas entra com a F07-03.
 
 ### [ ] F07-06 — Paleta de comandos (T10)
 `cmdk` com navegação, criação, controle de agentes, envio de mensagem, operações do quadro,

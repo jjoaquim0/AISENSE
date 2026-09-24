@@ -3,6 +3,7 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type { AgentId } from '@/types/generated/AgentId';
 import type { BusBlocked } from '@/types/generated/BusBlocked';
 import type { BusMessageEvent } from '@/types/generated/BusMessageEvent';
+import type { ChannelInfo } from '@/types/generated/ChannelInfo';
 import type { MessageId } from '@/types/generated/MessageId';
 import type { MessageView } from '@/types/generated/MessageView';
 import type { PushInjected } from '@/types/generated/PushInjected';
@@ -21,6 +22,16 @@ export const busApi = {
   /** Libera a equipe pausada pelo orçamento de mensagens (guarda anti-laço). */
   resume: (teamId: TeamId): Promise<void> => invoke('bus_resume', { teamId }),
   paused: (teamId: TeamId): Promise<boolean> => invoke('bus_paused', { teamId }),
+  /** Canais com inscritos (vazio = aberto à equipe toda). */
+  channels: (teamId: TeamId): Promise<ChannelInfo[]> => invoke('channels_list', { teamId }),
+  saveChannel: (
+    teamId: TeamId,
+    slug: string,
+    topic: string,
+    members: string[],
+  ): Promise<ChannelInfo> => invoke('channel_save', { teamId, slug, topic, members }),
+  deleteChannel: (teamId: TeamId, slug: string): Promise<void> =>
+    invoke('channel_delete', { teamId, slug }),
 };
 
 /** Uma guarda anti-laço barrou um agente (docs/07). */

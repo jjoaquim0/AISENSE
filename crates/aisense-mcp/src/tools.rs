@@ -78,6 +78,18 @@ pub fn list() -> Value {
             }
         },
         {
+            "name": "aisense_channels",
+            "description": "Canais da equipe: list (com inscritos), join ou leave. Canal sem inscritos vai para a equipe toda.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "action": { "type": "string", "enum": ["list", "join", "leave"] },
+                    "channel": { "type": "string", "description": "#canal (join/leave)" }
+                },
+                "required": ["action"]
+            }
+        },
+        {
             "name": "aisense_board",
             "description": "O quadro da equipe em texto: colunas, cartões, responsáveis, bloqueios. É a memória do trabalho — leia antes de começar.",
             "inputSchema": {
@@ -341,6 +353,14 @@ pub fn request(name: &str, args: &Value) -> Result<Request, String> {
             },
             other => return Err(format!("ação desconhecida: {other}")),
         }),
+        "aisense_channels" => match text(args, "action")?.as_str() {
+            "list" => Request::Channels,
+            action @ ("join" | "leave") => Request::Subscribe {
+                channel: text(args, "channel")?,
+                join: action == "join",
+            },
+            other => return Err(format!("ação desconhecida: {other}")),
+        },
         "aisense_board" => Request::Board {
             column: opt(args, "column"),
             full: flag(args, "full"),
@@ -468,6 +488,16 @@ mod tests {
                 json!({"column": "doing"}),
             ),
             (vec!["task", "next"], "aisense_next_task", json!({})),
+            (
+                vec!["channels"],
+                "aisense_channels",
+                json!({"action": "list"}),
+            ),
+            (
+                vec!["join", "#pesquisa"],
+                "aisense_channels",
+                json!({"action": "join", "channel": "#pesquisa"}),
+            ),
             (
                 vec!["task", "list", "--mine", "--label", "backend"],
                 "aisense_list_tasks",

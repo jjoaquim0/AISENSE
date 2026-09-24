@@ -717,3 +717,87 @@ mod guards {
         assert!(err.hint().unwrap().contains("aisense note"));
     }
 }
+
+#[tokio::test]
+async fn canal_com_inscritos_so_entrega_a_eles_e_pesquisa_paralela_funciona() {
+    // CU-3: quatro pesquisadores publicam em #pesquisa; o sintetizador acompanha o canal.
+    use crate::agent::AgentState;
+    use std::sync::Arc;
+    let store = Arc::new(InMemoryStore::new());
+    let handles = ["p1", "p2", "p3", "p4", "sintetizador", "fora"];
+    let (team, ids) = team("Pesquisa", &store, &handles).await;
+    let bus = BusService::new(
+        Arc::clone(&store),
+        Arc::new(|_: &AgentId| AgentState::Idle),
+        Arc::new(NoObserver),
+    );
+    let members: Vec<String> = handles[..5].iter().map(|h| format!("@{h}")).collect();
+    let info = bus
+        .save_channel(&team, "#pesquisa", "achados", &members)
+        .await
+        .unwrap();
+    assert_eq!(info.members.len(), 5);
+    assert_eq!(info.channel.topic, "achados");
+    for (i, id) in ids.iter().take(4).enumerate() {
+        let routed = bus
+            .send(
+                &team,
+                Sender::Agent {
+                    agent_id: id.clone(),
+                },
+                &["#pesquisa".into()],
+                &format!("achado {i}"),
+                None,
+                MessageMeta::default(),
+            )
+            .await
+            .unwrap();
+        // Os outros 4 inscritos; quem está fora não recebe.
+        assert_eq!(routed[0].deliveries.len(), 4);
+        assert!(routed[0].deliveries.iter().all(|d| d.agent_id != ids[5]));
+    }
+    let synth = bus.inbox(&ids[4], true).await.unwrap();
+    assert_eq!(synth.len(), 4);
+    assert!(bus.inbox(&ids[5], true).await.unwrap().is_empty());
+
+    // Sair e entrar pelo próprio agente.
+    let me = Identity {
+        agent_id: ids[5].clone(),
+        team_id: team.clone(),
+        handle: crate::agent::Handle::parse("fora").unwrap(),
+        team_name: "Pesquisa".into(),
+        session_id: None,
+    };
+    let joined = bus.subscribe_channel(&me, "#pesquisa", true).await.unwrap();
+    assert_eq!(joined.members.len(), 6);
+    let left = bus.subscribe_channel(&me, "pesquisa", false).await.unwrap();
+    assert_eq!(left.members.len(), 5);
+    // Canal novo pelo join: nasce com quem entrou.
+    let fresh = bus.subscribe_channel(&me, "#deploys", true).await.unwrap();
+    assert_eq!(fresh.members.len(), 1);
+
+    // Canal aberto (sem inscritos) continua indo para todos.
+    bus.save_channel(&team, "geral", "", &[]).await.unwrap();
+    let routed = bus
+        .send(
+            &team,
+            Sender::Human,
+            &["#geral".into()],
+            "bom dia",
+            None,
+            MessageMeta::default(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(routed[0].deliveries.len(), 6);
+    assert!(bus.save_channel(&team, "#Errado!", "", &[]).await.is_err());
+    assert_eq!(
+        bus.save_channel(&team, "x", "", &["@ninguem".into()])
+            .await
+            .unwrap_err()
+            .code(),
+        "unknown_agent"
+    );
+    bus.delete_channel(&team, "#pesquisa").await.unwrap();
+    assert_eq!(bus.channels(&team).await.unwrap().len(), 2);
+}

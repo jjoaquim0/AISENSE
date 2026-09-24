@@ -99,6 +99,13 @@ CREATE TABLE channels (
   UNIQUE (team_id, slug)
 );
 
+-- 0006 (F07-05): inscritos. Canal sem linhas aqui é aberto (vai para a equipe toda).
+CREATE TABLE channel_members (
+  channel_id TEXT NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+  agent_id   TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+  PRIMARY KEY (channel_id, agent_id)
+);
+
 CREATE TABLE messages (                  -- recriada na migração 0004 (F05-02)
   id          TEXT PRIMARY KEY,            -- ULID monotônico: a ordem do id é a do tempo
   team_id     TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,

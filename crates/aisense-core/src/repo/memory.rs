@@ -15,7 +15,9 @@ use crate::board::{
     Comment, WriteGuard,
 };
 use crate::bus::{BusRepository, Channel, Delivery, DeliveryState, InboxItem, InboxQuery, Message};
-use crate::ids::{AgentId, BoardId, CardId, ColumnId, MessageId, SessionId, SkillId, TeamId};
+use crate::ids::{
+    AgentId, BoardId, CardId, ChannelId, ColumnId, MessageId, SessionId, SkillId, TeamId,
+};
 use crate::skill::Skill;
 use crate::team::Team;
 use crate::time::Millis;
@@ -31,6 +33,8 @@ struct Inner {
     /// Por agente, na ordem de injeção.
     agent_skills: BTreeMap<String, Vec<AgentSkill>>,
     channels: Vec<Channel>,
+    /// (canal, agente).
+    channel_members: std::collections::BTreeSet<(String, String)>,
     /// `AISENSE_TOKEN` → dono.
     tokens: BTreeMap<String, TokenRecord>,
     /// Por id: ULID monotônico, então a ordem da chave é a ordem de criação.
@@ -168,6 +172,8 @@ impl TeamRepository for InMemoryStore {
         inner.forget_orphans();
         // Cascata do barramento, como as FKs do SQLite.
         inner.channels.retain(|c| c.team_id != *id);
+        let channels: Vec<String> = inner.channels.iter().map(|c| c.id.to_string()).collect();
+        inner.channel_members.retain(|(c, _)| channels.contains(c));
         inner.messages.retain(|_, m| m.team_id != *id);
         let (messages, agents) = (&inner.messages, &inner.agents);
         let kept: BTreeMap<(String, String), Delivery> = inner
@@ -269,6 +275,7 @@ impl AgentRepository for InMemoryStore {
                 inner
                     .deliveries
                     .retain(|(_, agent), _| agent != id.as_str());
+                inner.channel_members.retain(|(_, a)| a != id.as_str());
                 // ON DELETE SET NULL do quadro.
                 for card in inner.cards.values_mut() {
                     for field in [
@@ -468,6 +475,71 @@ impl BusRepository for InMemoryStore {
             .collect();
         list.sort_by(|a, b| a.slug.cmp(&b.slug));
         Ok(list)
+    }
+
+    async fn set_channel_topic(&self, id: &ChannelId, topic: &str) -> RepoResult<()> {
+        let mut inner = self.lock();
+        let channel = inner
+            .channels
+            .iter_mut()
+            .find(|c| &c.id == id)
+            .ok_or_else(|| RepoError::Corrupt(format!("channel {id} not found")))?;
+        channel.topic = topic.to_owned();
+        Ok(())
+    }
+
+    async fn delete_channel(&self, id: &ChannelId) -> RepoResult<()> {
+        let mut inner = self.lock();
+        inner.channels.retain(|c| &c.id != id);
+        inner.channel_members.retain(|(c, _)| c != id.as_str());
+        inner.messages.retain(
+            |_, m| !matches!(&m.to, crate::bus::Target::Channel { channel_id } if channel_id == id),
+        );
+        let messages = &inner.messages;
+        let kept: BTreeMap<(String, String), Delivery> = inner
+            .deliveries
+            .iter()
+            .filter(|((m, _), _)| messages.contains_key(m))
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        inner.deliveries = kept;
+        Ok(())
+    }
+
+    async fn channel_members(&self, id: &ChannelId) -> RepoResult<Vec<AgentId>> {
+        Ok(self
+            .lock()
+            .channel_members
+            .iter()
+            .filter(|(c, _)| c == id.as_str())
+            .map(|(_, a)| AgentId::from_raw(a.clone()))
+            .collect())
+    }
+
+    async fn set_channel_members(&self, id: &ChannelId, members: &[AgentId]) -> RepoResult<()> {
+        let mut inner = self.lock();
+        let team = inner
+            .channels
+            .iter()
+            .find(|c| &c.id == id)
+            .map(|c| c.team_id.clone())
+            .ok_or_else(|| RepoError::Corrupt(format!("channel {id} not found")))?;
+        for agent in members {
+            let ok = inner
+                .agents
+                .get(agent.as_str())
+                .is_some_and(|a| a.team_id == team);
+            if !ok {
+                return Err(RepoError::AgentNotFound(agent.clone()));
+            }
+        }
+        inner.channel_members.retain(|(c, _)| c != id.as_str());
+        for agent in members {
+            inner
+                .channel_members
+                .insert((id.as_str().to_owned(), agent.as_str().to_owned()));
+        }
+        Ok(())
     }
 
     async fn insert_message(&self, message: &Message, deliveries: &[Delivery]) -> RepoResult<()> {

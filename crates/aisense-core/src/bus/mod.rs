@@ -26,9 +26,9 @@ pub use push::{
 };
 pub use repo::{BusRepository, InboxQuery};
 pub use service::{
-    AgentInfo, BusMessageEvent, BusObserver, BusService, BusStore, Directory, Identity,
-    MessageView, NoObserver, Receipts, StateFn, UnreadCount, ASK_DEFAULT, ASK_MAX, INBOX_LIMIT,
-    REMOVED_AGENT_LABEL, SYSTEM_LABEL, WAIT_MAX,
+    AgentInfo, BusMessageEvent, BusObserver, BusService, BusStore, ChannelInfo, Directory,
+    Identity, MessageView, NoObserver, Receipts, StateFn, UnreadCount, ASK_DEFAULT, ASK_MAX,
+    INBOX_LIMIT, REMOVED_AGENT_LABEL, SYSTEM_LABEL, WAIT_MAX,
 };
 
 use crate::agent::{Agent, Handle};
@@ -213,11 +213,21 @@ where
         }
         Address::Channel(slug) => {
             let channel = channel_for(store, team_id, slug, now).await?;
+            // Canal com inscritos vai só para eles; sem inscritos, para a equipe toda.
+            let members = store.channel_members(&channel.id).await?;
+            let recipients = if members.is_empty() {
+                others()
+            } else {
+                others()
+                    .into_iter()
+                    .filter(|a| members.contains(&a.id))
+                    .collect()
+            };
             (
                 Target::Channel {
                     channel_id: channel.id,
                 },
-                others(),
+                recipients,
             )
         }
         Address::All => (Target::Team, others()),

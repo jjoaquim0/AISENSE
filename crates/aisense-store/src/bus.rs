@@ -366,6 +366,84 @@ impl BusRepository for Store {
             .collect()
     }
 
+    async fn set_channel_topic(&self, id: &ChannelId, topic: &str) -> RepoResult<()> {
+        let done = sqlx::query("UPDATE channels SET topic = ? WHERE id = ?")
+            .bind(topic)
+            .bind(id.as_str())
+            .execute(self.pool())
+            .await
+            .map_err(backend)?;
+        if done.rows_affected() == 0 {
+            return Err(RepoError::Corrupt(format!("channel {id} not found")));
+        }
+        Ok(())
+    }
+
+    async fn delete_channel(&self, id: &ChannelId) -> RepoResult<()> {
+        sqlx::query("DELETE FROM channels WHERE id = ?")
+            .bind(id.as_str())
+            .execute(self.pool())
+            .await
+            .map_err(backend)?;
+        Ok(())
+    }
+
+    async fn channel_members(&self, id: &ChannelId) -> RepoResult<Vec<AgentId>> {
+        let rows: Vec<(String,)> = sqlx::query_as(
+            "SELECT agent_id FROM channel_members WHERE channel_id = ? ORDER BY agent_id",
+        )
+        .bind(id.as_str())
+        .fetch_all(self.pool())
+        .await
+        .map_err(backend)?;
+        Ok(rows.into_iter().map(|(a,)| AgentId::from_raw(a)).collect())
+    }
+
+    async fn set_channel_members(&self, id: &ChannelId, members: &[AgentId]) -> RepoResult<()> {
+        let mut tx = self.pool().begin().await.map_err(backend)?;
+        let team: Option<(String,)> = sqlx::query_as("SELECT team_id FROM channels WHERE id = ?")
+            .bind(id.as_str())
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(backend)?;
+        let Some((team,)) = team else {
+            return Err(RepoError::Corrupt(format!("channel {id} not found")));
+        };
+        sqlx::query("DELETE FROM channel_members WHERE channel_id = ?")
+            .bind(id.as_str())
+            .execute(&mut *tx)
+            .await
+            .map_err(backend)?;
+        for agent in members {
+            // Só agente da mesma equipe entra.
+            let done = sqlx::query(
+                "INSERT OR IGNORE INTO channel_members (channel_id, agent_id) \
+                 SELECT ?, id FROM agents WHERE id = ? AND team_id = ?",
+            )
+            .bind(id.as_str())
+            .bind(agent.as_str())
+            .bind(&team)
+            .execute(&mut *tx)
+            .await
+            .map_err(backend)?;
+            if done.rows_affected() == 0 {
+                let exists: Option<(String,)> = sqlx::query_as(
+                    "SELECT channel_id FROM channel_members WHERE channel_id = ? AND agent_id = ?",
+                )
+                .bind(id.as_str())
+                .bind(agent.as_str())
+                .fetch_optional(&mut *tx)
+                .await
+                .map_err(backend)?;
+                if exists.is_none() {
+                    return Err(RepoError::AgentNotFound(agent.clone()));
+                }
+            }
+        }
+        tx.commit().await.map_err(backend)?;
+        Ok(())
+    }
+
     async fn prune_messages(&self, before: Millis) -> RepoResult<u64> {
         Ok(sqlx::query("DELETE FROM messages WHERE created_at < ?")
             .bind(before)

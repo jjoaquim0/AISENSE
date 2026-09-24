@@ -192,6 +192,13 @@ impl<S: BoardStore + 'static> BusHandler<S> {
                 Response::ok(json!({ "text": text, "board": view }))
             }
             Request::Task(op) => self.task(me, op).await.map_err(|e| board_error(&e))?,
+            Request::Channels => Response::ok(self.bus.channels(&me.team_id).await.map_err(err)?),
+            Request::Subscribe { channel, join } => Response::ok(
+                self.bus
+                    .subscribe_channel(me, &channel, join)
+                    .await
+                    .map_err(err)?,
+            ),
         })
     }
 

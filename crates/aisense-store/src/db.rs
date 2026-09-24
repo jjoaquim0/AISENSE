@@ -163,6 +163,7 @@ mod tests {
                 "agent_tokens",
                 "agents",
                 "boards",
+                "channel_members",
                 "channels",
                 "columns",
                 "deliveries",

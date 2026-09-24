@@ -20,6 +20,8 @@ aisense — fale com a sua equipe de agentes (AISENSE)
   aisense status \"estado\" [--note x]     diz o que você está fazendo
   aisense whoami                         seu endereço e equipe
   aisense notes list|read|append|write|search|new ...   notas da equipe
+  aisense channels                       canais da equipe e quem está inscrito
+  aisense join #canal | leave #canal     entra ou sai de um canal
   aisense board [--column doing] [--full]  o quadro da equipe em texto
   aisense task next                      o próximo cartão que você deveria pegar
   aisense task list [--mine] [--column c] [--unassigned] [--label l] [--all]
@@ -90,6 +92,11 @@ pub enum Command {
         full: bool,
     },
     Task(TaskOp),
+    Channels,
+    Subscribe {
+        channel: String,
+        join: bool,
+    },
     /// Executado pela própria CLI, no terminal do agente (F05-13).
     Run {
         name: String,
@@ -143,6 +150,8 @@ impl Command {
             Command::Notes(op) => Request::Notes(op),
             Command::Board { column, full } => Request::Board { column, full },
             Command::Task(op) => Request::Task(op),
+            Command::Channels => Request::Channels,
+            Command::Subscribe { channel, join } => Request::Subscribe { channel, join },
             Command::Help
             | Command::Version
             | Command::Run { .. }
@@ -240,6 +249,16 @@ pub fn parse(argv: &[String]) -> Result<Parsed, String> {
             no_args(&args, Command::Board { column, full })?
         }
         "task" => Command::Task(task(args)?),
+        "channels" => no_args(&args, Command::Channels)?,
+        "join" | "leave" => {
+            if args.len() != 1 || !args[0].starts_with('#') {
+                return Err(format!("diga o canal: aisense {name} #canal"));
+            }
+            Command::Subscribe {
+                channel: args.remove(0),
+                join: name == "join",
+            }
+        }
         "run" => {
             if args.len() != 1 {
                 return Err(

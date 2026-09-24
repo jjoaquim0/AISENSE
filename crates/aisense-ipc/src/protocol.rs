@@ -67,6 +67,13 @@ pub enum Request {
     },
     /// Cartões do quadro (F06-05): `aisense task <ação>`.
     Task(TaskOp),
+    /// Canais da equipe com os inscritos (F07-05).
+    Channels,
+    /// Inscreve-se (`join: true`) ou sai de um canal.
+    Subscribe {
+        channel: String,
+        join: bool,
+    },
 }
 
 /// As ações de `aisense task` (`docs/13`, "API dos agentes").
@@ -195,6 +202,8 @@ impl Request {
             Self::Notes(_) => "notes",
             Self::Board { .. } => "board",
             Self::Task(_) => "task",
+            Self::Channels => "channels",
+            Self::Subscribe { .. } => "subscribe",
         }
     }
 }

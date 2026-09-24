@@ -1063,6 +1063,56 @@ async fn board_columns_are_replaced_atomically(repo: impl Repo) {
     );
 }
 
+async fn channel_members_follow_channel_and_agent(repo: impl Repo) {
+    let t = team("Squad", 1);
+    repo.create_team(&t).await.unwrap();
+    let other = team("Outra", 1);
+    repo.create_team(&other).await.unwrap();
+    let a = add_agent(&repo, &t, "p1").await;
+    let b = add_agent(&repo, &t, "p2").await;
+    let stranger = add_agent(&repo, &other, "estranho").await;
+    let ch = Channel {
+        id: ChannelId::new(),
+        team_id: t.id.clone(),
+        slug: "pesquisa".into(),
+        topic: String::new(),
+        created_at: 1,
+    };
+    repo.create_channel(&ch).await.unwrap();
+    assert!(repo.channel_members(&ch.id).await.unwrap().is_empty());
+    repo.set_channel_members(&ch.id, &[a.id.clone(), b.id.clone()])
+        .await
+        .unwrap();
+    assert_eq!(repo.channel_members(&ch.id).await.unwrap().len(), 2);
+    // Agente de outra equipe não entra, e nada muda.
+    assert!(matches!(
+        repo.set_channel_members(&ch.id, std::slice::from_ref(&stranger.id))
+            .await,
+        Err(RepoError::AgentNotFound(_))
+    ));
+    repo.set_channel_topic(&ch.id, "achados").await.unwrap();
+    assert_eq!(
+        repo.channel_by_slug(&t.id, "pesquisa")
+            .await
+            .unwrap()
+            .unwrap()
+            .topic,
+        "achados"
+    );
+    repo.delete_agent(&a.id).await.unwrap();
+    assert_eq!(
+        repo.channel_members(&ch.id).await.unwrap(),
+        std::slice::from_ref(&b.id)
+    );
+    repo.delete_channel(&ch.id).await.unwrap();
+    assert!(repo
+        .channel_by_slug(&t.id, "pesquisa")
+        .await
+        .unwrap()
+        .is_none());
+    assert!(repo.channel_members(&ch.id).await.unwrap().is_empty());
+}
+
 macro_rules! contract {
     ($($name:ident),+ $(,)?) => {
         mod sqlite {
@@ -1103,6 +1153,7 @@ contract!(
     bus_channels_are_unique_and_retention_prunes,
     tokens_live_with_the_session,
     board_round_trips_and_guards_writes,
+    channel_members_follow_channel_and_agent,
     board_columns_are_replaced_atomically,
 );
 

@@ -107,8 +107,37 @@ pub fn render(op: &str, data: &Value, if_any: bool) -> String {
         "notes" => notes(data),
         // O servidor já manda o texto, feito pelas funções do core (mesmo na CLI e no MCP).
         "board" | "task" => s(data, "text").to_owned(),
+        "channels" => {
+            let list = data.as_array().cloned().unwrap_or_default();
+            if list.is_empty() {
+                return "Nenhum canal. Crie mandando para um: aisense send #nome \"...\"\n".into();
+            }
+            list.iter().map(channel).collect()
+        }
+        "subscribe" => channel(data),
         _ => format!("{data}\n"),
     }
+}
+
+/// Um canal: `#slug — tópico · inscritos`.
+fn channel(c: &Value) -> String {
+    let members: Vec<String> = c["members"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(|h| format!("@{h}"))
+        .collect();
+    let who = if members.is_empty() {
+        "aberto (equipe toda)".to_owned()
+    } else {
+        members.join(", ")
+    };
+    let topic = match s(&c["channel"], "topic") {
+        "" => String::new(),
+        t => format!(" — {t}"),
+    };
+    format!("#{}{topic} · {who}\n", s(&c["channel"], "slug"))
 }
 
 fn notes(data: &Value) -> String {

@@ -40,6 +40,16 @@ pub struct Identity {
     pub session_id: Option<SessionId>,
 }
 
+/// Um canal com os inscritos (`aisense channels`, editor de canais).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../apps/desktop/src/types/generated/")]
+pub struct ChannelInfo {
+    pub channel: super::model::Channel,
+    /// Vazio = canal aberto: vai para a equipe toda.
+    pub members: Vec<Handle>,
+}
+
 /// Uma linha de `aisense agents`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -504,6 +514,137 @@ impl<S: BusStore> BusService<S> {
         limit: u32,
     ) -> BusResult<Vec<Message>> {
         Ok(self.store.timeline(team_id, before, limit.min(500)).await?)
+    }
+
+    // ───────────────────────────── canais (F07-05) ─────────────────────────────
+
+    /// Os canais da equipe, com quem está inscrito. Sem inscritos = aberto a todos.
+    pub async fn channels(&self, team_id: &TeamId) -> BusResult<Vec<ChannelInfo>> {
+        let agents = self.store.list_agents(team_id).await?;
+        let mut out = Vec::new();
+        for channel in self.store.list_channels(team_id).await? {
+            let members = self
+                .store
+                .channel_members(&channel.id)
+                .await?
+                .iter()
+                .filter_map(|id| agents.iter().find(|a| &a.id == id))
+                .map(|a| a.handle.clone())
+                .collect();
+            out.push(ChannelInfo { channel, members });
+        }
+        Ok(out)
+    }
+
+    async fn channel(&self, team_id: &TeamId, raw: &str) -> BusResult<super::model::Channel> {
+        let slug = raw.trim().trim_start_matches('#');
+        self.store
+            .channel_by_slug(team_id, slug)
+            .await?
+            .ok_or_else(|| BusError::InvalidRequest(format!("there is no channel #{slug}")))
+    }
+
+    async fn member_ids(&self, team_id: &TeamId, handles: &[String]) -> BusResult<Vec<AgentId>> {
+        let agents = self.store.list_agents(team_id).await?;
+        handles
+            .iter()
+            .map(|raw| {
+                let name = raw.trim().trim_start_matches('@');
+                agents
+                    .iter()
+                    .find(|a| a.handle.as_str() == name)
+                    .map(|a| a.id.clone())
+                    .ok_or_else(|| BusError::UnknownAgent(name.to_owned()))
+            })
+            .collect()
+    }
+
+    /// Cria (ou atualiza, se já existe) um canal com tópico e inscritos.
+    pub async fn save_channel(
+        &self,
+        team_id: &TeamId,
+        slug: &str,
+        topic: &str,
+        members: &[String],
+    ) -> BusResult<ChannelInfo> {
+        let slug = slug.trim().trim_start_matches('#');
+        if !super::model::valid_channel(slug) {
+            return Err(BusError::InvalidRequest(format!(
+                "invalid channel #{slug}: use lowercase letters, digits and hyphens"
+            )));
+        }
+        let ids = self.member_ids(team_id, members).await?;
+        let channel = match self.store.channel_by_slug(team_id, slug).await? {
+            Some(channel) => channel,
+            None => {
+                let channel = super::model::Channel {
+                    id: crate::ids::ChannelId::new(),
+                    team_id: team_id.clone(),
+                    slug: slug.to_owned(),
+                    topic: String::new(),
+                    created_at: now_ms(),
+                };
+                self.store.create_channel(&channel).await?;
+                channel
+            }
+        };
+        self.store
+            .set_channel_topic(&channel.id, topic.trim())
+            .await?;
+        self.store.set_channel_members(&channel.id, &ids).await?;
+        self.channels(team_id)
+            .await?
+            .into_iter()
+            .find(|c| c.channel.id == channel.id)
+            .ok_or_else(|| BusError::InvalidRequest(format!("channel #{slug} vanished")))
+    }
+
+    /// Apaga o canal e as mensagens dele.
+    pub async fn delete_channel(&self, team_id: &TeamId, slug: &str) -> BusResult<()> {
+        let channel = self.channel(team_id, slug).await?;
+        Ok(self.store.delete_channel(&channel.id).await?)
+    }
+
+    /// `aisense join #canal` / `leave`: o próprio agente se inscreve ou sai. Entrar num canal
+    /// aberto o fecha nele e em quem mais entrar depois — por isso a lista volta na resposta.
+    pub async fn subscribe_channel(
+        &self,
+        me: &Identity,
+        slug: &str,
+        join: bool,
+    ) -> BusResult<ChannelInfo> {
+        let slug_clean = slug.trim().trim_start_matches('#');
+        let channel = match self.store.channel_by_slug(&me.team_id, slug_clean).await? {
+            Some(channel) => channel,
+            None if join => {
+                return self
+                    .save_channel(
+                        &me.team_id,
+                        slug_clean,
+                        "",
+                        &[me.handle.as_str().to_owned()],
+                    )
+                    .await
+            }
+            None => {
+                return Err(BusError::InvalidRequest(format!(
+                    "there is no channel #{slug_clean}"
+                )))
+            }
+        };
+        let mut members = self.store.channel_members(&channel.id).await?;
+        members.retain(|a| a != &me.agent_id);
+        if join {
+            members.push(me.agent_id.clone());
+        }
+        self.store
+            .set_channel_members(&channel.id, &members)
+            .await?;
+        self.channels(&me.team_id)
+            .await?
+            .into_iter()
+            .find(|c| c.channel.id == channel.id)
+            .ok_or_else(|| BusError::InvalidRequest(format!("channel #{slug_clean} vanished")))
     }
 
     /// Relógio do serviço — um lugar só, para os testes poderem raciocinar sobre ele.

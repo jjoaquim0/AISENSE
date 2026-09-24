@@ -13,6 +13,13 @@ vi.mock('@/features/bus/api', () => ({
     timeline: (...a: unknown[]) => timeline(...a),
     send: (...a: unknown[]) => send(...a),
     resume: vi.fn(),
+    channels: () =>
+      Promise.resolve([
+        {
+          channel: { id: 'c1', teamId: 't1', slug: 'pesquisa', topic: '', createdAt: 0 },
+          members: [],
+        },
+      ]),
   },
   onBusMessage: (handler: (event: BusMessageEvent) => void) => {
     emit = handler;
@@ -143,5 +150,10 @@ describe('<TimelineView />', () => {
       textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })),
     );
     expect(send).toHaveBeenCalledWith('t1', ['@all'], 'parem e resumam');
+    // Canais cadastrados entram no filtro e nos destinos do compositor.
+    const options = [...container.querySelectorAll('select[aria-label="Para"] option')].map(
+      (o) => o.textContent,
+    );
+    expect(options).toContain('#pesquisa');
   });
 });
