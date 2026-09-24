@@ -10,6 +10,7 @@ pub mod board;
 pub mod bus;
 mod color;
 mod command_error;
+pub mod diagnostics;
 pub mod fswatch;
 mod ids;
 pub mod notes;

@@ -46,16 +46,37 @@ fn store_failure_message(error: &aisense_store::StoreError, database: &Path) -> 
     }
 }
 
-fn main() {
-    // O nível de log das Configurações vale na subida; `AISENSE_LOG` ainda vence.
-    let level = aisense_core::DataDir::resolve()
+/// Log no terminal e em `logs/aisense-app.log` (a execução anterior vira `.1`), que é
+/// o que o "Exportar diagnóstico" leva, redigido (F09-05). O nível das Configurações
+/// vale na subida; `AISENSE_LOG` ainda vence.
+fn init_logging() {
+    use tracing_subscriber::layer::SubscriberExt;
+    use tracing_subscriber::util::SubscriberInitExt;
+
+    let data = aisense_core::DataDir::resolve();
+    let level = data
+        .as_ref()
         .map(|d| aisense_core::settings::SettingsFile::new(d.settings()).load())
         .map_or("info", |loaded| loaded.settings.advanced.log_level.as_str());
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            EnvFilter::try_from_env("AISENSE_LOG").unwrap_or_else(|_| EnvFilter::new(level)),
-        )
+    let filter = EnvFilter::try_from_env("AISENSE_LOG").unwrap_or_else(|_| EnvFilter::new(level));
+    let file = data
+        .as_ref()
+        .map(|d| aisense_core::diagnostics::rotate_app_log(&d.logs()))
+        .and_then(|path| path.and_then(std::fs::File::create).ok());
+    let file_layer = file.map(|file| {
+        tracing_subscriber::fmt::layer()
+            .with_ansi(false)
+            .with_writer(std::sync::Mutex::new(file))
+    });
+    tracing_subscriber::registry()
+        .with(filter)
+        .with(tracing_subscriber::fmt::layer())
+        .with(file_layer)
         .init();
+}
+
+fn main() {
+    init_logging();
 
     tracing::info!(version = aisense_core::VERSION, "AISENSE iniciando");
 
@@ -143,6 +164,7 @@ fn main() {
         })
         .manage(manager)
         .manage(commands::notify::Viewing::default())
+        .manage(commands::settings::DiagnosticsDraft::default())
         .invoke_handler(tauri::generate_handler![
             commands::app_info,
             commands::pty::pty_spawn,
@@ -165,7 +187,9 @@ fn main() {
             commands::settings::calibration_screen,
             commands::settings::calibration_test,
             commands::settings::calibration_apply,
-            commands::settings::diagnostics_export,
+            commands::settings::diagnostics_preview,
+            commands::settings::diagnostics_file_name,
+            commands::settings::diagnostics_save,
             commands::notify::ui_viewing,
             commands::agents::agent_start,
             commands::agents::agent_stop,

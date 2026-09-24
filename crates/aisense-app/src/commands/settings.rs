@@ -3,7 +3,8 @@
 
 use std::sync::{Arc, Mutex, PoisonError};
 
-use aisense_core::adapter::{save_state_rules, AdapterCatalog, StateRules};
+use aisense_core::adapter::{save_state_rules, AdapterCatalog, RuntimeRegistry, StateRules};
+use aisense_core::diagnostics::{self, DiagnosticBundle, Redactor};
 use aisense_core::settings::{
     secret_env, valid_env_name, AppSettings, SecretRef, SecretVault, SettingsFile, SettingsView,
 };
@@ -332,42 +333,129 @@ pub async fn calibration_apply(
     Ok(path.display().to_string())
 }
 
-/// Grava um diagnóstico (versão, SO, preferências sem segredos, adaptadores com
-/// problema) para anexar a um relato de bug. Devolve o caminho.
+/// O último pacote mostrado na prévia: salvar grava exatamente ele, não um novo com
+/// o log que cresceu no meio tempo.
+#[derive(Default)]
+pub struct DiagnosticsDraft(Mutex<Option<DiagnosticBundle>>);
+
+/// Monta o pacote de diagnóstico (F09-05) já redigido, para a prévia: relatório
+/// (versão, SO, preferências sem segredos, runtimes e adaptadores com problema) e o log
+/// do app desta execução e da anterior. As transcrições dos terminais ficam de fora.
 #[tauri::command]
-pub fn diagnostics_export(
+pub async fn diagnostics_preview(
     settings: State<'_, Settings>,
     registry: State<'_, Registry>,
-) -> Result<String, CommandError> {
-    let catalog = registry.catalog();
+    draft: State<'_, DiagnosticsDraft>,
+) -> Result<DiagnosticBundle, CommandError> {
+    let (settings, registry) = (Arc::clone(&settings), Arc::clone(&registry));
+    let bundle =
+        tauri::async_runtime::spawn_blocking(move || build_diagnostics(&settings, &registry))
+            .await
+            .map_err(|error| {
+                CommandError::new(
+                    "diagnostics_failed",
+                    format!("building the diagnostics stopped unexpectedly: {error}"),
+                    None,
+                )
+            })?;
+    *draft.0.lock().unwrap_or_else(PoisonError::into_inner) = Some(bundle.clone());
+    Ok(bundle)
+}
+
+fn build_diagnostics(settings: &SettingsHub, registry: &RuntimeRegistry) -> DiagnosticBundle {
     let mut prefs = settings.get();
-    // Só os nomes, e mesmo assim sem o runtime: basta saber quantos há.
+    // Os valores do keychain entram só como coisa a mascarar, caso algum tenha ido
+    // parar num log (a saída de um runtime que imprimiu a própria chave, por exemplo).
+    let known = prefs
+        .secrets
+        .iter()
+        .filter_map(|s| settings.vault.get(&s.key()).ok().flatten());
+    let redactor = Redactor::new(Redactor::home_dir().as_deref(), known.collect::<Vec<_>>());
     let secrets = prefs.secrets.len();
     prefs.secrets.clear();
+    let overview = registry.overview(false);
     let report = serde_json::json!({
         "app": aisense_core::AppInfo::current(),
+        "arch": std::env::consts::ARCH,
         "dataDir": settings.data.root().display().to_string(),
         "settings": prefs,
         "secretsConfigured": secrets,
-        "adapters": catalog.adapters().map(|a| &a.id).collect::<Vec<_>>(),
-        "adapterProblems": catalog.problems().iter().map(ToString::to_string).collect::<Vec<_>>(),
+        "runtimes": overview.runtimes,
+        "adapterProblems": overview.problems.iter().map(ToString::to_string).collect::<Vec<_>>(),
         "generatedAt": aisense_core::now_ms(),
     });
-    let path = settings
-        .data
-        .logs()
-        .join(format!("diagnostico-{}.json", aisense_core::now_ms()));
-    let write = |e: std::io::Error| {
-        CommandError::new(
-            "diagnostics_failed",
-            format!("could not write {}: {e}", path.display()),
-            Some("Confira as permissões da pasta de dados.".into()),
-        )
-    };
-    if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir).map_err(write)?;
+    let mut bundle = DiagnosticBundle::default();
+    bundle.add_text(
+        &redactor,
+        "relatorio.json",
+        &serde_json::to_string_pretty(&report).unwrap_or_default(),
+    );
+    let logs = settings.data.logs();
+    for name in [
+        diagnostics::APP_LOG.to_owned(),
+        format!("{}.1", diagnostics::APP_LOG),
+    ] {
+        bundle.add_log_tail(
+            &redactor,
+            &name,
+            &logs.join(&name),
+            diagnostics::LOG_TAIL_BYTES,
+        );
     }
-    let text = serde_json::to_string_pretty(&report).unwrap_or_default();
-    std::fs::write(&path, text).map_err(write)?;
-    Ok(path.display().to_string())
+    let transcripts = std::fs::read_dir(&logs)
+        .map(|dir| {
+            dir.flatten()
+                .filter(|e| {
+                    !e.file_name()
+                        .to_string_lossy()
+                        .starts_with(diagnostics::APP_LOG)
+                })
+                .count()
+        })
+        .unwrap_or(0);
+    if transcripts > 0 {
+        bundle.left_out.push(format!(
+            "Transcrições dos terminais dos agentes ({transcripts} arquivos): têm o que você e \
+             os agentes escreveram. Se forem necessárias, exporte uma pelo inspetor do agente."
+        ));
+    }
+    bundle
+        .left_out
+        .push("Banco de dados, notas, skills e o conteúdo das equipes.".to_owned());
+    bundle
+}
+
+/// Nome sugerido para o `.zip`.
+#[tauri::command]
+pub fn diagnostics_file_name() -> String {
+    diagnostics::bundle_file_name(aisense_core::now_ms())
+}
+
+/// Grava em `path` o pacote da última prévia. Devolve o tamanho em bytes.
+#[tauri::command]
+pub fn diagnostics_save(
+    draft: State<'_, DiagnosticsDraft>,
+    path: String,
+) -> Result<u64, CommandError> {
+    let bundle = draft
+        .0
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .clone()
+        .ok_or_else(|| {
+            CommandError::new(
+                "no_preview",
+                "there is no diagnostics preview to save",
+                Some("Abra a prévia do diagnóstico antes de salvar.".into()),
+            )
+        })?;
+    bundle
+        .write_zip(std::path::Path::new(&path), aisense_core::now_ms())
+        .map_err(|e| {
+            CommandError::new(
+                "diagnostics_failed",
+                format!("could not write {path}: {e}"),
+                Some("Escolha outra pasta ou confira as permissões.".into()),
+            )
+        })
 }

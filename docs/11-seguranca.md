@@ -86,4 +86,12 @@ Verificação de assinatura obrigatória. Usuário pode desligar.
 - Nenhuma requisição de rede feita pelo AISENSE além da checagem de atualização (desligável).
 - O que a CLI de IA faz com a rede é responsabilidade dela; o app apenas a hospeda.
 - "Exportar diagnóstico" gera um `.zip` com logs **redigidos** (tokens e caminhos de home mascarados)
-  e mostra o conteúdo antes de salvar.
+  e mostra o conteúdo antes de salvar. Como funciona (F09-05, `aisense-core::diagnostics`): o
+  pacote tem `relatorio.json` (versão, SO, preferências sem a lista de segredos, runtimes
+  detectados, adaptadores com problema) e o fim (1 MB) do log do app desta execução e da anterior
+  (`logs/aisense-app.log` e `.1`). A redação troca por `‹redigido›`: os valores exatos guardados no
+  keychain; valores de nomes que dizem segredo (`*_API_KEY=`, `token:`, `"password": "…"`);
+  formatos que se reconhecem sozinhos (`sk-…`, `ghp_…`, `github_pat_…`, `xox?-…`, `AKIA…`,
+  `AIza…`, JWT, `Bearer …`, 64 hex do `AISENSE_TOKEN`); e a pasta home vira `~`. Transcrições dos
+  terminais, banco, notas e skills **não** entram, e a prévia diz isso. O `.zip` salvo é o mesmo
+  da prévia, byte a byte.

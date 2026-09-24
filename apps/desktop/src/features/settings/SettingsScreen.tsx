@@ -13,6 +13,7 @@ import type { AppSettings } from '@/types/generated/AppSettings';
 import type { SettingsView } from '@/types/generated/SettingsView';
 import { settingsApi } from './api';
 import { CalibrationPanel } from './CalibrationPanel';
+import { DiagnosticsDialog } from './DiagnosticsDialog';
 import { Group, NumberField, PathLine, Radios, Toggle } from './fields';
 import { useSettings } from './store';
 
@@ -648,20 +649,9 @@ function SecretsSection({ settings }: { settings: AppSettings }) {
 function AdvancedSection({ view, update }: { view: SettingsView; update: Update }) {
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [diagnostics, setDiagnostics] = useState(false);
   const received = useSettings((s) => s.received);
   const logId = useId();
-
-  const exportDiagnostics = async () => {
-    try {
-      const path = await settingsApi.exportDiagnostics();
-      setMessage({
-        tone: 'ok',
-        text: `Diagnóstico gravado em ${path}. Anexe-o ao relato do problema.`,
-      });
-    } catch (e: unknown) {
-      setMessage({ tone: 'error', text: errorMessage(e) });
-    }
-  };
 
   const reset = async () => {
     try {
@@ -709,7 +699,7 @@ function AdvancedSection({ view, update }: { view: SettingsView; update: Update 
           <span className="text-caption text-muted">Vale na próxima vez que o app abrir.</span>
         </div>
         <div>
-          <Button onClick={() => void exportDiagnostics()}>Exportar diagnóstico</Button>
+          <Button onClick={() => setDiagnostics(true)}>Exportar diagnóstico…</Button>
         </div>
       </Group>
       <Group title="Resetar">
@@ -740,6 +730,11 @@ function AdvancedSection({ view, update }: { view: SettingsView; update: Update 
           {message.text}
         </p>
       )}
+      <DiagnosticsDialog
+        open={diagnostics}
+        onOpenChange={setDiagnostics}
+        onSaved={(text) => setMessage({ tone: 'ok', text })}
+      />
     </>
   );
 }

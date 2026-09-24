@@ -37,10 +37,23 @@ Runner de migração com backup automático do `.db` antes de aplicar, e rollbac
 > falhava ~1 em 10: uma conexão ainda se fechando fazia checkpoint do WAL por cima do backup
 > recolocado. O diálogo não foi visto numa janela real.
 
-### [ ] F09-05 — Diagnóstico exportável
+### [x] F09-05 — Diagnóstico exportável
 "Exportar diagnóstico" gerando `.zip` com logs redigidos (tokens, chaves e caminho de home
 mascarados), versões e adaptadores, com preview antes de salvar.
 **Aceite:** teste garantindo que nenhum token ou chave aparece no pacote gerado.
+
+> Feito: `aisense-core/src/diagnostics.rs` (`Redactor`, `DiagnosticBundle`, `.zip` *stored*
+> escrito à mão — sem dependência nova; CRC-32 conferido contra o valor de referência). O app
+> passou a gravar o próprio log em `logs/aisense-app.log` (a execução anterior vira `.1`);
+> antes só ia para o terminal. Comandos `diagnostics_preview` (monta e guarda o pacote),
+> `diagnostics_file_name` e `diagnostics_save` (grava **o pacote da prévia**, não um novo).
+> Front: `features/settings/DiagnosticsDialog.tsx` — um arquivo por aba, o que fica de fora,
+> "Salvar .zip…". Aceite: `no_token_or_key_reaches_the_generated_package` escreve o `.zip` e
+> procura 12 segredos (keychain, `AISENSE_TOKEN`, chaves Anthropic/OpenAI/GitHub/Slack/AWS/Google,
+> JWT, `Bearer`, `*_PASSWORD=`) e a home **nos bytes do arquivo** — como não há compressão, texto
+> vazado apareceria literal — e lê o zip de volta para provar que o resto do log chegou. E2E do
+> diálogo e axe nos dois temas; screenshots em `docs/screenshots/fase-09/`. Não visto no app
+> real (janela).
 
 ### [ ] F09-06 — Documentação de usuário
 README com instalação e primeiros passos, guia de criação de adaptador, guia de skills,

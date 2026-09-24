@@ -487,7 +487,25 @@ export function installFakeCore(): void {
     calibration_screen: ({ agentId }) => (screens.get(agentId) ?? '').replace(/\r/g, ''),
     calibration_test: ({ rules, screen }) => calibrate(rules, screen),
     calibration_apply: ({ adapterId }) => `/home/voce/.aisense/adapters/${adapterId}.toml`,
-    diagnostics_export: () => '/home/voce/.aisense/logs/diagnostico.json',
+    diagnostics_preview: () => ({
+      files: [
+        {
+          name: 'relatorio.json',
+          content: JSON.stringify({ app: { version: '0.1.0' }, dataDir: '~/.aisense' }, null, 2),
+          truncated: false,
+        },
+        {
+          name: 'aisense-app.log',
+          content: 'INFO AISENSE iniciando\nDEBUG env AISENSE_TOKEN=‹redigido›\n',
+          truncated: true,
+        },
+      ],
+      leftOut: ['Banco de dados, notas, skills e o conteúdo das equipes.'],
+    }),
+    diagnostics_file_name: () => 'aisense-diagnostico-2026-09-24.zip',
+    diagnostics_save: () => 2048,
+    'plugin:dialog|save': ({ options }) =>
+      `/home/voce/${(options as { defaultPath?: string }).defaultPath ?? 'arquivo'}`,
     teams_list: ({ includeArchived }) => summaries(Boolean(includeArchived)),
     team_template_plan: ({ template }): PlannedAgent[] =>
       (TEMPLATE_AGENTS[template as TeamTemplate] ?? []).map(([h, name, adapterId]) => ({

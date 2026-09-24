@@ -75,6 +75,18 @@ for (const scheme of ['light', 'dark'] as const) {
       }
     });
 
+    test('prévia do diagnóstico', async ({ page }) => {
+      await openApp(page, { onboardingDone: true });
+      await page.getByRole('button', { name: 'Configurações' }).click();
+      await page
+        .getByRole('navigation', { name: 'Seções das configurações' })
+        .getByRole('button', { name: 'Avançado' })
+        .click();
+      await page.getByRole('button', { name: 'Exportar diagnóstico…' }).click();
+      await expect(page.getByRole('tab', { name: 'relatorio.json' })).toBeVisible();
+      expect(await audit(page)).toEqual([]);
+    });
+
     test('biblioteca de skills', async ({ page }) => {
       await openApp(page, { onboardingDone: true });
       await page.getByRole('button', { name: 'Biblioteca de skills' }).click();
