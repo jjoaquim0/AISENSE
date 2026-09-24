@@ -79,15 +79,23 @@ CRUD de canais, inscrição de agentes, `aisense send #canal`, filtro na timelin
 > Teste do CU-3: quatro pesquisadores publicam em `#pesquisa`, o sintetizador recebe os 4 e quem
 > está fora não recebe nada. O nó de canal no canvas entra com a F07-03.
 
-### [ ] F07-06 — Paleta de comandos (T10)
+### [x] F07-06 — Paleta de comandos (T10)
 `cmdk` com navegação, criação, controle de agentes, envio de mensagem, operações do quadro,
 troca de vista e configurações. Busca difusa e recentes no topo.
 **Aceite:** toda ação principal é alcançável por `⌘K` sem mouse. Depende de F03-08.
 
+> Feito: `cmdk` (já no `docs/03-stack`) em `features/palette/`: `⌘K` no shell, ações globais +
+> ações registradas pela tela aberta (`usePaletteActions`), busca difusa, 5 recentes no topo,
+> atalho à direita, `> enviar @agente texto`. Na Sala da Equipe: as 5 vistas, equipe
+> (iniciar/parar/reiniciar), cada agente (iniciar/parar/reiniciar/ir para o terminal), novo agente,
+> novo cartão (abre o diálogo do quadro), notas e comandos. Teste: digitar "fluxo" + Enter troca a
+> vista sem mouse, o usado aparece em Recentes, e o envio chega ao barramento.
+
 ## Critérios de saída
 - [ ] Um coordenador coordena 4 agentes até concluir um objetivo, usando o quadro como instrumento
-- [ ] Canvas mostra agentes, mensagens e cartões em tempo real
-- [ ] Nenhum agente executa ação estrutural sem aprovação humana
+  (depende de runtimes reais; skill e ferramentas prontas)
+- [x] Canvas mostra agentes, mensagens e cartões em tempo real
+- [x] Nenhum agente executa ação estrutural sem aprovação humana
 
 ## Riscos
 | Risco | Mitigação |

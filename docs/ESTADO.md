@@ -5,7 +5,7 @@
 > Se estiver desatualizado, o próximo agente se perde. Mantenha-o honesto.
 
 **Última atualização:** 2026-09-24
-**Fase atual:** `FASE 06 — Quadro Kanban` com as 11 tarefas em código (as Fases 02–05 também; o que falta nelas é conferência numa máquina com tela e runtimes reais)
+**Fase atual:** `FASE 07 — Coordenação` com 5 de 6 tarefas em código e a F07-01 parcial (falta o CU-2 com um coordenador real); Fases 02–06 com código completo
 **Fluxo de trabalho atual:** várias tarefas seguidas no mesmo branch `claude/...`, **um commit por
 tarefa** (ID no título) e um PR só ao fim do lote, com o CI verde nos 3 SOs antes do merge (o
 usuário mergeia). Pedido do usuário em 2026-09-23 para acelerar.
@@ -17,13 +17,18 @@ usuário mergeia). Pedido do usuário em 2026-09-23 para acelerar.
 Fundação, terminal, equipes/agentes, Sala da Equipe, skills, barramento e **o quadro Kanban**
 (Fase 06: claim atômico, WIP, dependências, automações, avisos pelo barramento, gate de revisão,
 CLI/MCP e a vista Quadro) estão em código e testados. O que falta nas fases feitas é conferência
-numa máquina com tela e runtimes reais (claude/codex). Próximo trabalho: **Fase 07 — Coordenação**.
+numa máquina com tela e runtimes reais (claude/codex). A Fase 07 (canais, propostas, Fluxo, paleta)
+também está em código. Próximo trabalho: **Fase 08 — Acabamento**.
 
 ## Para quem chega agora (retomada)
 
 1. Leia `AGENTS.md` e este arquivo inteiro; depois `docs/fases/FASE-03-sala-da-equipe.md` — cada
    tarefa feita tem uma nota `> Feito:` dizendo onde está o código e o que ficou de fora.
-2. **Próxima: Fase 07 — Coordenação** (`docs/fases/FASE-07-*.md`). O quadro está pronto:
+2. **Próxima: Fase 08 — Acabamento** (`docs/fases/FASE-08-*.md`). Fase 07 em código:
+   canais com inscritos (`channel_members`, `aisense join|leave|channels`), propostas
+   (`aisense-core/src/proposal/`, `aisense propose`, banner na Sala), skill `coordenador` v2,
+   vista Fluxo (`features/flow/`, banco `#/dev/flow`) e paleta `⌘K` (`features/palette/`).
+   O quadro está pronto:
    `aisense-core/src/board/` (modelo, regras, automações, `BoardService`, texto do
    `aisense board`), migração `0005_board.sql` + `aisense-store/src/board.rs`, frames
    `board`/`task` no `aisense-ipc`, 7 ferramentas MCP, `commands/board.rs` no app (serviço único
@@ -58,7 +63,7 @@ numa máquina com tela e runtimes reais (claude/codex). Próximo trabalho: **Fas
 | 04 — Sistema de Skills | 🟨 Código quase completo | 8 feitas, 1 parcial de 9 |
 | 05 — Barramento | 🟨 Código completo | 13 de 13 — falta conferir com claude/codex/opencode de verdade |
 | 06 — Quadro Kanban | 🟨 Código completo | 11 de 11 — falta a demonstração com agentes reais |
-| 07 — Coordenação | ⬜ Não iniciada | 0/6 |
+| 07 — Coordenação | 🟨 Código quase completo | 5 feitas, 1 parcial de 6 — falta o CU-2 com runtime real |
 | 08 — Acabamento | ⬜ Não iniciada | 0/9 |
 | 09 — Distribuição | ⬜ Não iniciada | 0/7 |
 

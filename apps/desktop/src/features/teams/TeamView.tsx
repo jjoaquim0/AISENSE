@@ -7,12 +7,16 @@ import {
   RotateCw,
   SquareTerminal,
 } from 'lucide-react';
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Dialog, EmptyState, IconButton } from '@/components/ui';
 import { AgentFormDialog } from '@/features/agents/AgentFormDialog';
 import { agentsApi } from '@/features/agents/api';
+import { boardApi } from '@/features/board/api';
+import { NewCardDialog } from '@/features/board/NewCardDialog';
+import { busApi } from '@/features/bus/api';
 import { GuardBanner } from '@/features/bus/GuardBanner';
 import { useUnread } from '@/features/bus/useUnread';
+import { type PaletteAction, usePalette, usePaletteActions } from '@/features/palette/paletteStore';
 import { ProjectCommandsDialog } from '@/features/project/ProjectCommandsDialog';
 import { ProposalsBanner } from '@/features/proposals/ProposalsBanner';
 import { ShellSlot } from '@/features/shell/slots';
@@ -34,9 +38,10 @@ import { focusAgentPane } from '@/features/terminal/focus';
 import { TimelineView } from '@/features/timeline/TimelineView';
 import { useShortcuts } from '@/lib/useShortcuts';
 import type { Agent } from '@/types/generated/Agent';
+import type { BoardView } from '@/types/generated/BoardView';
 import type { StartOutcome } from '@/types/generated/StartOutcome';
 import type { TeamSummary } from '@/types/generated/TeamSummary';
-import { describeStartReport, errorMessage } from './api';
+import { describeStartReport, errorMessage, teamsApi } from './api';
 import { useTeams } from './store';
 
 // Sob demanda: o quadro e o editor de notas trazem o preview de Markdown.
@@ -210,6 +215,124 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
     [grid, view, selectedId, setGrid, setView],
   );
   useShortcuts(shortcuts);
+
+  // Paleta (T10): o que dá para fazer nesta equipe, sem mouse.
+  const [newCard, setNewCard] = useState<BoardView | null>(null);
+  // As funções locais mudam a cada render; a paleta chama sempre a versão mais nova.
+  const live = useRef({ act, startAgent, restartAgent, handleOf });
+  live.current = { act, startAgent, restartAgent, handleOf };
+  const paletteActions = useMemo<PaletteAction[]>(() => {
+    const { act, startAgent, restartAgent, handleOf } = {
+      act: (f: () => Promise<unknown>) => live.current.act(f),
+      startAgent: (id: string) => live.current.startAgent(id),
+      restartAgent: (id: string) => live.current.restartAgent(id),
+      handleOf: (id: string) => live.current.handleOf(id),
+    };
+    const views: [typeof view, string][] = [
+      ['grid', 'Grade'],
+      ['focus', 'Foco'],
+      ['flow', 'Fluxo'],
+      ['timeline', 'Mensagens'],
+      ['board', 'Quadro'],
+    ];
+    const report = (r: Awaited<ReturnType<typeof teamsApi.start>>) => {
+      const lines = describeStartReport(r, handleOf);
+      if (lines.length > 0) setNotice({ text: lines.join(' · ') });
+    };
+    return [
+      ...views.map(([v, label]) => ({
+        id: `view:${v}`,
+        label: `Vista ${label}`,
+        group: 'Vista',
+        shortcut: '⌘G',
+        keywords: ['vista', 'mostrar', label.toLowerCase()],
+        run: () => setView(v),
+      })),
+      {
+        id: 'team:start',
+        label: `Iniciar equipe ${team.name}`,
+        group: 'Equipe',
+        keywords: ['play', 'ligar', 'subir'],
+        run: () => act(async () => report(await teamsApi.start(team.id))),
+      },
+      {
+        id: 'team:stop',
+        label: `Parar equipe ${team.name}`,
+        group: 'Equipe',
+        keywords: ['desligar', 'pausar'],
+        run: () => act(() => teamsApi.stop(team.id)),
+      },
+      {
+        id: 'team:restart',
+        label: `Reiniciar equipe ${team.name}`,
+        group: 'Equipe',
+        run: () => act(async () => report(await teamsApi.restart(team.id))),
+      },
+      {
+        id: 'create:agent',
+        label: 'Novo agente',
+        group: 'Criar',
+        keywords: ['criar', 'agente'],
+        run: () => setForm({ open: true }),
+      },
+      {
+        id: 'create:card',
+        label: 'Novo cartão no quadro',
+        group: 'Criar',
+        keywords: ['criar', 'tarefa', 'task', 'quadro'],
+        run: () =>
+          boardApi
+            .get(team.id)
+            .then(setNewCard)
+            .catch((e: unknown) => setProblem(errorMessage(e))),
+      },
+      { id: 'open:notes', label: 'Notas da equipe', group: 'Abrir', run: () => setNotesOpen(true) },
+      {
+        id: 'open:commands',
+        label: 'Comandos do projeto',
+        group: 'Abrir',
+        run: () => setCommandsOpen(true),
+      },
+      ...agents.flatMap((a) => [
+        {
+          id: `agent:start:${a.id}`,
+          label: `Iniciar @${a.handle}`,
+          group: 'Agentes',
+          keywords: ['play', 'ligar', a.name],
+          run: () => startAgent(a.id),
+        },
+        {
+          id: `agent:stop:${a.id}`,
+          label: `Parar @${a.handle}`,
+          group: 'Agentes',
+          keywords: ['desligar', a.name],
+          run: () => act(() => agentsApi.stop(a.id)),
+        },
+        {
+          id: `agent:restart:${a.id}`,
+          label: `Reiniciar @${a.handle}`,
+          group: 'Agentes',
+          run: () => restartAgent(a.id),
+        },
+        {
+          id: `agent:focus:${a.id}`,
+          label: `Ir para o terminal de @${a.handle}`,
+          group: 'Agentes',
+          keywords: ['foco', 'terminal', a.name],
+          run: () => {
+            setSelectedId(a.id);
+            setView('focus');
+          },
+        },
+      ]),
+    ];
+  }, [team.id, team.name, agents, setView]);
+  usePaletteActions('team-room', paletteActions);
+  const setSend = usePalette((s) => s.setSend);
+  useEffect(() => {
+    setSend((to, body) => busApi.send(team.id, [to], body));
+    return () => setSend(null);
+  }, [team.id, setSend]);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -392,6 +515,17 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
         onOpenChange={(open) => setForm((f) => ({ ...f, open }))}
         onSaved={agentSaved}
       />
+
+      {newCard && (
+        <NewCardDialog
+          open
+          teamId={team.id}
+          columns={newCard.columns}
+          agents={newCard.agents}
+          onOpenChange={(open) => !open && setNewCard(null)}
+          onCreated={() => setNotice({ text: 'Cartão criado no quadro.' })}
+        />
+      )}
 
       <ProjectCommandsDialog
         workdir={team.workdir}

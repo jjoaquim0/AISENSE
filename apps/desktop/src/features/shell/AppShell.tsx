@@ -2,6 +2,9 @@ import { BookOpen, Moon, PanelRight, Plus, Sun, Users } from 'lucide-react';
 import { type ReactNode, useCallback, useMemo } from 'react';
 import { IconButton, Tooltip } from '@/components/ui';
 import { formatShortcut } from '@/components/ui/Kbd';
+import { CommandPalette } from '@/features/palette/CommandPalette';
+import type { PaletteAction } from '@/features/palette/paletteStore';
+import { usePalette } from '@/features/palette/paletteStore';
 import { useTeams } from '@/features/teams/store';
 import { isDark, useTheme } from '@/lib/theme';
 import { useShortcuts } from '@/lib/useShortcuts';
@@ -26,15 +29,87 @@ export function AppShell({ children }: { children: ReactNode }) {
     toggleInspector,
   } = usePanels();
   const { toggle: toggleTheme } = useTheme();
+  const setPaletteOpen = usePalette((s) => s.setOpen);
+  const go = useNav((s) => s.go);
+  const teams = useTeams((s) => s.teams);
+  const selectTeam = useTeams((s) => s.selectTeam);
+  const openWizard = useTeams((s) => s.setWizardOpen);
 
   const shortcuts = useMemo(
-    () => ({ '⌘B': toggleSidebar, '⌘I': toggleInspector, '⌘⇧D': toggleTheme }),
-    [toggleSidebar, toggleInspector, toggleTheme],
+    () => ({
+      '⌘B': toggleSidebar,
+      '⌘I': toggleInspector,
+      '⌘⇧D': toggleTheme,
+      '⌘K': () => setPaletteOpen(true),
+    }),
+    [toggleSidebar, toggleInspector, toggleTheme, setPaletteOpen],
   );
   useShortcuts(shortcuts);
 
+  // Ações que valem em qualquer tela (T10); a tela aberta acrescenta as dela.
+  const globalActions = useMemo<PaletteAction[]>(
+    () => [
+      ...(teams ?? [])
+        .filter((t) => !t.team.archivedAt)
+        .map((t) => ({
+          id: `team:${t.team.id}`,
+          label: `Abrir equipe ${t.team.name}`,
+          group: 'Ir para',
+          keywords: ['equipe', 'time', t.team.name],
+          run: () => {
+            go('teams');
+            selectTeam(t.team.id);
+          },
+        })),
+      {
+        id: 'go:teams',
+        label: 'Equipes',
+        group: 'Ir para',
+        run: () => {
+          go('teams');
+          selectTeam(null);
+        },
+      },
+      { id: 'go:skills', label: 'Biblioteca de skills', group: 'Ir para', run: () => go('skills') },
+      {
+        id: 'create:team',
+        label: 'Nova equipe',
+        group: 'Criar',
+        keywords: ['criar', 'time'],
+        run: () => {
+          go('teams');
+          openWizard(true);
+        },
+      },
+      {
+        id: 'settings:theme',
+        label: 'Alternar tema claro/escuro',
+        group: 'Configurações',
+        shortcut: '⌘⇧D',
+        keywords: ['tema', 'dark', 'escuro', 'claro'],
+        run: toggleTheme,
+      },
+      {
+        id: 'settings:sidebar',
+        label: 'Mostrar/ocultar lista de agentes',
+        group: 'Configurações',
+        shortcut: '⌘B',
+        run: toggleSidebar,
+      },
+      {
+        id: 'settings:inspector',
+        label: 'Mostrar/ocultar inspetor',
+        group: 'Configurações',
+        shortcut: '⌘I',
+        run: toggleInspector,
+      },
+    ],
+    [teams, go, selectTeam, openWizard, toggleTheme, toggleSidebar, toggleInspector],
+  );
+
   return (
     <div className="flex h-full flex-col bg-base text-primary">
+      <CommandPalette global={globalActions} />
       <TitleBar onToggleInspector={toggleInspector} inspectorVisible={inspectorVisible} />
       <div className="flex min-h-0 flex-1">
         <TeamRail />

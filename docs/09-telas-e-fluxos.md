@@ -359,6 +359,12 @@ Uma barra de busca que faz tudo. Categorias: ir para equipe/agente, criar, inici
 enviar mensagem (`> enviar @backend ...`), aplicar skill, mudar vista, abrir configuração.
 Busca difusa, resultados recentes no topo, atalho exibido à direita de cada item.
 
+Como está feito (F07-06): `features/palette/`. O shell registra as ações globais (ir para equipe,
+skills, nova equipe, tema, painéis); a tela aberta registra as dela com `usePaletteActions` — a
+Sala da Equipe põe vistas, iniciar/parar/reiniciar equipe e cada agente, ir para o terminal,
+novo agente, novo cartão, notas e comandos. `> enviar @agente texto` (ou `>#canal texto`) manda
+pelo barramento como `@voce`. Os recentes ficam no navegador (conveniência local).
+
 ---
 
 ## Fluxos críticos (E2E da Fase 8)
