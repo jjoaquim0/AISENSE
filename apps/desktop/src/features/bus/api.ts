@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type { AgentId } from '@/types/generated/AgentId';
+import type { BusBlocked } from '@/types/generated/BusBlocked';
 import type { BusMessageEvent } from '@/types/generated/BusMessageEvent';
 import type { MessageId } from '@/types/generated/MessageId';
 import type { MessageView } from '@/types/generated/MessageView';
@@ -16,7 +17,15 @@ export const busApi = {
   send: (teamId: TeamId, to: string[], body: string): Promise<MessageId[]> =>
     invoke('bus_send', { teamId, to, body }),
   unread: (teamId: TeamId): Promise<UnreadCount[]> => invoke('bus_unread', { teamId }),
+  /** Libera a equipe pausada pelo orçamento de mensagens (guarda anti-laço). */
+  resume: (teamId: TeamId): Promise<void> => invoke('bus_resume', { teamId }),
+  paused: (teamId: TeamId): Promise<boolean> => invoke('bus_paused', { teamId }),
 };
+
+/** Uma guarda anti-laço barrou um agente (docs/07). */
+export function onBusBlocked(handler: (event: BusBlocked) => void): Promise<UnlistenFn> {
+  return listen<BusBlocked>('bus:blocked', ({ payload }) => handler(payload));
+}
 
 /** Toda mensagem roteada, de qualquer equipe, já com os nomes. */
 export function onBusMessage(handler: (event: BusMessageEvent) => void): Promise<UnlistenFn> {

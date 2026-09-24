@@ -19,6 +19,8 @@ pub type Bus = BusService<Store>;
 pub const BUS_MESSAGE: &str = "bus:message";
 /// Payload: o `AgentId` cujas mensagens foram lidas (o badge dele muda).
 pub const BUS_READ: &str = "bus:read";
+/// Uma guarda anti-laço barrou um agente (payload `BusBlocked`).
+pub const BUS_BLOCKED: &str = "bus:blocked";
 
 /// Retenção de mensagens (`docs/04`, "Retenção"): 90 dias, limpeza na subida e a cada 6 h.
 const RETENTION_MS: i64 = 90 * 24 * 60 * 60 * 1000;
@@ -29,6 +31,12 @@ struct TauriBusObserver {
 }
 
 impl BusObserver for TauriBusObserver {
+    fn blocked(&self, event: &aisense_core::bus::BusBlocked) {
+        if let Err(error) = self.app.emit(BUS_BLOCKED, event) {
+            tracing::warn!(%error, "falha ao avisar a UI sobre bloqueio");
+        }
+    }
+
     fn deliveries_changed(&self, _ids: &[MessageId], agent_id: &AgentId) {
         if let Err(error) = self.app.emit(BUS_READ, agent_id) {
             tracing::warn!(%error, "falha ao avisar a UI sobre mensagens lidas");
@@ -153,4 +161,16 @@ pub async fn bus_unread(
     team_id: TeamId,
 ) -> Result<Vec<UnreadCount>, CommandError> {
     bus.unread(&team_id).await.map_err(bus_error)
+}
+
+/// O humano libera a equipe pausada pelo orçamento de mensagens.
+#[tauri::command]
+pub fn bus_resume(bus: State<'_, Bus>, team_id: TeamId) {
+    bus.resume_team(&team_id);
+}
+
+/// A equipe está pausada pelo orçamento?
+#[tauri::command]
+pub fn bus_paused(bus: State<'_, Bus>, team_id: TeamId) -> bool {
+    bus.team_paused(&team_id)
 }

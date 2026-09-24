@@ -4,10 +4,12 @@
 //! por destinatário (invariante I3). Não abre socket nem PTY: o servidor IPC, a CLI, o MCP
 //! e a UI chamam esta mesma função — nenhuma fachada tem lógica própria.
 
+mod guards;
 mod model;
 mod repo;
 mod service;
 
+pub use guards::{BlockReason, BusBlocked, GuardConfig};
 pub use model::{
     valid_channel, Address, Channel, Delivery, DeliveryState, InboxItem, Message, MessageKind,
     MessageMeta, Priority, Sender, Target, CHANNEL_SLUG_MAX, MESSAGE_BODY_MAX,
@@ -36,6 +38,12 @@ pub enum BusError {
     UnknownMessage(MessageId),
     #[error("{0}")]
     InvalidRequest(String),
+    #[error("{detail}")]
+    Blocked {
+        reason: BlockReason,
+        detail: String,
+        hint: String,
+    },
     #[error("no answer from @{handle} in {secs} s")]
     Timeout { handle: String, secs: u64 },
     #[error("@{target} is waiting for an answer from you: asking back would lock both ({cycle})")]
@@ -54,6 +62,11 @@ impl BusError {
             Self::UnknownMessage(_) => "unknown_message",
             Self::InvalidRequest(_) => "invalid_request",
             Self::Timeout { .. } => "timeout",
+            Self::Blocked { reason, .. } => match reason {
+                BlockReason::RateLimited { .. } => "rate_limited",
+                BlockReason::Repeated { .. } => "repeated_message",
+                BlockReason::TeamBudget { .. } => "team_paused",
+            },
             Self::WouldDeadlock { .. } => "would_deadlock",
             Self::Repo(_) => "internal",
         }
@@ -66,6 +79,7 @@ impl BusError {
                 "Rode o comando de dentro de um terminal de agente aberto pelo AISENSE.".into(),
             ),
             Self::UnknownAgent(_) => Some("Veja quem está na equipe com: aisense agents".into()),
+            Self::Blocked { hint, .. } => Some(hint.clone()),
             Self::Timeout { .. } => {
                 Some("Siga sem a resposta ou tente de novo; um recado com aisense send não bloqueia.".into())
             }

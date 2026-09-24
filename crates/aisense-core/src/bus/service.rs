@@ -58,6 +58,8 @@ pub trait BusObserver: Send + Sync + 'static {
     fn routed(&self, _routed: &Routed) {}
     /// Entregas que mudaram de estado (lidas, injetadas).
     fn deliveries_changed(&self, _message_ids: &[crate::ids::MessageId], _agent_id: &AgentId) {}
+    /// Uma guarda anti-laço barrou um agente (F05-10). Chamado uma vez por episódio.
+    fn blocked(&self, _event: &super::guards::BusBlocked) {}
 }
 
 /// Observador que não faz nada (testes, CLI).
@@ -130,6 +132,7 @@ pub struct BusService<S> {
     /// Toda mensagem roteada: acorda `wait` e `ask` sem polling.
     hub: broadcast::Sender<Arc<Routed>>,
     waits: Arc<std::sync::Mutex<WaitGraph>>,
+    guards: Arc<std::sync::Mutex<super::guards::GuardState>>,
 }
 
 impl<S> Clone for BusService<S> {
@@ -140,6 +143,7 @@ impl<S> Clone for BusService<S> {
             observer: Arc::clone(&self.observer),
             hub: self.hub.clone(),
             waits: Arc::clone(&self.waits),
+            guards: Arc::clone(&self.guards),
         }
     }
 }
@@ -153,7 +157,33 @@ impl<S: BusStore> BusService<S> {
             observer,
             hub,
             waits: Arc::default(),
+            guards: Arc::default(),
         }
+    }
+
+    /// Com limites próprios (Configurações → Equipe; testes).
+    pub fn with_guards(self, config: super::guards::GuardConfig) -> Self {
+        Self {
+            guards: Arc::new(std::sync::Mutex::new(
+                super::guards::GuardState::with_config(config),
+            )),
+            ..self
+        }
+    }
+
+    fn guards(&self) -> std::sync::MutexGuard<'_, super::guards::GuardState> {
+        self.guards
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
+    /// O humano libera a equipe pausada pelo orçamento.
+    pub fn resume_team(&self, team_id: &TeamId) {
+        self.guards().resume(team_id);
+    }
+
+    pub fn team_paused(&self, team_id: &TeamId) -> bool {
+        self.guards().is_paused(team_id)
     }
 
     pub fn store(&self) -> &Arc<S> {
@@ -195,13 +225,113 @@ impl<S: BusStore> BusService<S> {
         })
     }
 
-    /// Roteia, avisa a UI e acorda quem espera.
+    /// Roteia, avisa a UI e acorda quem espera. Mensagem de agente passa antes pelas
+    /// guardas anti-laço (F05-10); humano e sistema não.
     pub async fn dispatch(&self, team_id: &TeamId, out: Outgoing) -> BusResult<Routed> {
+        let agent_sender = match &out.from {
+            Sender::Agent { agent_id } => Some(agent_id.clone()),
+            _ => None,
+        };
+        if let Some(agent_id) = &agent_sender {
+            let verdict =
+                self.guards()
+                    .admit(team_id, agent_id, &out.to.to_string(), &out.body, now_ms());
+            if let super::guards::Verdict::Block(reason) = verdict {
+                return Err(self.block(team_id, agent_id, reason).await);
+            }
+        }
+        let depth = match (&agent_sender, &out.reply_to) {
+            (Some(_), Some(parent)) => self.reply_depth(parent).await,
+            _ => 0,
+        };
         let routed = route(&*self.store, team_id, out, now_ms(), |id| self.running(id)).await?;
         self.observer.routed(&routed);
         // Sem ninguém esperando não é erro.
         let _ = self.hub.send(Arc::new(routed.clone()));
+        let max_depth = self.guards().config().max_reply_depth;
+        if let Some(agent_id) = agent_sender.filter(|_| depth == max_depth) {
+            // Cadeia longa: a `max_depth`-ésima resposta passa, mas o remetente recebe um aviso
+            // (uma vez, na profundidade exata, para não virar mais uma mensagem por volta).
+            let warning = Outgoing {
+                kind: MessageKind::System,
+                ..Outgoing::message(
+                    Sender::System,
+                    Address::Agent(self.handle_of(&agent_id).await?),
+                    format!(
+                        "Esta conversa já tem {max_depth} respostas encadeadas. Resuma o que foi decidido, \
+                         decida e siga — ou registre o impasse com aisense note para o humano."
+                    ),
+                )
+            };
+            let _ = Box::pin(self.dispatch(team_id, warning)).await;
+        }
         Ok(routed)
+    }
+
+    async fn handle_of(&self, agent_id: &AgentId) -> BusResult<Handle> {
+        self.store
+            .get_agent(agent_id)
+            .await?
+            .map(|a| a.handle)
+            .ok_or_else(|| BusError::UnknownAgent(agent_id.to_string()))
+    }
+
+    /// Quantas respostas há acima de `parent` (0 para uma mensagem que não responde nada).
+    async fn reply_depth(&self, parent: &crate::ids::MessageId) -> u32 {
+        let limit = self.guards().config().max_reply_depth + 1;
+        let mut depth = 1;
+        let mut current = parent.clone();
+        while depth < limit {
+            match self.store.get_message(&current).await {
+                Ok(Some(message)) => match message.reply_to {
+                    Some(up) => {
+                        depth += 1;
+                        current = up;
+                    }
+                    None => break,
+                },
+                _ => break,
+            }
+        }
+        depth
+    }
+
+    /// Registra o bloqueio: na primeira vez do episódio, avisa a UI e deixa uma mensagem de
+    /// sistema na linha do tempo — nenhum bloqueio é silencioso.
+    async fn block(
+        &self,
+        team_id: &TeamId,
+        agent_id: &AgentId,
+        reason: super::guards::BlockReason,
+    ) -> BusError {
+        let handle = self
+            .handle_of(agent_id)
+            .await
+            .map_or_else(|_| "?".to_owned(), |h| h.as_str().to_owned());
+        let detail = reason.describe(&handle);
+        let hint = reason.hint();
+        if self.guards().first_block(team_id, agent_id, &reason) {
+            tracing::warn!(agent = %agent_id, %detail, "guarda anti-laço");
+            self.observer.blocked(&super::guards::BusBlocked {
+                team_id: team_id.clone(),
+                agent_id: agent_id.clone(),
+                reason: reason.clone(),
+                detail: detail.clone(),
+            });
+            let notice = Outgoing {
+                kind: MessageKind::System,
+                subject: Some("guarda anti-laço".into()),
+                ..Outgoing::message(Sender::System, Address::Human, detail.clone())
+            };
+            if let Err(error) = Box::pin(self.dispatch(team_id, notice)).await {
+                tracing::warn!(%error, "aviso de bloqueio não registrado");
+            }
+        }
+        BusError::Blocked {
+            reason,
+            detail,
+            hint,
+        }
     }
 
     /// `send`: uma mensagem por endereço. Endereço inválido recusa o lote inteiro antes de

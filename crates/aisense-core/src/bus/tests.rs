@@ -560,3 +560,160 @@ mod ask {
         );
     }
 }
+
+// ───────────────────────── guardas anti-laço (F05-10) ─────────────────────────
+
+mod guards {
+    use std::sync::{Arc, Mutex};
+
+    use super::*;
+    use crate::agent::AgentState;
+
+    #[derive(Default)]
+    struct Seen(Mutex<Vec<BusBlocked>>);
+    impl BusObserver for Seen {
+        fn blocked(&self, event: &BusBlocked) {
+            self.0.lock().unwrap().push(event.clone());
+        }
+    }
+
+    fn from(s: &Squad, handle: &str) -> Sender {
+        s.from(handle)
+    }
+
+    #[tokio::test]
+    async fn ping_pong_e_interrompido_e_o_humano_decide() {
+        let s = squad().await;
+        let (team, a, b) = (s.team.clone(), from(&s, "backend"), from(&s, "frontend"));
+        let seen = Arc::new(Seen::default());
+        let bus = BusService::new(
+            Arc::new(s.store),
+            Arc::new(|_: &AgentId| AgentState::Idle),
+            Arc::clone(&seen) as Arc<dyn BusObserver>,
+        )
+        .with_guards(GuardConfig {
+            team_per_hour: 6,
+            ..GuardConfig::default()
+        });
+        let mut last: Option<MessageId> = None;
+        let mut sent = 0;
+        let mut blocked = None;
+        for i in 0..20 {
+            let (who, to) = if i % 2 == 0 {
+                (&a, "@frontend")
+            } else {
+                (&b, "@backend")
+            };
+            let out = Outgoing {
+                reply_to: last.clone(),
+                ..Outgoing::message(who.clone(), addr(to), format!("e aí? {i}"))
+            };
+            match bus.dispatch(&team, out).await {
+                Ok(routed) => {
+                    last = Some(routed.message.id);
+                    sent += 1;
+                }
+                Err(e) => {
+                    blocked = Some(e);
+                    break;
+                }
+            }
+        }
+        assert_eq!(sent, 6, "parou no limite configurado");
+        let err = blocked.unwrap();
+        assert_eq!(err.code(), "team_paused");
+        assert!(bus.team_paused(&team));
+
+        // Outra tentativa barrada não gera outro aviso.
+        let again = bus
+            .dispatch(
+                &team,
+                Outgoing::message(b.clone(), addr("@backend"), "insisto"),
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(again.code(), "team_paused");
+        let events = seen.0.lock().unwrap().clone();
+        assert_eq!(events.len(), 1);
+        assert!(events[0].detail.contains("pausadas até você liberar"));
+        let timeline = bus.store().timeline(&team, None, 50).await.unwrap();
+        let system: Vec<_> = timeline
+            .iter()
+            .filter(|m| m.kind == MessageKind::System && m.to == Target::Human)
+            .collect();
+        assert_eq!(system.len(), 1, "um aviso na linha do tempo");
+
+        // O humano continua falando e libera a equipe.
+        bus.dispatch(
+            &team,
+            Outgoing::message(Sender::Human, addr("@all"), "parem e resumam"),
+        )
+        .await
+        .unwrap();
+        bus.resume_team(&team);
+        bus.dispatch(&team, Outgoing::message(a, addr("@frontend"), "resumo: X"))
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn cadeia_longa_avisa_o_remetente_uma_vez() {
+        let s = squad().await;
+        let (team, a, b) = (s.team.clone(), from(&s, "backend"), from(&s, "frontend"));
+        let backend = s.id("backend");
+        let bus = BusService::new(
+            Arc::new(s.store),
+            Arc::new(|_: &AgentId| AgentState::Idle),
+            Arc::new(NoObserver),
+        )
+        .with_guards(GuardConfig {
+            max_reply_depth: 4,
+            ..GuardConfig::default()
+        });
+        let mut last: Option<MessageId> = None;
+        for i in 0..8 {
+            let (who, to) = if i % 2 == 0 {
+                (&a, "@frontend")
+            } else {
+                (&b, "@backend")
+            };
+            let out = Outgoing {
+                reply_to: last.clone(),
+                ..Outgoing::message(who.clone(), addr(to), format!("r{i}"))
+            };
+            last = Some(bus.dispatch(&team, out).await.unwrap().message.id);
+        }
+        let inbox = bus.inbox(&backend, false).await.unwrap();
+        let warnings: Vec<_> = inbox
+            .iter()
+            .filter(|i| i.message.kind == MessageKind::System)
+            .collect();
+        assert_eq!(warnings.len(), 1, "um aviso, na profundidade exata");
+        assert!(warnings[0].message.body.contains("4 respostas encadeadas"));
+    }
+
+    #[tokio::test]
+    async fn mensagem_repetida_e_barrada_com_dica() {
+        let s = squad().await;
+        let (team, a) = (s.team.clone(), from(&s, "backend"));
+        let bus = BusService::new(
+            Arc::new(s.store),
+            Arc::new(|_: &AgentId| AgentState::Idle),
+            Arc::new(NoObserver),
+        );
+        for _ in 0..3 {
+            bus.dispatch(
+                &team,
+                Outgoing::message(a.clone(), addr("@frontend"), "pronto?"),
+            )
+            .await
+            .unwrap();
+        }
+        let err = bus
+            .dispatch(&team, Outgoing::message(a, addr("@frontend"), "pronto?"))
+            .await
+            .unwrap_err();
+        assert_eq!(err.code(), "repeated_message");
+        assert!(err.hint().unwrap().contains("aisense note"));
+    }
+}

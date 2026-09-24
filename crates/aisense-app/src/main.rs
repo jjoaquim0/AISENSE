@@ -129,6 +129,8 @@ fn main() {
             commands::bus::bus_timeline,
             commands::bus::bus_send,
             commands::bus::bus_unread,
+            commands::bus::bus_resume,
+            commands::bus::bus_paused,
             commands::project::project_lookup,
             commands::project::project_accept,
         ])

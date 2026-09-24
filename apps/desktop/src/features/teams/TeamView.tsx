@@ -11,6 +11,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react
 import { Button, Dialog, EmptyState, IconButton } from '@/components/ui';
 import { AgentFormDialog } from '@/features/agents/AgentFormDialog';
 import { agentsApi } from '@/features/agents/api';
+import { GuardBanner } from '@/features/bus/GuardBanner';
 import { useUnread } from '@/features/bus/useUnread';
 import { ProjectCommandsDialog } from '@/features/project/ProjectCommandsDialog';
 import { ShellSlot } from '@/features/shell/slots';
@@ -285,6 +286,7 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
         </Button>
       </header>
 
+      <GuardBanner teamId={team.id} />
       {(problem || notice) && (
         <div className="flex flex-col gap-1 border-b border-subtle px-4 py-2">
           {problem && (

@@ -127,11 +127,21 @@ configuração do runtime quando `capabilities.mcp = true`.
 **Aceite:** teste de contrato garantindo que CLI e MCP produzem exatamente o mesmo efeito no core.
 Depende de F05-06.
 
-### [ ] F05-10 — Guardas anti-laço
+### [x] F05-10 — Guardas anti-laço
 Limite de taxa por agente, profundidade de cadeia de reply, detecção de mensagens repetidas,
 orçamento por hora da equipe. Todo bloqueio vira mensagem de sistema visível com ação.
 **Aceite:** dois agentes em ping-pong são interrompidos dentro do limite configurado e o humano é
 avisado com opção de continuar. Depende de F05-01.
+> Feito: `aisense-core/src/bus/guards.rs`, aplicado em `BusService::dispatch` a toda
+> mensagem de **agente** (humano e sistema passam). Padrões do `docs/07`: 30 msg/min por agente
+> (`rate_limited`), 4ª mensagem idêntica ao mesmo destino em 10 min (`repeated_message`),
+> 500 msg/h por equipe (`team_paused` — a equipe fica pausada até o humano liberar) e, na
+> 12ª resposta encadeada, aviso de sistema ao remetente ("resuma e decida"). Todo bloqueio vira
+> `bus:blocked` e uma mensagem de sistema na linha do tempo — **uma vez por episódio** (por
+> agente; a pausa, por equipe), para o aviso não virar ele mesmo um laço. Limites por
+> `GuardConfig` (a tela de Configurações é da Fase 08). UI: faixa na Sala da Equipe com o que
+> foi barrado e o botão **Continuar** (`bus_resume`). Aceite: ping-pong com orçamento 6 para
+> na 7ª, avisa uma vez só e volta depois do Continuar.
 
 ### [ ] F05-11 — Vista Timeline (T4.4)
 Lista virtualizada de mensagens com cor do remetente, recibos de entrega/leitura, `ask` pendente com
