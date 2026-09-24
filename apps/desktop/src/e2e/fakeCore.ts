@@ -405,6 +405,7 @@ export function installFakeCore(): void {
       settings = { ...settings, onboardingDone: true };
       return settings;
     },
+    ui_viewing: () => null,
     settings_last_team: ({ teamId }) => {
       settings = { ...settings, session: { ...settings.session, lastTeam: teamId } };
       return null;

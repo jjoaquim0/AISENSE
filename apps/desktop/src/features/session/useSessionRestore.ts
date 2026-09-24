@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { settingsApi } from '@/features/settings/api';
 import { useSettings } from '@/features/settings/store';
+import { useNav } from '@/features/shell/nav';
 import { useTeams } from '@/features/teams/store';
+import { sessionApi } from './api';
 import { teamToRestore } from './restore';
 
 /**
@@ -14,6 +16,7 @@ export function useSessionRestore(): void {
   const teams = useTeams((s) => s.teams);
   const selected = useTeams((s) => s.selectedTeamId);
   const selectTeam = useTeams((s) => s.selectTeam);
+  const screen = useNav((s) => s.screen);
   const [restored, setRestored] = useState(false);
 
   // Uma vez, quando preferências e equipes chegaram.
@@ -30,4 +33,10 @@ export function useSessionRestore(): void {
     if (!restored) return;
     void settingsApi.lastTeam(selected).catch(() => {});
   }, [restored, selected]);
+
+  // O que está na tela, para as notificações do SO (F08-07).
+  const viewing = screen === 'teams' ? selected : null;
+  useEffect(() => {
+    void sessionApi.viewing(viewing).catch(() => {});
+  }, [viewing]);
 }

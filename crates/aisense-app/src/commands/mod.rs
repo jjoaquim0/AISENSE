@@ -9,6 +9,7 @@ pub mod agents;
 pub mod board;
 pub mod bus;
 pub mod notes;
+pub mod notify;
 pub mod project;
 pub mod proposals;
 pub mod pty;

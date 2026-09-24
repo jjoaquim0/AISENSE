@@ -40,6 +40,7 @@ fn main() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .setup(move |app| {
             let data = aisense_core::DataDir::resolve()
                 .ok_or("could not find the user's home directory; set AISENSE_HOME")?;
@@ -87,6 +88,9 @@ fn main() {
             app.manage(supervisor);
             app.manage(library);
             app.manage(commands::skills::SkillsHome(data.skills()));
+            if let Some(tray) = commands::notify::setup_tray(app.handle()) {
+                app.manage(tray);
+            }
             if let Some(watcher) = skill_watcher {
                 app.manage(watcher);
             }
@@ -97,6 +101,7 @@ fn main() {
             Ok(())
         })
         .manage(manager)
+        .manage(commands::notify::Viewing::default())
         .invoke_handler(tauri::generate_handler![
             commands::app_info,
             commands::pty::pty_spawn,
@@ -120,6 +125,7 @@ fn main() {
             commands::settings::calibration_test,
             commands::settings::calibration_apply,
             commands::settings::diagnostics_export,
+            commands::notify::ui_viewing,
             commands::agents::agent_start,
             commands::agents::agent_stop,
             commands::agents::agent_restart,

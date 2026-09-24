@@ -13,6 +13,7 @@ mod command_error;
 pub mod fswatch;
 mod ids;
 pub mod notes;
+pub mod notify;
 mod paths;
 pub mod project;
 pub mod proposal;

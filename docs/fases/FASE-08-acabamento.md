@@ -84,10 +84,23 @@ Opção "religar agentes ao abrir".
 > fechar o app, 5 execuções seguidas sem falha) — com o core falso: a gravação do layout pelo
 > core real é a mesma de antes (`team_set_layout`).
 
-### [ ] F08-07 — Notificações do sistema
+### [x] F08-07 — Notificações do sistema
 Notificação do SO quando um agente entra em `awaiting_input` ou `failed` com o app em segundo plano;
 ícone na bandeja com resumo. Configurável e silenciável.
 **Aceite:** notificações não disparam quando a janela está focada na equipe em questão.
+
+> Feito: a regra é pura, em `aisense-core/src/notify.rs` (`decide`): só `awaiting_input` e
+> `failed`, cada um com o próprio interruptor, nada com as notificações desligadas ou silenciadas,
+> e **nunca** para a equipe na tela com a janela em foco — o aceite é o teste
+> `never_for_the_team_on_screen_with_the_window_focused`. Ela roda no core (`commands/notify.rs`),
+> não no front: com a janela em segundo plano a webview pode ser suspensa, e o aviso existe
+> justamente para esse caso. O front só informa qual equipe está na tela (`ui_viewing`); o foco
+> da janela vem do Tauri. Bandeja: linha de resumo ("3 agentes rodando · 1 esperando você"),
+> Mostrar o AISENSE, Silenciar por 1 hora / Reativar e Sair; sem bandeja no SO, o app sobe sem
+> ela. Configurações → Notificações liga/desliga cada tipo e silencia por 1 h ou 8 h. Novas
+> dependências: `tauri-plugin-notification` e a feature `tray-icon` do `tauri` (no Linux usa o
+> `libayatana-appindicator3`, que o CI já instala). Falta ver o aviso e o ícone numa área de
+> trabalho de verdade.
 
 ### [ ] F08-08 — Testes E2E
 Playwright cobrindo os 5 fluxos críticos de [09 — Telas](../09-telas-e-fluxos.md#fluxos-críticos-e2e-da-fase-8).

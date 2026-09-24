@@ -958,6 +958,11 @@ impl<S: SupervisorStore> AgentSupervisor<S> {
 
     /// O painel do agente mudou de tamanho: a tela do detector precisa acompanhar,
     /// senão uma TUI desenhada para outra largura vira texto quebrado.
+    /// Estado de cada agente que já passou pelo supervisor nesta execução (bandeja, F08-07).
+    pub fn states(&self) -> Vec<AgentState> {
+        self.agents().values().map(|entry| entry.state).collect()
+    }
+
     /// Agentes com processo de pé agora (para religar na próxima subida, F08-06).
     pub fn running_agents(&self) -> Vec<AgentId> {
         let mut ids: Vec<AgentId> = self
