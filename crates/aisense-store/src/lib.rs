@@ -3,6 +3,7 @@
 #![warn(clippy::unwrap_used, clippy::expect_used)]
 
 mod agents;
+mod bus;
 mod convert;
 mod db;
 mod error;

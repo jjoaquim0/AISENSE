@@ -99,25 +99,26 @@ CREATE TABLE channels (
   UNIQUE (team_id, slug)
 );
 
-CREATE TABLE messages (
-  id          TEXT PRIMARY KEY,            -- ULID
+CREATE TABLE messages (                  -- recriada na migração 0004 (F05-02)
+  id          TEXT PRIMARY KEY,            -- ULID monotônico: a ordem do id é a do tempo
   team_id     TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
   kind        TEXT NOT NULL,               -- message | request | response | event | system
-  from_agent  TEXT REFERENCES agents(id) ON DELETE SET NULL,  -- NULL = humano ou sistema
-  from_human  INTEGER NOT NULL DEFAULT 0,
-  to_agent    TEXT REFERENCES agents(id) ON DELETE SET NULL,  -- DM
+  from_kind   TEXT NOT NULL,               -- agent | human | system
+  from_agent  TEXT,                        -- sem FK: a conversa sobrevive ao agente excluído
+  to_agent    TEXT,                        -- DM (sem FK, pelo mesmo motivo)
   to_channel  TEXT REFERENCES channels(id) ON DELETE CASCADE, -- ou canal
-  broadcast   INTEGER NOT NULL DEFAULT 0,                     -- ou toda a equipe
-  reply_to    TEXT REFERENCES messages(id) ON DELETE SET NULL,
+  broadcast   INTEGER NOT NULL DEFAULT 0,                     -- ou toda a equipe (@all)
+  to_human    INTEGER NOT NULL DEFAULT 0,                     -- ou o humano (@voce)
+  reply_to    TEXT,                        -- sem FK: a retenção apaga a pergunta antes da resposta
   subject     TEXT,
   body        TEXT NOT NULL,
   meta        TEXT NOT NULL DEFAULT '{}',  -- JSON: prioridade, anexos, timeout
   created_at  INTEGER NOT NULL,
-  CHECK (to_agent IS NOT NULL OR to_channel IS NOT NULL OR broadcast = 1)
+  CHECK ((to_agent IS NOT NULL) + (to_channel IS NOT NULL) + broadcast + to_human = 1)
 );
-CREATE INDEX idx_messages_team_time ON messages(team_id, created_at DESC);
-CREATE INDEX idx_messages_to_agent  ON messages(to_agent, created_at DESC);
-CREATE INDEX idx_messages_reply_to  ON messages(reply_to);
+CREATE INDEX idx_messages_team_id  ON messages(team_id, id);      -- linha do tempo por cursor
+CREATE INDEX idx_messages_reply_to ON messages(reply_to);
+CREATE INDEX idx_messages_created  ON messages(created_at);       -- retenção
 
 -- Estado de entrega por destinatário: uma mensagem broadcast tem N linhas aqui.
 CREATE TABLE deliveries (
@@ -130,7 +131,8 @@ CREATE TABLE deliveries (
   error        TEXT,
   PRIMARY KEY (message_id, agent_id)
 );
-CREATE INDEX idx_deliveries_pending ON deliveries(agent_id, state) WHERE state = 'pending';
+CREATE INDEX idx_deliveries_agent   ON deliveries(agent_id, message_id);   -- caixa de entrada
+CREATE INDEX idx_deliveries_pending ON deliveries(agent_id, state) WHERE state IN ('pending', 'delivered');
 
 -- ───────────────────────────── TAREFAS ─────────────────────────────────
 CREATE TABLE tasks (
@@ -195,7 +197,7 @@ Layout salvo inválido nunca quebra a tela: a vista cai para o padrão.
 | # | Invariante | Garantido por |
 |---|---|---|
 | I1 | `handle` é único dentro da equipe e casa com `^[a-z][a-z0-9-]{1,31}$` | `UNIQUE` + validação no core |
-| I2 | Uma mensagem tem exatamente um destino (agente, canal ou broadcast) | `CHECK` |
+| I2 | Uma mensagem tem exatamente um destino (agente, canal, broadcast ou humano) | `CHECK` |
 | I3 | Toda mensagem entregue tem uma linha em `deliveries` por destinatário | Transação única no `Bus::route` |
 | I4 | Token de IPC só é válido enquanto a sessão está viva | `expires_at` + limpeza no `session end` |
 | I5 | Apagar equipe apaga agentes, canais, mensagens e tarefas | `ON DELETE CASCADE` |

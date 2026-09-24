@@ -30,11 +30,19 @@ destinatário parado. Não depende de nada além do domínio.
 > `ask` só para um agente; mandar para si mesmo é `invalid_request`. `reply_address` acha o
 > caminho de volta. 10 testes de roteamento.
 
-### [ ] F05-02 — Persistência de mensagens
+### [x] F05-02 — Persistência de mensagens
 Repositórios de `messages`, `deliveries` e `channels`; consultas de caixa de entrada e de linha do
 tempo com paginação por cursor; rotina de retenção.
 **Aceite:** inserir 100.000 mensagens e consultar a timeline de uma equipe em <20 ms.
 Depende de F05-01, F02-02.
+> Feito: `aisense-store/src/bus.rs` e a migração `0004_bus.sql`, que recria `messages` (e
+> `deliveries`, que a referencia): quarto destino `to_human` (`@voce`) no `CHECK` de destino
+> único, `from_kind` explícito, e `from_agent`/`to_agent`/`reply_to` **sem FK** — a conversa
+> sobrevive à exclusão do agente e a retenção apaga perguntas antigas sem esbarrar nas
+> respostas. Paginação por cursor no id (ULID monotônico = ordem de criação), índices para
+> linha do tempo, caixa de entrada e retenção (`prune_messages`; o agendamento de 90 dias entra
+> com o app, F05-05). O mesmo contrato roda contra SQLite e memória. Aceite: 100.000 mensagens
+> (10% de outra equipe) e a segunda página da linha do tempo em menos de 20 ms.
 
 ### [ ] F05-03 — Servidor IPC
 `aisense-ipc`: socket UDS / named pipe com permissão restrita, framing NDJSON com limite de 1 MiB,

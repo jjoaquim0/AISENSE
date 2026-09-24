@@ -7,17 +7,27 @@
 use std::collections::BTreeMap;
 
 use aisense_core::agent::{Agent, AgentDraft, DeliveryMode, Handle, RestartPolicy, Workbench};
+use aisense_core::bus::{
+    route, Address, BusRepository, Channel, Delivery, DeliveryState, InboxQuery, MessageKind,
+    Outgoing, Sender, Target,
+};
 use aisense_core::repo::{
     AgentRepository, AgentSkill, InMemoryStore, RepoError, SessionRecord, SessionRepository,
     SkillRepository, TeamFilter, TeamRepository, SESSIONS_KEPT_PER_AGENT,
 };
 use aisense_core::skill::{parse_skill, Skill, SkillSource};
 use aisense_core::team::{Team, TeamDraft};
-use aisense_core::{AgentColor, AgentId, SessionId, TeamId};
+use aisense_core::{AgentColor, AgentId, ChannelId, MessageId, SessionId, TeamId};
 use aisense_store::Store;
 
-trait Repo: TeamRepository + AgentRepository + SessionRepository + SkillRepository {}
-impl<T: TeamRepository + AgentRepository + SessionRepository + SkillRepository> Repo for T {}
+trait Repo:
+    TeamRepository + AgentRepository + SessionRepository + SkillRepository + BusRepository
+{
+}
+impl<T> Repo for T where
+    T: TeamRepository + AgentRepository + SessionRepository + SkillRepository + BusRepository
+{
+}
 
 fn team(name: &str, now: i64) -> Team {
     Team::create(
@@ -484,6 +494,204 @@ async fn agent_skills_keep_order_and_follow_the_agent(repo: impl Repo) {
     assert!(repo.agent_skills(&a.id).await.unwrap().is_empty());
 }
 
+async fn bus_round_trips_messages_and_deliveries(repo: impl Repo) {
+    let t = team("Squad", 1);
+    repo.create_team(&t).await.unwrap();
+    let a = add_agent(&repo, &t, "backend").await;
+    let b = add_agent(&repo, &t, "frontend").await;
+    let c = add_agent(&repo, &t, "revisor").await;
+    let running = |_: &AgentId| true;
+    let from = |agent: &Agent| Sender::Agent {
+        agent_id: agent.id.clone(),
+    };
+
+    // DM com todos os campos.
+    let mut out = Outgoing::message(
+        from(&a),
+        Address::parse("@frontend").unwrap(),
+        "oi\nlinha 2",
+    );
+    out.subject = Some("contrato".into());
+    out.meta.timeout_s = Some(30);
+    out.meta.attachments = vec!["/tmp/a.md".into()];
+    out.kind = MessageKind::Request;
+    let dm = route(&repo, &t.id, out, 10, running).await.unwrap();
+    assert_eq!(
+        repo.get_message(&dm.message.id).await.unwrap(),
+        Some(dm.message.clone())
+    );
+    assert_eq!(
+        repo.deliveries_of(&dm.message.id).await.unwrap(),
+        dm.deliveries
+    );
+
+    // Os quatro destinos voltam iguais.
+    let channel = route(
+        &repo,
+        &t.id,
+        Outgoing::message(from(&b), Address::parse("#geral").unwrap(), "c"),
+        11,
+        running,
+    )
+    .await
+    .unwrap();
+    let all = route(
+        &repo,
+        &t.id,
+        Outgoing::message(Sender::Human, Address::All, "todos"),
+        12,
+        running,
+    )
+    .await
+    .unwrap();
+    let human = route(
+        &repo,
+        &t.id,
+        Outgoing::message(Sender::System, Address::Human, "aviso"),
+        13,
+        running,
+    )
+    .await
+    .unwrap();
+    let mut reply = Outgoing::message(from(&b), Address::parse("@backend").unwrap(), "resposta");
+    reply.kind = MessageKind::Response;
+    reply.reply_to = Some(dm.message.id.clone());
+    let answer = route(&repo, &t.id, reply, 14, running).await.unwrap();
+    for routed in [&channel, &all, &human, &answer] {
+        assert_eq!(
+            repo.get_message(&routed.message.id).await.unwrap().as_ref(),
+            Some(&routed.message)
+        );
+    }
+    assert!(matches!(channel.message.to, Target::Channel { .. }));
+    assert_eq!(repo.list_channels(&t.id).await.unwrap().len(), 1);
+    assert_eq!(
+        repo.replies_to(&dm.message.id).await.unwrap(),
+        vec![answer.message.clone()]
+    );
+
+    // Caixa de entrada de @frontend: DM, broadcast (o canal foi dele).
+    let unread = InboxQuery {
+        unread_only: true,
+        after: None,
+        limit: 50,
+    };
+    let inbox = repo.inbox(&b.id, &unread).await.unwrap();
+    let ids: Vec<_> = inbox.iter().map(|i| i.message.id.clone()).collect();
+    assert_eq!(ids, vec![dm.message.id.clone(), all.message.id.clone()]);
+    let after = InboxQuery {
+        after: Some(dm.message.id.clone()),
+        ..unread.clone()
+    };
+    assert_eq!(repo.inbox(&b.id, &after).await.unwrap().len(), 1);
+
+    // Entrega e leitura.
+    let mut delivery = inbox[0].delivery.clone();
+    delivery.state = DeliveryState::Delivered;
+    delivery.delivered_at = Some(20);
+    delivery.attempts = 1;
+    repo.update_delivery(&delivery).await.unwrap();
+    assert_eq!(
+        repo.deliveries_of(&dm.message.id).await.unwrap(),
+        vec![delivery.clone()]
+    );
+    assert_eq!(repo.unread_counts(&t.id).await.unwrap(), {
+        // @backend: canal, broadcast e a resposta.
+        let mut v = vec![(a.id.clone(), 3), (b.id.clone(), 2), (c.id.clone(), 2)];
+        v.sort_by(|x, y| x.0.as_str().cmp(y.0.as_str()));
+        v
+    });
+    assert_eq!(
+        repo.mark_read(&b.id, &[dm.message.id.clone(), all.message.id.clone()], 30)
+            .await
+            .unwrap(),
+        2
+    );
+    assert_eq!(
+        repo.mark_read(&b.id, std::slice::from_ref(&dm.message.id), 31)
+            .await
+            .unwrap(),
+        0
+    );
+    assert!(repo.inbox(&b.id, &unread).await.unwrap().is_empty());
+    let every = InboxQuery {
+        unread_only: false,
+        ..unread
+    };
+    assert_eq!(
+        repo.inbox(&b.id, &every).await.unwrap()[0].delivery.read_at,
+        Some(30)
+    );
+
+    // Linha do tempo: mais nova primeiro, com cursor.
+    let timeline = repo.timeline(&t.id, None, 2).await.unwrap();
+    assert_eq!(
+        timeline,
+        vec![answer.message.clone(), human.message.clone()]
+    );
+    let older = repo
+        .timeline(&t.id, Some(&human.message.id), 10)
+        .await
+        .unwrap();
+    assert_eq!(older.len(), 3);
+
+    let missing = Delivery::pending(&MessageId::new(), &b.id);
+    assert!(repo.update_delivery(&missing).await.is_err());
+}
+
+async fn bus_channels_are_unique_and_retention_prunes(repo: impl Repo) {
+    let t = team("Squad", 1);
+    repo.create_team(&t).await.unwrap();
+    let a = add_agent(&repo, &t, "backend").await;
+    let _b = add_agent(&repo, &t, "frontend").await;
+    let ch = Channel {
+        id: ChannelId::new(),
+        team_id: t.id.clone(),
+        slug: "geral".into(),
+        topic: String::new(),
+        created_at: 1,
+    };
+    repo.create_channel(&ch).await.unwrap();
+    let dup = Channel {
+        id: ChannelId::new(),
+        ..ch.clone()
+    };
+    assert!(matches!(
+        repo.create_channel(&dup).await,
+        Err(RepoError::AlreadyExists(_))
+    ));
+    assert_eq!(
+        repo.channel_by_slug(&t.id, "geral").await.unwrap(),
+        Some(ch)
+    );
+
+    let from = Sender::Agent {
+        agent_id: a.id.clone(),
+    };
+    for (i, at) in [100, 200, 300].into_iter().enumerate() {
+        route(
+            &repo,
+            &t.id,
+            Outgoing::message(from.clone(), Address::All, format!("m{i}")),
+            at,
+            |_| true,
+        )
+        .await
+        .unwrap();
+    }
+    assert_eq!(repo.prune_messages(250).await.unwrap(), 2);
+    let left = repo.timeline(&t.id, None, 10).await.unwrap();
+    assert_eq!(left.len(), 1);
+    assert_eq!(left[0].body, "m2");
+
+    // Excluir o agente leva as entregas dele; a mensagem que ele mandou fica.
+    repo.delete_agent(&a.id).await.unwrap();
+    assert_eq!(repo.timeline(&t.id, None, 10).await.unwrap().len(), 1);
+    repo.delete_team(&t.id).await.unwrap();
+    assert!(repo.timeline(&t.id, None, 10).await.unwrap().is_empty());
+    assert!(repo.list_channels(&t.id).await.unwrap().is_empty());
+}
+
 macro_rules! contract {
     ($($name:ident),+ $(,)?) => {
         mod sqlite {
@@ -520,7 +728,52 @@ contract!(
     sessions_are_pruned_per_agent,
     skills_sync_by_slug_without_losing_assignments,
     agent_skills_keep_order_and_follow_the_agent,
+    bus_round_trips_messages_and_deliveries,
+    bus_channels_are_unique_and_retention_prunes,
 );
+
+#[tokio::test]
+async fn timeline_of_100k_messages_answers_in_under_20ms() {
+    // Aceite da F05-02. Inserção em lote por SQL (o que se mede é a consulta).
+    let store = Store::open_in_memory().await.unwrap();
+    let t = team("Grande", 1);
+    store.create_team(&t).await.unwrap();
+    let other = team("Outra", 1);
+    store.create_team(&other).await.unwrap();
+    let a = add_agent(&store, &t, "backend").await;
+    let mut tx = store.pool().begin().await.unwrap();
+    for i in 0..100_000u32 {
+        let team_id = if i % 10 == 0 {
+            other.id.as_str()
+        } else {
+            t.id.as_str()
+        };
+        sqlx::query(
+            "INSERT INTO messages (id, team_id, kind, from_kind, from_agent, broadcast, body, created_at) \
+             VALUES (?, ?, 'message', 'agent', ?, 1, 'corpo da mensagem', ?)",
+        )
+        .bind(MessageId::new().as_str())
+        .bind(team_id)
+        .bind(a.id.as_str())
+        .bind(i64::from(i))
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    }
+    tx.commit().await.unwrap();
+
+    let first = store.timeline(&t.id, None, 100).await.unwrap();
+    assert_eq!(first.len(), 100);
+    let started = std::time::Instant::now();
+    let page = store
+        .timeline(&t.id, Some(&first[99].id), 100)
+        .await
+        .unwrap();
+    let elapsed = started.elapsed();
+    assert_eq!(page.len(), 100);
+    assert!(page.iter().all(|m| m.team_id == t.id));
+    assert!(elapsed.as_millis() < 20, "timeline levou {elapsed:?}");
+}
 
 // ───────────────────────── só SQLite ─────────────────────────
 
@@ -534,7 +787,7 @@ async fn team_deletion_cascades_to_everything_it_owns() {
     let (tid, aid) = (t.id.as_str(), a.id.as_str());
     for (sql, binds) in [
         ("INSERT INTO channels (id, team_id, slug, created_at) VALUES ('ch1', ?, 'geral', 0)", vec![tid]),
-        ("INSERT INTO messages (id, team_id, kind, from_agent, broadcast, body, created_at) VALUES ('m1', ?, 'message', ?, 1, 'oi', 0)", vec![tid, aid]),
+        ("INSERT INTO messages (id, team_id, kind, from_kind, from_agent, broadcast, body, created_at) VALUES ('m1', ?, 'message', 'agent', ?, 1, 'oi', 0)", vec![tid, aid]),
         ("INSERT INTO deliveries (message_id, agent_id) VALUES ('m1', ?)", vec![aid]),
         ("INSERT INTO tasks (id, team_id, title, created_at, updated_at) VALUES ('t1', ?, 'x', 0, 0)", vec![tid]),
         ("INSERT INTO sessions (id, agent_id, started_at, log_path) VALUES ('s1', ?, 0, '/tmp/x.log')", vec![aid]),
