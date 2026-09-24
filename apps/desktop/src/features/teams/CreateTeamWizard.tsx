@@ -201,7 +201,7 @@ function IdentityStep({
           onChange={(e) => onChange({ ...draft, mission: e.target.value })}
           rows={3}
           placeholder="Migrar a autenticação para OAuth sem derrubar o login atual."
-          className="rounded-md border border-strong bg-surface px-2.5 py-1.5 text-body text-primary placeholder:text-muted focus:border-accent"
+          className="rounded-md border border-strong bg-surface px-2.5 py-1.5 text-body text-primary placeholder:text-muted focus:border-emphasis"
         />
         <p className="text-caption text-muted">Isto vai no prompt de todos os agentes.</p>
       </div>
@@ -291,7 +291,7 @@ function TemplateStep({
           className={cn(
             'flex cursor-pointer flex-col items-start gap-0.5 rounded-lg border p-3 transition-colors duration-100',
             'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring',
-            value === t.id ? 'border-accent bg-hover' : 'border-subtle hover:bg-hover',
+            value === t.id ? 'border-emphasis bg-hover' : 'border-subtle hover:bg-hover',
           )}
         >
           <input

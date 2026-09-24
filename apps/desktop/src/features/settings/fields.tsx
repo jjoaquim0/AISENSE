@@ -146,7 +146,7 @@ export function NumberField({
           aria-describedby={`${id}-hint`}
           className={cn(
             'h-8 w-24 rounded-md border bg-surface px-2.5 text-body text-primary',
-            invalid ? 'border-failed' : 'border-strong focus:border-accent',
+            invalid ? 'border-failed' : 'border-strong focus:border-emphasis',
           )}
         />
         {suffix && <span className="text-caption text-muted">{suffix}</span>}

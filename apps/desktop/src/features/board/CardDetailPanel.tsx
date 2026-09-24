@@ -18,7 +18,7 @@ const selectClass = 'h-7 rounded-md border border-strong bg-surface px-1.5 text-
 /** Quem fez, como o quadro mostra: `@handle` com a cor do agente, você ou o AISENSE. */
 export function actorOf(actor: Actor, agents: AgentTag[]): { label: string; color?: string } {
   if (actor.kind === 'human') return { label: '@voce' };
-  if (actor.kind === 'system') return { label: 'AISENSE' };
+  if (actor.kind === 'system') return { label: 'aisense' };
   const agent = agents.find((a) => a.id === actor.agentId);
   return agent ? { label: `@${agent.handle}`, color: agent.color } : { label: 'agente removido' };
 }
@@ -28,7 +28,7 @@ function Avatar({ label, color }: { label: string; color?: string }) {
     <span
       aria-hidden
       className="flex size-5 shrink-0 items-center justify-center rounded-full bg-hover text-caption text-primary"
-      style={color ? { background: `var(--agent-${color})`, color: 'var(--accent-fg)' } : undefined}
+      style={color ? { background: `var(--agent-${color})`, color: 'var(--on-agent)' } : undefined}
     >
       {label.replace('@', '').slice(0, 1).toUpperCase()}
     </span>
@@ -105,7 +105,7 @@ export function CardDetailPanel({
               <button
                 type="button"
                 onClick={() => onOpenCard(r.id)}
-                className="text-body text-accent hover:underline"
+                className="text-body text-emphasis hover:underline"
               >
                 {shortId(r.id)} · {r.title}
               </button>{' '}

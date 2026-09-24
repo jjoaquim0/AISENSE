@@ -4,8 +4,8 @@
 > Toda sessão de desenvolvimento começa lendo isto e termina atualizando isto.
 > Se estiver desatualizado, o próximo agente se perde. Mantenha-o honesto.
 
-**Última atualização:** 2026-09-24 (Fase 08)
-**Fase atual:** `FASE 08 — Acabamento`, em código (7 feitas, 2 parciais de 9), em lote no branch `claude/fase-08-implementation-fvgh8n`. Fases 06 e 07 mergeadas no PR #21; a F07-01 está parcial (falta o CU-2 com um coordenador real)
+**Última atualização:** 2026-09-24 (Fase 09)
+**Fase atual:** `FASE 09 — Distribuição`, iniciada a pedido do usuário, em lote no branch `claude/fase-9-2uslmm` (2 feitas, 5 parciais e 2 novas de 9 — o que falta nas parciais é o que só o dono do projeto tem: certificados, chave do updater e a primeira tag). Fase 08 mergeada no PR #22 com a F08-01 e a F08-08 parciais
 **Fluxo de trabalho atual:** várias tarefas seguidas no mesmo branch `claude/...`, **um commit por
 tarefa** (ID no título) e um PR só ao fim do lote, com o CI verde nos 3 SOs antes do merge (o
 usuário mergeia). Pedido do usuário em 2026-09-23 para acelerar.
@@ -20,8 +20,10 @@ CLI/MCP e a vista Quadro) estão em código e testados. O que falta nas fases fe
 numa máquina com tela e runtimes reais (claude/codex). A Fase 07 (canais, propostas, Fluxo, paleta)
 também está em código, e a **Fase 08 — Acabamento** (configurações com calibração ao vivo,
 onboarding, sessão restaurada, notificações, estados vazios/erro, acessibilidade, E2E, polimento)
-também. Próximo trabalho: fechar as parciais da Fase 08 numa máquina com GPU e o CI dos 3 SOs, e
-então a **Fase 09 — Distribuição**.
+também. A **Fase 09 — Distribuição** está em código: pacotes com os sidecars e teste de fumaça, migração
+com rollback, diagnóstico redigido, auto-update assinado, workflow de release por tag e a
+documentação de usuário. Próximo trabalho: cadastrar os segredos (`docs/distribuicao.md`), rodar o
+ensaio do workflow de release nos 3 SOs e criar a tag `v0.1.0`.
 
 ## Para quem chega agora (retomada)
 
@@ -93,11 +95,33 @@ então a **Fase 09 — Distribuição**.
 | 06 — Quadro Kanban | 🟨 Código completo | 11 de 11 — falta a demonstração com agentes reais |
 | 07 — Coordenação | 🟨 Código quase completo | 5 feitas, 1 parcial de 6 — falta o CU-2 com runtime real |
 | 08 — Acabamento | 🟨 Código quase completo | 7 feitas, 2 parciais de 9 — faltam GPU e o CI dos 3 SOs |
-| 09 — Distribuição | ⬜ Não iniciada | 0/7 |
+| 09 — Distribuição | 🟨 Em andamento | 2 feitas, 5 parciais, 2 não iniciadas de 9 — faltam certificados, chave do updater e a primeira tag |
 
 Legenda: ⬜ não iniciada · 🟨 em andamento · ✅ concluída · 🟥 bloqueada
 
 ## Em andamento agora
+
+**Fase 09 — Distribuição** (2026-09-24, em lote, um commit por tarefa, PR só ao fim).
+
+| Tarefa | Situação |
+|---|---|
+| F09-04 Migração | ✅ backup e migração numa conexão única; falha no meio recoloca o backup e o app avisa num diálogo e sai |
+| F09-05 Diagnóstico | ✅ `.zip` redigido com prévia de cada arquivo; teste procura 12 formatos de segredo nos bytes do pacote; o app passou a gravar o próprio log |
+| F09-01 Pacotes | 🟨 sidecars no `externalBin`, `.deb`/`.AppImage`/`.rpm` gerados aqui e a fumaça passa no `.deb` instalado; macOS e Windows só no ensaio do workflow |
+| F09-03 Auto-update | 🟨 updater com chave compilada, faixa e opção de desligar, pacotes assinados gerados aqui com chave de teste; falta N → N+1 com releases reais |
+| F09-07 Release por tag | 🟨 `release.yml` (rascunho → 3 SOs → fumaça → publica) e notas dos commits; nunca rodou |
+| F09-02 Assinatura | 🟨 workflow pronto para Apple e Authenticode; faltam os certificados |
+| F09-06 Docs de usuário | 🟨 README e `docs/guia/`; falta alguém de fora seguir só com eles |
+| F09-08 Editor de adaptador | ⬜ pedido do usuário: Novo adaptador, Testar e Instalar integração MCP na interface (`docs/05`) |
+| F09-10 Identidade visual | ✅ manual de marca v1.0 no app: cores, fontes, símbolo Elo, ícone e nome em minúsculas na interface |
+| F09-09 Prévia de skill | ⬜ `docs/11` exige prévia antes de importar skill; o app não tem |
+
+Para continuar: cadastrar os segredos de `docs/distribuicao.md` (no mínimo o par do updater),
+rodar **Actions → Release → Run workflow** (ensaio: pacotes e fumaça nos 3 SOs, sem publicar),
+instalar os pacotes numa máquina limpa de cada SO e só então `git tag v0.1.0 && git push --tags`.
+O aceite da F09-03 precisa de dois releases (v0.1.0 e v0.1.1). Dois riscos do Windows marcados
+para "decidir na Fase 09" continuam **abertos** (ver Riscos ativos): levar `conpty.dll` +
+`OpenConsole.exe` próprios no instalador e restringir a DACL do named pipe ao usuário.
 
 **Fase 08 — Acabamento** (2026-09-24, em lote, um commit por tarefa, PR só ao fim).
 
@@ -329,6 +353,7 @@ Bugs encontrados pelos próprios testes, todos corrigidos na origem:
 - Atalhos com o terminal focado: só `⌘1..9` fora do macOS, `Esc Esc` para sair → [ADR 0007](adr/0007-atalhos-com-o-terminal-focado.md)
 - Entrega de mensagens **híbrida**: caixa de entrada + injeção opcional no PTY → [ADR 0006](adr/0006-entrega-de-mensagens.md)
 - Front em **React 19 + TypeScript + Tailwind 4 + Radix**, terminal com **xterm.js/WebGL**
+- **Identidade visual do Manual de Marca v1.0** (2026-09-24): Tinta/Papel com verde `#2EE68A` como sinal, Bricolage Grotesque + Plus Jakarta Sans + JetBrains Mono, símbolo Elo → [08](08-design-system.md#identidade-visual-manual-de-marca-v10)
 
 ## Decisões pendentes
 
@@ -338,7 +363,7 @@ Bugs encontrados pelos próprios testes, todos corrigidos na origem:
 | D2 | Rastreio de custo por agente (tokens/USD) | Fase 8 | Só o que o próprio runtime imprimir no terminal; sem estimativa própria |
 | D3 | Marketplace de skills | Pós-v1 | Import/export de pasta `.zip` apenas |
 | D4 | Modo daemon headless (usar AISENSE sem GUI) | Pós-v1 | O crate `aisense-ipc` já é separado justamente para permitir isso depois |
-| D5 | Telemetria anônima | Fase 9 | Desligada por padrão, opt-in explícito |
+| D5 | Telemetria anônima | ~~Fase 9~~ | **Decidido na Fase 09: nenhuma no v1.** A única requisição de rede do app é a checagem de atualização, desligável (`docs/11`) |
 
 
 ## Riscos ativos
@@ -395,3 +420,4 @@ Bugs encontrados pelos próprios testes, todos corrigidos na origem:
 | 2026-09-23 | Claude | F04-06 (injeção do BOOT.md: flag, MCP preparado, terminal) |
 | 2026-09-23 | Claude | F04-09 (notas da equipe: core, índice no BOOT.md, painel) |
 | 2026-09-24 | Claude | Fase 05 inteira em código (F05-01..13), em commits por tarefa no PR #20 |
+| 2026-09-24 | Claude | Início da Fase 09: F09-04 e F09-05 feitas; F09-01, 02, 03, 06 e 07 em código, esperando certificados, chave do updater e a primeira tag |

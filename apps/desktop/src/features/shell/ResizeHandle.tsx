@@ -79,7 +79,7 @@ export function ResizeHandle({
       onKeyDown={handleKeyDown}
       className={cn(
         'group relative w-px shrink-0 cursor-col-resize bg-subtle',
-        'transition-colors duration-100 hover:bg-accent focus-visible:bg-accent',
+        'transition-colors duration-100 hover:bg-emphasis focus-visible:bg-emphasis',
       )}
     >
       {/* Alvo de clique maior que a linha de 1px, sem ocupar espaço no layout. */}

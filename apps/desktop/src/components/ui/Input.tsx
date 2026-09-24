@@ -30,7 +30,7 @@ export function Input({ label, error, hint, className, id, ...props }: InputProp
           'placeholder:text-muted',
           'transition-colors duration-100 ease-out',
           'disabled:opacity-50',
-          error ? 'border-failed' : 'border-strong focus:border-accent',
+          error ? 'border-failed' : 'border-strong focus:border-emphasis',
           className,
         )}
         {...props}

@@ -1,6 +1,7 @@
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { AlertTriangle, FolderOpen, Monitor, Moon, Sun } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
+import { Logo } from '@/components/brand/Logo';
 import { Button, Input } from '@/components/ui';
 import { runtimesApi } from '@/features/runtimes/api';
 import { RuntimeList } from '@/features/runtimes/RuntimeList';
@@ -49,12 +50,13 @@ export function Onboarding() {
         className="flex w-full max-w-lg flex-col gap-5 rounded-xl border border-subtle bg-surface p-6"
       >
         <header className="flex flex-col items-center gap-1 text-center">
+          {step === 1 && <Logo size={30} className="mb-3 text-primary" />}
           <p className="text-caption text-muted" aria-live="polite">
             Passo {step} de 3
           </p>
           <h1 id="onboarding-title" className="text-title text-primary">
             {step === 1
-              ? 'Bem-vindo ao AISENSE'
+              ? 'Bem-vindo ao aisense'
               : step === 2
                 ? 'Escolha o tema'
                 : 'Sua primeira equipe'}
@@ -116,7 +118,7 @@ function ThemeStep() {
             'flex cursor-pointer flex-col items-center gap-2 rounded-lg border p-4 text-body',
             'transition-colors duration-100 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring',
             theme === id
-              ? 'border-accent text-primary'
+              ? 'border-emphasis text-primary'
               : 'border-subtle text-secondary hover:bg-hover',
           )}
         >

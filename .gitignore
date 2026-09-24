@@ -12,6 +12,8 @@ dist/
 # Esquemas de ACL gerados pelo tauri-build a cada compilação: versioná-los só cria
 # ruído de diff, e o linter reprovaria a formatação deles.
 /crates/aisense-app/gen/
+# Sidecars com o sufixo do target, gerados por `scripts/sidecars.mjs` (F09-01).
+/crates/aisense-app/binaries/
 /apps/desktop/src/types/generated/*.d.ts.map
 
 # Dados locais do AISENSE (nunca versionar)
@@ -33,3 +35,6 @@ Thumbs.db
 /apps/desktop/playwright-report/
 /apps/desktop/dist-e2e/
 __pycache__/
+
+# Gerada no release a partir do segredo da chave pública (scripts/release-config.mjs).
+/crates/aisense-app/tauri.release.conf.json

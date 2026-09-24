@@ -6,6 +6,7 @@ import { runtimesApi } from '@/features/runtimes/api';
 import { RuntimeList } from '@/features/runtimes/RuntimeList';
 import { useNav } from '@/features/shell/nav';
 import { errorMessage } from '@/features/teams/api';
+import { useUpdates } from '@/features/updates/store';
 import { cn } from '@/lib/cn';
 import { recordCombo, SHORTCUT_CATALOG } from '@/lib/shortcuts';
 import type { Adapter } from '@/types/generated/Adapter';
@@ -13,6 +14,7 @@ import type { AppSettings } from '@/types/generated/AppSettings';
 import type { SettingsView } from '@/types/generated/SettingsView';
 import { settingsApi } from './api';
 import { CalibrationPanel } from './CalibrationPanel';
+import { DiagnosticsDialog } from './DiagnosticsDialog';
 import { Group, NumberField, PathLine, Radios, Toggle } from './fields';
 import { useSettings } from './store';
 
@@ -215,7 +217,7 @@ function AppearanceSection({ settings, update }: { settings: AppSettings; update
         label="Fonte do terminal"
         value={a.terminalFontFamily}
         placeholder="JetBrains Mono (padrão)"
-        hint="Uma fonte monoespaçada instalada no sistema. Vazio usa a do AISENSE."
+        hint="Uma fonte monoespaçada instalada no sistema. Vazio usa a do aisense."
         onCommit={(v) =>
           update((d) => {
             d.appearance.terminalFontFamily = v;
@@ -489,7 +491,7 @@ function ShortcutsSection({ settings, update }: { settings: AppSettings; update:
                     className="rounded-md px-1.5 py-0.5 hover:bg-hover"
                   >
                     {recording === s.combo ? (
-                      <span className="text-caption text-accent">Pressione…</span>
+                      <span className="text-caption text-emphasis">Pressione…</span>
                     ) : (
                       <Kbd>{formatShortcut(effective(s.combo))}</Kbd>
                     )}
@@ -648,20 +650,9 @@ function SecretsSection({ settings }: { settings: AppSettings }) {
 function AdvancedSection({ view, update }: { view: SettingsView; update: Update }) {
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [diagnostics, setDiagnostics] = useState(false);
   const received = useSettings((s) => s.received);
   const logId = useId();
-
-  const exportDiagnostics = async () => {
-    try {
-      const path = await settingsApi.exportDiagnostics();
-      setMessage({
-        tone: 'ok',
-        text: `Diagnóstico gravado em ${path}. Anexe-o ao relato do problema.`,
-      });
-    } catch (e: unknown) {
-      setMessage({ tone: 'error', text: errorMessage(e) });
-    }
-  };
 
   const reset = async () => {
     try {
@@ -685,6 +676,14 @@ function AdvancedSection({ view, update }: { view: SettingsView; update: Update 
           Para mudar o diretório, defina a variável de ambiente AISENSE_HOME antes de abrir o app.
         </p>
       </Group>
+      <UpdatesGroup
+        enabled={view.settings.advanced.checkUpdates}
+        onEnabled={(on) =>
+          update((d) => {
+            d.advanced.checkUpdates = on;
+          })
+        }
+      />
       <Group title="Diagnóstico">
         <div className="flex flex-col gap-1">
           <label htmlFor={logId} className="text-label text-secondary">
@@ -709,7 +708,7 @@ function AdvancedSection({ view, update }: { view: SettingsView; update: Update 
           <span className="text-caption text-muted">Vale na próxima vez que o app abrir.</span>
         </div>
         <div>
-          <Button onClick={() => void exportDiagnostics()}>Exportar diagnóstico</Button>
+          <Button onClick={() => setDiagnostics(true)}>Exportar diagnóstico…</Button>
         </div>
       </Group>
       <Group title="Resetar">
@@ -740,7 +739,74 @@ function AdvancedSection({ view, update }: { view: SettingsView; update: Update 
           {message.text}
         </p>
       )}
+      <DiagnosticsDialog
+        open={diagnostics}
+        onOpenChange={setDiagnostics}
+        onSaved={(text) => setMessage({ tone: 'ok', text })}
+      />
     </>
+  );
+}
+
+/** Auto-update (F09-03): ligar/desligar e procurar agora. A instalação é pela faixa. */
+function UpdatesGroup({
+  enabled,
+  onEnabled,
+}: {
+  enabled: boolean;
+  onEnabled: (on: boolean) => void;
+}) {
+  const phase = useUpdates((s) => s.phase);
+  const check = useUpdates((s) => s.check);
+  const install = useUpdates((s) => s.install);
+  const status =
+    phase.kind === 'checking'
+      ? 'Procurando…'
+      : phase.kind === 'current'
+        ? 'Você está na versão mais nova.'
+        : phase.kind === 'available'
+          ? `A versão ${phase.update.version} está disponível.`
+          : phase.kind === 'installing'
+            ? `Instalando a versão ${phase.update.version}…`
+            : phase.kind === 'error'
+              ? phase.message
+              : null;
+  return (
+    <Group
+      title="Atualizações"
+      description="As versões novas vêm do canal estável, com a assinatura conferida antes de instalar."
+    >
+      <Toggle
+        label="Procurar atualizações ao abrir o app"
+        hint="É a única conexão de rede que o aisense faz. Nada é instalado sem você pedir."
+        checked={enabled}
+        onChange={onEnabled}
+      />
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          onClick={() => void check()}
+          disabled={phase.kind === 'checking' || phase.kind === 'installing'}
+        >
+          Procurar agora
+        </Button>
+        {phase.kind === 'available' && (
+          <Button variant="primary" onClick={() => void install()}>
+            Instalar e reiniciar
+          </Button>
+        )}
+        {status && (
+          <span
+            role={phase.kind === 'error' ? 'alert' : 'status'}
+            className={cn(
+              'text-caption',
+              phase.kind === 'error' ? 'text-failed' : 'text-secondary',
+            )}
+          >
+            {status}
+          </span>
+        )}
+      </div>
+    </Group>
   );
 }
 

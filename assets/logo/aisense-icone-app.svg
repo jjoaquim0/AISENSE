@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Ícone de app do aisense (manual de marca v1.0, seção 07): fundo Tinta #0C0F0D, símbolo
+       Elo branco com o nó verde #2EE68A, a caixa do símbolo ocupa 56% do lado (72 de 128 px no manual). -->
+  <rect width="1024" height="1024" rx="240" fill="#0C0F0D"/>
+  <g transform="translate(512 512) scale(9) translate(-32 -32)"><path d="M32 15.5L13 49.5M32 15.5L51 49.5" fill="none" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round"/><circle cx="13" cy="49.5" r="9" fill="#FFFFFF"/><circle cx="51" cy="49.5" r="9" fill="#FFFFFF"/><circle cx="32" cy="15.5" r="10" fill="#2EE68A"/></g>
+</svg>

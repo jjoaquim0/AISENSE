@@ -190,7 +190,7 @@ export function CalibrationPanel() {
       {!adapter && (
         <p className="flex items-center gap-2 text-caption text-muted">
           <Gauge size={14} aria-hidden />
-          Escolha um runtime para ajustar como o AISENSE reconhece ocioso, ocupado e aguardando.
+          Escolha um runtime para ajustar como o aisense reconhece ocioso, ocupado e aguardando.
         </p>
       )}
 
@@ -224,7 +224,7 @@ export function CalibrationPanel() {
                 inputMode="numeric"
                 value={rules.quietMs}
                 onChange={(e) => setField('quietMs', e.target.value)}
-                className="h-8 w-28 rounded-md border border-strong bg-surface px-2.5 font-mono text-label text-primary focus:border-accent"
+                className="h-8 w-28 rounded-md border border-strong bg-surface px-2.5 font-mono text-label text-primary focus:border-emphasis"
               />
               <span className="text-caption text-muted">Entre 50 e 10000 ms.</span>
             </div>
@@ -321,7 +321,7 @@ function RegexField({
         aria-describedby={error ? `${id}-error` : undefined}
         className={cn(
           'h-8 rounded-md border bg-surface px-2.5 font-mono text-label text-primary',
-          error ? 'border-failed' : 'border-strong focus:border-accent',
+          error ? 'border-failed' : 'border-strong focus:border-emphasis',
         )}
       />
       {error && (

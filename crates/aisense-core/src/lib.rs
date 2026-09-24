@@ -10,6 +10,7 @@ pub mod board;
 pub mod bus;
 mod color;
 mod command_error;
+pub mod diagnostics;
 pub mod fswatch;
 mod ids;
 pub mod notes;
@@ -26,6 +27,7 @@ pub mod team;
 mod time;
 mod toml_pos;
 pub mod transcript;
+pub mod updates;
 mod validation;
 
 pub use app_info::AppInfo;

@@ -34,7 +34,7 @@ export function parseEnv(text: string): { env: Record<string, string>; error?: s
     const key = (eq === -1 ? line : line.slice(0, eq)).trim();
     if (!ENV_KEY.test(key)) return { env, error: `Linha ${index + 1}: nome de variável inválido` };
     if (key.toUpperCase().startsWith('AISENSE_')) {
-      return { env, error: `Linha ${index + 1}: ${key} é controlada pelo AISENSE` };
+      return { env, error: `Linha ${index + 1}: ${key} é controlada pelo aisense` };
     }
     env[key] = eq === -1 ? '' : line.slice(eq + 1);
   }

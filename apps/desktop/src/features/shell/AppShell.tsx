@@ -1,11 +1,13 @@
 import { BookOpen, Moon, PanelRight, Plus, Settings, Sun, Users } from 'lucide-react';
 import { type ReactNode, useCallback, useMemo } from 'react';
+import { Logo } from '@/components/brand/Logo';
 import { IconButton, Tooltip } from '@/components/ui';
 import { formatShortcut } from '@/components/ui/Kbd';
 import { CommandPalette } from '@/features/palette/CommandPalette';
 import type { PaletteAction } from '@/features/palette/paletteStore';
 import { usePalette } from '@/features/palette/paletteStore';
 import { useTeams } from '@/features/teams/store';
+import { UpdateBanner, useUpdateCheckOnStart } from '@/features/updates/UpdateBanner';
 import { isDark, useTheme } from '@/lib/theme';
 import { useShortcuts } from '@/lib/useShortcuts';
 import { type Screen, useNav } from './nav';
@@ -59,6 +61,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     [toggleSidebar, toggleInspector, toggleTheme, setPaletteOpen, go],
   );
   useShortcuts(shortcuts);
+  useUpdateCheckOnStart();
 
   // Ações que valem em qualquer tela (T10); a tela aberta acrescenta as dela.
   const globalActions = useMemo<PaletteAction[]>(
@@ -138,6 +141,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         inspectorSqueezed={teamScreen && inspectorVisible && !fit.inspector}
         showInspectorToggle={teamScreen}
       />
+      <UpdateBanner />
       <div className="flex min-h-0 flex-1">
         <TeamRail />
         {fit.sidebar && teamScreen && (
@@ -192,7 +196,7 @@ function TitleBar({
       data-tauri-drag-region
       className="flex h-10 shrink-0 items-center justify-between border-b border-subtle bg-surface pr-2 pl-20"
     >
-      <span className="text-label text-secondary">AISENSE</span>
+      <Logo size={18} className="text-primary" />
       <div className="flex items-center gap-0.5">
         {showInspectorToggle && (
           <Tooltip
@@ -238,7 +242,7 @@ function TeamRail() {
             go('teams');
             openWizard(true);
           }}
-          className="flex size-8 items-center justify-center rounded-lg border border-dashed border-strong text-muted transition-colors duration-100 hover:border-accent hover:text-accent"
+          className="flex size-8 items-center justify-center rounded-lg border border-dashed border-strong text-muted transition-colors duration-100 hover:border-emphasis hover:text-emphasis"
         >
           <Plus size={16} />
         </button>

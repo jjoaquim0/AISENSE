@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "AISENSE",
+        "title": "aisense",
         "width": 1440,
         "height": 900,
         "minWidth": 1024,
@@ -26,6 +26,13 @@
     ],
     "security": {
       "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost; script-src 'self'"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "",
+      "requireSignedVersion": true,
+      "endpoints": ["https://github.com/jjoaquim0/AISENSE/releases/latest/download/latest.json"]
     }
   },
   "bundle": {

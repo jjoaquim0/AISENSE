@@ -25,12 +25,68 @@ o AISENSE materializa essas skills no diretório de trabalho e injeta o prompt d
 └───────────┴──────────────────────────────────────────────────────────────┘
 ```
 
-## Status
+## Instalação
 
-🚧 **Fase de projeto.** O código ainda não foi escrito — a documentação completa de arquitetura,
-design e plano de execução está pronta em [`docs/`](docs/).
+Baixe o instalador do seu sistema na página de
+[Releases](https://github.com/jjoaquim0/AISENSE/releases/latest):
 
-**Comece por [`docs/INDEX.md`](docs/INDEX.md).**
+| Sistema | Arquivo | Como instalar |
+|---|---|---|
+| macOS 11+ (Apple Silicon e Intel) | `AISENSE_<versão>_universal.dmg` | Abra o `.dmg` e arraste o AISENSE para Aplicativos |
+| Windows 10/11 | `AISENSE_<versão>_x64-setup.exe` (ou o `.msi`) | Execute o instalador; não precisa de administrador no `-setup.exe` |
+| Ubuntu, Debian e derivados | `AISENSE_<versão>_amd64.deb` | `sudo apt install ./AISENSE_<versão>_amd64.deb` |
+| Qualquer Linux x86_64 | `AISENSE_<versão>_amd64.AppImage` | `chmod +x AISENSE_*.AppImage` e execute |
+
+O AISENSE hospeda as CLIs de IA; ele não traz nenhuma. Instale pelo menos uma das que você quer usar
+(sem nenhuma, dá para começar com agentes de terminal puro):
+
+| IA | Instalação |
+|---|---|
+| Claude Code | `npm i -g @anthropic-ai/claude-code` |
+| Codex CLI | `npm i -g @openai/codex` |
+| OpenCode | `npm i -g opencode-ai` |
+| Gemini CLI | `npm i -g @google/gemini-cli` |
+
+As versões novas chegam sozinhas: o app confere se há atualização ao abrir e pergunta antes de
+instalar. Dá para desligar em **Configurações → Avançado**.
+
+## Primeiros passos
+
+1. **Abra o AISENSE.** O primeiro passo mostra quais IAs ele encontrou no seu computador. Se alguma
+   que você instalou não aparece, veja [Solução de problemas](docs/guia/problemas.md#runtimes).
+2. **Escolha o tema** (dá para trocar depois com `⌘⇧D`/`Ctrl+Shift+D`).
+3. **Crie a primeira equipe:** um nome, a pasta do projeto em que ela vai trabalhar e um modelo —
+   *Dupla Dev* (`@dev` e `@revisor`), *Squad completo* (`@arquiteto`, `@backend`, `@frontend`,
+   `@revisor`), *Pesquisa*, *Operação* ou *Vazio*. A equipe é criada e iniciada: os terminais sobem
+   na **Sala da Equipe**.
+4. **Dê a missão.** Clique no terminal de um agente e fale com a IA como faria num terminal comum.
+   Cada agente já nasceu sabendo quem é, quem são os colegas e como falar com eles.
+5. **Veja a equipe conversando.** Os agentes usam a CLI `aisense` (ou o servidor MCP) entre si —
+   `aisense send @revisor "pronto para revisar"`, `aisense ask @arquiteto "qual contrato?"`. Tudo
+   aparece na vista **Mensagens**; o trabalho, na vista **Quadro**; quem fala com quem, na vista
+   **Fluxo**. Você também escreve na linha do tempo como `@voce`.
+
+Para ir além:
+
+- [Criar um adaptador para outra IA](docs/guia/adaptadores.md)
+- [Criar e atribuir skills](docs/guia/skills.md)
+- [Solução de problemas](docs/guia/problemas.md)
+- `⌘K` / `Ctrl+K` abre a paleta com todos os comandos do app.
+
+## Desenvolvimento
+
+O estado do projeto e o plano por fases estão em [`docs/ESTADO.md`](docs/ESTADO.md) e
+[`docs/INDEX.md`](docs/INDEX.md). Para compilar:
+
+```bash
+pnpm install
+pnpm app          # app em modo de desenvolvimento (Tauri)
+pnpm app:build    # instaladores do seu sistema em target/release/bundle/
+pnpm test         # testes do front e do core
+```
+
+No Linux, o app precisa de `libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev
+librsvg2-dev libsoup-3.0-dev patchelf`.
 
 ## Stack
 

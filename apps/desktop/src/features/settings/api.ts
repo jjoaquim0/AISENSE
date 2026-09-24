@@ -3,6 +3,7 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type { AgentId } from '@/types/generated/AgentId';
 import type { AppSettings } from '@/types/generated/AppSettings';
 import type { Calibration } from '@/types/generated/Calibration';
+import type { DiagnosticBundle } from '@/types/generated/DiagnosticBundle';
 import type { SettingsView } from '@/types/generated/SettingsView';
 import type { StateRules } from '@/types/generated/StateRules';
 import type { TeamId } from '@/types/generated/TeamId';
@@ -28,7 +29,11 @@ export const settingsApi = {
   /** Grava no adaptador e aplica às sessões vivas. Devolve o arquivo gravado. */
   calibrationApply: (adapterId: string, rules: StateRules): Promise<string> =>
     invoke('calibration_apply', { adapterId, rules }),
-  exportDiagnostics: (): Promise<string> => invoke('diagnostics_export'),
+  /** Monta o pacote já redigido; é ele que `diagnosticsSave` grava (F09-05). */
+  diagnosticsPreview: (): Promise<DiagnosticBundle> => invoke('diagnostics_preview'),
+  diagnosticsFileName: (): Promise<string> => invoke('diagnostics_file_name'),
+  /** Grava o `.zip` da última prévia. Devolve o tamanho em bytes. */
+  diagnosticsSave: (path: string): Promise<number> => invoke('diagnostics_save', { path }),
 };
 
 export function onSettingsChanged(handler: (settings: AppSettings) => void): Promise<UnlistenFn> {

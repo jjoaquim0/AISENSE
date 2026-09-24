@@ -7,44 +7,106 @@
 
 mod commands;
 
+use std::path::Path;
+
 use tauri::Manager;
+use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use tracing_subscriber::EnvFilter;
 
-/// Abre o banco e aplica as migrações antes da janela existir: se falhar, o app
+/// Abre o banco e aplica as migrações antes de o core subir: se falhar, o app
 /// não deve subir pela metade, com a UI mostrando dados que não persistem.
 fn open_store(
     data: &aisense_core::DataDir,
-) -> Result<aisense_store::Store, Box<dyn std::error::Error>> {
-    let path = data.database();
-    Ok(tauri::async_runtime::block_on(aisense_store::Store::open(
-        &path,
-    ))?)
+) -> Result<aisense_store::Store, aisense_store::StoreError> {
+    tauri::async_runtime::block_on(aisense_store::Store::open(&data.database()))
+}
+
+/// O que dizer quando o banco não abre (F09-04). O caminho do backup vai inteiro:
+/// é com ele que a pessoa recupera os dados se precisar.
+fn store_failure_message(error: &aisense_store::StoreError, database: &Path) -> String {
+    use aisense_store::StoreError;
+    match error {
+        StoreError::MigrationRolledBack { backup, .. } => format!(
+            "A atualização do banco de dados desta versão falhou e ele foi restaurado do backup. \
+             Nenhum dado foi perdido.\n\nBackup: {}\n\nEsta versão não consegue usar o banco. \
+             Volte para a versão anterior do aisense e relate o problema com o log abaixo.\n\n{error}",
+            backup.display()
+        ),
+        StoreError::RestoreFailed { backup, .. } => format!(
+            "A atualização do banco de dados falhou e não foi possível restaurar o backup \
+             automaticamente. Seus dados estão intactos no backup.\n\nPara recuperar, com o \
+             aisense fechado, copie\n{}\npara\n{}\n\n{error}",
+            backup.display(),
+            database.display()
+        ),
+        _ => format!(
+            "O aisense não conseguiu abrir o banco de dados em {}.\n\n{error}",
+            database.display()
+        ),
+    }
+}
+
+/// Log no terminal e em `logs/aisense-app.log` (a execução anterior vira `.1`), que é
+/// o que o "Exportar diagnóstico" leva, redigido (F09-05). O nível das Configurações
+/// vale na subida; `AISENSE_LOG` ainda vence.
+fn init_logging() {
+    use tracing_subscriber::layer::SubscriberExt;
+    use tracing_subscriber::util::SubscriberInitExt;
+
+    let data = aisense_core::DataDir::resolve();
+    let level = data
+        .as_ref()
+        .map(|d| aisense_core::settings::SettingsFile::new(d.settings()).load())
+        .map_or("info", |loaded| loaded.settings.advanced.log_level.as_str());
+    let filter = EnvFilter::try_from_env("AISENSE_LOG").unwrap_or_else(|_| EnvFilter::new(level));
+    let file = data
+        .as_ref()
+        .map(|d| aisense_core::diagnostics::rotate_app_log(&d.logs()))
+        .and_then(|path| path.and_then(std::fs::File::create).ok());
+    let file_layer = file.map(|file| {
+        tracing_subscriber::fmt::layer()
+            .with_ansi(false)
+            .with_writer(std::sync::Mutex::new(file))
+    });
+    tracing_subscriber::registry()
+        .with(filter)
+        .with(tracing_subscriber::fmt::layer())
+        .with(file_layer)
+        .init();
 }
 
 fn main() {
-    // O nível de log das Configurações vale na subida; `AISENSE_LOG` ainda vence.
-    let level = aisense_core::DataDir::resolve()
-        .map(|d| aisense_core::settings::SettingsFile::new(d.settings()).load())
-        .map_or("info", |loaded| loaded.settings.advanced.log_level.as_str());
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            EnvFilter::try_from_env("AISENSE_LOG").unwrap_or_else(|_| EnvFilter::new(level)),
-        )
-        .init();
+    init_logging();
 
     tracing::info!(version = aisense_core::VERSION, "AISENSE iniciando");
 
     let manager: commands::pty::Manager = std::sync::Arc::new(aisense_pty::PtyManager::new());
-    let shutdown_manager = std::sync::Arc::clone(&manager);
     let setup_manager = std::sync::Arc::clone(&manager);
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(move |app| {
             let data = aisense_core::DataDir::resolve()
                 .ok_or("could not find the user's home directory; set AISENSE_HOME")?;
-            let store = open_store(&data)?;
+            let store = match open_store(&data) {
+                Ok(store) => store,
+                Err(error) => {
+                    tracing::error!(%error, "o banco não abriu; o app não sobe");
+                    // Sem banco não há o que mostrar: esconde a janela, avisa e sai.
+                    if let Some(window) = app.get_webview_window("main") {
+                        let _ = window.hide();
+                    }
+                    let handle = app.handle().clone();
+                    app.dialog()
+                        .message(store_failure_message(&error, &data.database()))
+                        .title("aisense não pôde abrir os seus dados")
+                        .kind(MessageDialogKind::Error)
+                        .show(move |_| handle.exit(1));
+                    return Ok(());
+                }
+            };
             let settings = commands::settings::setup(&data);
             let (registry, watcher) = commands::runtimes::setup(app.handle(), &data);
             let (library, skill_watcher) = commands::skills::setup(app.handle(), &data, &store);
@@ -102,6 +164,8 @@ fn main() {
         })
         .manage(manager)
         .manage(commands::notify::Viewing::default())
+        .manage(commands::settings::DiagnosticsDraft::default())
+        .manage(commands::updates::PendingUpdate::default())
         .invoke_handler(tauri::generate_handler![
             commands::app_info,
             commands::pty::pty_spawn,
@@ -124,8 +188,12 @@ fn main() {
             commands::settings::calibration_screen,
             commands::settings::calibration_test,
             commands::settings::calibration_apply,
-            commands::settings::diagnostics_export,
+            commands::settings::diagnostics_preview,
+            commands::settings::diagnostics_file_name,
+            commands::settings::diagnostics_save,
             commands::notify::ui_viewing,
+            commands::updates::update_check,
+            commands::updates::update_install,
             commands::agents::agent_start,
             commands::agents::agent_stop,
             commands::agents::agent_restart,
@@ -210,21 +278,11 @@ fn main() {
                 "página"
             );
         })
-        .on_window_event(move |window, event| {
+        .on_window_event(|window, event| {
             // Fechar a janela precisa matar os processos dos agentes; senão eles
             // continuam vivos sem dono, consumindo CPU e segurando arquivos.
             if matches!(event, tauri::WindowEvent::Destroyed) {
-                // Antes de matar: senão a política de reinício traria os agentes de volta.
-                if let Some(supervisor) = window.try_state::<commands::agents::Supervisor>() {
-                    if let Some(settings) = window.try_state::<commands::settings::Settings>() {
-                        commands::settings::remember_running(&settings, &supervisor);
-                    }
-                    supervisor.shutdown();
-                }
-                if let Some(bus) = window.try_state::<commands::bus::BusShutdown>() {
-                    bus.0.cancel();
-                }
-                shutdown_manager.shutdown();
+                commands::shutdown(window.app_handle());
             }
         })
         .run(tauri::generate_context!())

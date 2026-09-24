@@ -18,7 +18,10 @@ Workspace (implícito, 1 por instalação)
 > Os dois `PRAGMA` abaixo **não** ficam na migração (dentro de transação o SQLite os ignora): o
 > `Store` os aplica em toda conexão, junto com `synchronous = NORMAL` e `busy_timeout = 5 s`.
 > Antes de aplicar migração pendente num banco que já tem dados, o `Store` grava uma cópia em
-> `aisense.db.bak-v<versão atual>`.
+> `aisense.db.bak-v<versão atual>`. Se uma migração falhar no meio, a cópia volta para o lugar do
+> banco (os `-wal`/`-shm` do banco quebrado são apagados), o erro é `MigrationRolledBack` e o app
+> avisa numa caixa de diálogo e sai sem subir pela metade. Backup e migração rodam numa conexão
+> única, fechada antes da restauração; o pool só abre depois (F09-04).
 > IDs são **ULID** em texto (26 chars): ordenáveis por tempo, bons para índice de mensagens.
 > Timestamps são `INTEGER` em epoch **milissegundos UTC**. Nunca guarde hora local.
 

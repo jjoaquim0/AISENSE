@@ -157,7 +157,7 @@ export function LogsTab({ agent, sessions, onReload }: LogsTabProps) {
             }}
             placeholder="Buscar na transcrição"
             aria-label="Buscar na transcrição"
-            className="h-7 w-full rounded-md border border-strong bg-surface pr-2 pl-6 text-caption text-primary placeholder:text-muted focus:border-accent"
+            className="h-7 w-full rounded-md border border-strong bg-surface pr-2 pl-6 text-caption text-primary placeholder:text-muted focus:border-emphasis"
           />
         </div>
         <span

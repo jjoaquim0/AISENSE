@@ -305,7 +305,7 @@ function MessageRow({
         className={cn(
           'rounded-md border border-l-[3px] border-subtle bg-surface px-2.5 py-1.5',
           system && 'border-l-awaiting bg-base',
-          message.from === '@voce' && 'border-l-accent',
+          message.from === '@voce' && 'border-l-emphasis',
         )}
       >
         <div className="flex items-baseline gap-1.5 text-caption">

@@ -28,7 +28,7 @@ for (const scheme of ['light', 'dark'] as const) {
 
     test('onboarding', async ({ page }) => {
       await openApp(page);
-      await expect(page.getByText('Bem-vindo ao AISENSE')).toBeVisible();
+      await expect(page.getByText('Bem-vindo ao aisense')).toBeVisible();
       await expect(page.getByText('Claude Code')).toBeVisible();
       expect(await audit(page)).toEqual([]);
       await page.getByRole('button', { name: 'Continuar →' }).click();
@@ -73,6 +73,26 @@ for (const scheme of ['light', 'dark'] as const) {
         await page.waitForTimeout(200);
         expect(await audit(page), section).toEqual([]);
       }
+    });
+
+    test('prévia do diagnóstico', async ({ page }) => {
+      await openApp(page, { onboardingDone: true });
+      await page.getByRole('button', { name: 'Configurações' }).click();
+      await page
+        .getByRole('navigation', { name: 'Seções das configurações' })
+        .getByRole('button', { name: 'Avançado' })
+        .click();
+      await page.getByRole('button', { name: 'Exportar diagnóstico…' }).click();
+      await expect(page.getByRole('tab', { name: 'relatorio.json' })).toBeVisible();
+      expect(await audit(page)).toEqual([]);
+    });
+
+    test('faixa de atualização', async ({ page }) => {
+      await openApp(page, { onboardingDone: true, update: { version: '0.2.0', notes: 'x' } });
+      await expect(page.getByRole('button', { name: 'Instalar e reiniciar' })).toBeVisible({
+        timeout: 10_000,
+      });
+      expect(await audit(page)).toEqual([]);
     });
 
     test('biblioteca de skills', async ({ page }) => {

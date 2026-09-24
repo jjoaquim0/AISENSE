@@ -58,13 +58,13 @@ pub fn setup_tray(app: &AppHandle) -> Option<Tray> {
 
 fn build_tray(app: &AppHandle) -> tauri::Result<Tray> {
     let status = MenuItem::with_id(app, "status", "Nenhum agente rodando", false, None::<&str>)?;
-    let show = MenuItem::with_id(app, "show", "Mostrar o AISENSE", true, None::<&str>)?;
+    let show = MenuItem::with_id(app, "show", "Mostrar o aisense", true, None::<&str>)?;
     let mute = MenuItem::with_id(app, "mute", "Silenciar por 1 hora", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Sair", true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
     let menu = Menu::with_items(app, &[&status, &separator, &show, &mute, &quit])?;
     let mut builder = TrayIconBuilder::with_id("main")
-        .tooltip("AISENSE")
+        .tooltip("aisense")
         .menu(&menu)
         .on_menu_event(|app, event| match event.id.as_ref() {
             "show" => show_window(app),
@@ -116,7 +116,7 @@ pub fn refresh_tray(app: &AppHandle) {
     };
     let line = TraySummary::of(supervisor.states()).line();
     let _ = tray.status.set_text(&line);
-    let _ = tray.icon.set_tooltip(Some(format!("AISENSE — {line}")));
+    let _ = tray.icon.set_tooltip(Some(format!("aisense — {line}")));
     let muted = app
         .try_state::<Settings>()
         .is_some_and(|s| s.get().notifications.muted(now_ms()));

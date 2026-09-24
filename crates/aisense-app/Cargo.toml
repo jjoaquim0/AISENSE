@@ -28,6 +28,9 @@ tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-dialog = "2"
 # Notificação do SO quando um agente espera ou cai com o app em segundo plano (F08-07).
 tauri-plugin-notification = "2"
+# Auto-update assinado (F09-03, docs/11 "Atualizações"): confere a assinatura minisign
+# de cada pacote contra a chave pública compilada no app antes de instalar.
+tauri-plugin-updater = "2"
 # Segredos dos runtimes no keychain do SO (R3, F08-05). `async-secret-service` fala
 # com o Secret Service do Linux em Rust puro (zbus), sem exigir libdbus no sistema.
 keyring = { version = "3", features = ["apple-native", "windows-native", "async-secret-service", "tokio", "crypto-rust"] }

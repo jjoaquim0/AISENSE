@@ -179,10 +179,16 @@ inclusive a de painéis fechados, que não geram evento para a UI.
 
 ## Como adicionar um runtime novo (guia do usuário, vira ajuda na UI)
 
+> **Especificação — ainda não implementada.** Os passos 1, 2 e 4 dependem da tarefa F09-08
+> (editor de adaptador e integração MCP); o passo 3 já existe. Até lá, o caminho é criar o TOML
+> na pasta de adaptadores, como descreve o [guia de adaptadores](guia/adaptadores.md).
+
 1. Configurações → Runtimes → **Novo adaptador** (abre o TOML em um editor com validação).
 2. Preencha `command` e `detect`; clique em **Testar** — o app roda o comando e mostra a saída.
 3. Suba um agente descartável e abra o **modo calibração**; ajuste `idle_regex` até o indicador
    ficar verde quando o prompt está esperando você.
 4. Se a CLI suportar MCP, aponte a configuração dela para o binário `aisense-mcp`
    (o botão **Instalar integração MCP** faz isso automaticamente quando `capabilities.mcp = true`).
+   Com `mcp_config`, o supervisor já registra o `aisense-mcp` no arquivo do projeto a cada início;
+   o botão é para os runtimes cuja configuração de MCP é global do usuário (ex.: `codex`).
 5. Salve. O adaptador aparece na lista de runtimes ao criar agentes.
