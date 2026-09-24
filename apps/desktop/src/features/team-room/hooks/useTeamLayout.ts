@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { type Point, readFlowPositions } from '@/features/flow/flowModel';
 import { errorMessage, teamsApi } from '@/features/teams/api';
 import type { Team } from '@/types/generated/Team';
 import { type GridLayout, readGridLayout, writeGridLayout } from '../gridLayout';
@@ -17,10 +18,13 @@ export function useTeamLayout(team: Team, agentIds: string[], onError: (text: st
   const idsKey = agentIds.join('|');
   const [grid, setGridState] = useState<GridLayout>(() => readGridLayout(team.layout, agentIds));
   const [view, setViewState] = useState<RoomView>(() => readRoomView(team.layout));
+  const [flow, setFlowState] = useState<Record<string, Point>>(() =>
+    readFlowPositions(team.layout),
+  );
   const saved = useRef<unknown>(team.layout);
   const pending = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const latest = useRef({ grid, view });
-  latest.current = { grid, view };
+  const latest = useRef({ grid, view, flow });
+  latest.current = { grid, view, flow };
   // Sem preset salvo nem escolhido, o preset acompanha a quantidade de agentes. Sem
   // isto, a equipe abria com a lista ainda vazia, ganhava "1" e ficava presa nele.
   const presetChosen = useRef(hasSavedPreset(team.layout));
@@ -41,6 +45,7 @@ export function useTeamLayout(team: Team, agentIds: string[], onError: (text: st
     const body = {
       ...writeGridLayout(saved.current, latest.current.grid),
       view: latest.current.view,
+      flow: { positions: latest.current.flow },
     };
     saved.current = body;
     void teamsApi.setLayout(team.id, body).catch((e: unknown) => onError(errorMessage(e)));
@@ -70,6 +75,16 @@ export function useTeamLayout(team: Team, agentIds: string[], onError: (text: st
     [schedule],
   );
 
+  /** Posições arrastadas no Fluxo; `{}` volta ao layout automático. */
+  const setFlowPositions = useCallback(
+    (next: Record<string, Point>) => {
+      latest.current = { ...latest.current, flow: next };
+      setFlowState(next);
+      schedule();
+    },
+    [schedule],
+  );
+
   // Sair da tela com uma gravação pendente: grava agora em vez de perder.
   useEffect(
     () => () => {
@@ -81,7 +96,7 @@ export function useTeamLayout(team: Team, agentIds: string[], onError: (text: st
     [persist],
   );
 
-  return { grid, setGrid, view, setView };
+  return { grid, setGrid, view, setView, flowPositions: flow, setFlowPositions };
 }
 
 function hasSavedPreset(teamLayout: unknown): boolean {

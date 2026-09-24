@@ -40,6 +40,9 @@ import { describeStartReport, errorMessage } from './api';
 import { useTeams } from './store';
 
 // Sob demanda: o quadro e o editor de notas trazem o preview de Markdown.
+const FlowView = lazy(() =>
+  import('@/features/flow/FlowView').then((m) => ({ default: m.FlowView })),
+);
 const BoardScreen = lazy(() =>
   import('@/features/board/BoardScreen').then((m) => ({ default: m.BoardScreen })),
 );
@@ -62,7 +65,7 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
   const [problem, setProblem] = useState<string | null>(null);
   const [commandsOpen, setCommandsOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
-  const { grid, setGrid, view, setView } = useTeamLayout(
+  const { grid, setGrid, view, setView, flowPositions, setFlowPositions } = useTeamLayout(
     team,
     agents.map((a) => a.id),
     setProblem,
@@ -332,7 +335,21 @@ export function TeamView({ summary }: { summary: TeamSummary }) {
 
       <div className="flex min-h-0 flex-1">
         <section aria-label="Terminais da equipe" className="flex min-w-0 flex-1 flex-col p-2">
-          {view === 'board' ? (
+          {view === 'flow' ? (
+            <Suspense fallback={null}>
+              <FlowView
+                teamId={team.id}
+                agents={agents}
+                stateOf={stateOf}
+                positions={flowPositions}
+                onPositions={setFlowPositions}
+                onOpenAgent={(id) => {
+                  setSelectedId(id);
+                  setView('focus');
+                }}
+              />
+            </Suspense>
+          ) : view === 'board' ? (
             <Suspense fallback={null}>
               <BoardScreen teamId={team.id} />
             </Suspense>

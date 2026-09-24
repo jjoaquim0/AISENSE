@@ -738,6 +738,8 @@ pub struct Receipts {
     /// Entregues ou lidas.
     pub delivered: u32,
     pub read: u32,
+    /// Entrega que falhou ou expirou (aresta vermelha no Fluxo).
+    pub failed: u32,
 }
 
 impl Receipts {
@@ -749,6 +751,7 @@ impl Receipts {
             recipients: u32::try_from(deliveries.len()).unwrap_or(u32::MAX),
             delivered: count(&|s| matches!(s, DeliveryState::Delivered | DeliveryState::Read)),
             read: count(&|s| s == DeliveryState::Read),
+            failed: count(&|s| matches!(s, DeliveryState::Failed | DeliveryState::Expired)),
         }
     }
 }

@@ -192,7 +192,10 @@ animam quando trafegam. É a melhor forma de entender "quem está falando com qu
 - Aresta = uma mensagem. Espessura pela frequência, animação de partícula ao trafegar,
   tracejada para `ask` pendente (com contador regressivo do timeout), vermelha para entrega falha.
 - Nós de canal aparecem como hexágonos.
-- Construído com `@xyflow/react`; layout automático (dagre) com posição manual persistida.
+- Construído com `@xyflow/react`; layout automático em camadas (quem manda acima de quem recebe;
+  implementação própria, sem dagre) com posição manual persistida em `teams.layout.flow`.
+- O cartão em andamento de cada agente aparece ao lado dele (aresta pontilhada); clicar abre o
+  detalhe do cartão.
 
 ### T4.4 — Timeline
 

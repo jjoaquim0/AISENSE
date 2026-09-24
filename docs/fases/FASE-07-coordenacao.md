@@ -42,16 +42,30 @@ Depende de F06-05.
 > ponta a ponta no socket: o agente pede para criar `@qa`, recebe o erro, a equipe continua com 2
 > agentes e a proposta fica pendente.
 
-### [ ] F07-03 — Vista Fluxo (T4.3)
+### [x] F07-03 — Vista Fluxo (T4.3)
 Canvas com `@xyflow/react`: nós de agente e de canal, arestas animadas por mensagem, tracejado com
 contagem regressiva para `ask` pendente, aresta vermelha para falha, layout automático (dagre) com
 posição manual persistida, filtro por janela de tempo.
 **Aceite:** com 6 agentes trocando mensagens, o canvas mantém ≥50 fps. Depende de F05-11.
 
-### [ ] F07-04 — Cartões no canvas
+> Feito: `features/flow/FlowView.tsx` (vista **Fluxo** da Sala, `⌘G`), `@xyflow/react` (já no
+> `docs/03-stack`). Nós de agente (cor, estado, última fala em 2 linhas; duplo clique abre o
+> terminal em Foco) e de canal (hexágono, contagem); arestas agregadas por par (`flowModel.ts`):
+> espessura pelo volume, animadas por 4 s depois de cada mensagem, tracejadas com contagem
+> regressiva para `ask` pendente, vermelhas com entrega falha/expirada (`Receipts.failed` novo).
+> Layout em camadas próprio (sem dagre: grafo pequeno, sem dependência nova) com posição manual
+> salva em `teams.layout.flow.positions`; "Auto-organizar", "Congelar" e janela 5 min/30 min/2 h/
+> tudo. Banco `#/dev/flow` (6 agentes, 1 mensagem a cada 150 ms): 56–60 fps no Chromium headless.
+> Falta conferir na janela real com GPU.
+
+### [x] F07-04 — Cartões no canvas
 Nó de agente mostra o cartão em que ele está trabalhando; clicar abre o detalhe.
 Aresta pontilhada liga agente ao cartão.
 **Aceite:** mover um cartão no quadro atualiza o canvas em <300 ms. Depende de F07-03, F06-08.
+
+> Feito: o cartão em andamento de cada agente (coluna `active`, o mais recente) vira um nó ao lado
+> dele, ligado por aresta pontilhada; clicar abre o `CardDetailPanel`. `board:changed` relê o quadro
+> e o canvas acompanha (teste: cartão saindo de Fazendo some do canvas em menos de 300 ms).
 
 ### [x] F07-05 — Canais
 CRUD de canais, inscrição de agentes, `aisense send #canal`, filtro na timeline, nó no canvas.

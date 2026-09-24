@@ -109,7 +109,7 @@ function BenchTerminal() {
   return <div ref={host} className="min-h-0 flex-1 bg-terminal" />;
 }
 
-function useFps(): number {
+export function useFps(): number {
   const [fps, setFps] = useState(0);
   useEffect(() => {
     let frames = 0;

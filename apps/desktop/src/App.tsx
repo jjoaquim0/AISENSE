@@ -1,6 +1,7 @@
 import { Users } from 'lucide-react';
 import { lazy, Suspense } from 'react';
 import { EmptyState, TooltipProvider } from '@/components/ui';
+import { FlowBench } from '@/features/dev/FlowBench';
 import { GridBench } from '@/features/dev/GridBench';
 import { KitchenSink } from '@/features/dev/KitchenSink';
 import { AppShell } from '@/features/shell/AppShell';
@@ -18,6 +19,9 @@ export function App() {
   // Amostra do design system, só em desenvolvimento (F00-03 / F00-06).
   if (import.meta.env.DEV && window.location.hash.startsWith('#/dev/grid')) {
     return <GridBench />;
+  }
+  if (import.meta.env.DEV && window.location.hash.startsWith('#/dev/flow')) {
+    return <FlowBench />;
   }
   if (import.meta.env.DEV && window.location.hash === '#/dev') {
     return (
