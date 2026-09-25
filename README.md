@@ -1,33 +1,139 @@
-<h1 align="center">AISENSE</h1>
-<p align="center"><strong>Crie times de IA de maneira fácil e gerenciável.</strong></p>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/readme/logo-escuro.png">
+    <img src="assets/readme/logo-claro.png" alt="aisense" width="300">
+  </picture>
+</p>
+
+<h3 align="center">Uma equipe. Muitos agentes.</h3>
+
+<p align="center">
+  Monte equipes de agentes de IA em terminais reais que <b>conversam entre si</b>,<br>
+  dividem um quadro de tarefas e sobem já sabendo o seu papel.
+</p>
+
+<p align="center">
+  <a href="#instalação">Instalação</a> ·
+  <a href="#primeiros-passos">Primeiros passos</a> ·
+  <a href="#como-funciona">Como funciona</a> ·
+  <a href="docs/guia/">Guias</a>
+</p>
+
+<p align="center">
+  <img alt="macOS · Windows · Linux" src="https://img.shields.io/badge/macOS%20·%20Windows%20·%20Linux-0C0F0D?style=flat-square">
+  <img alt="Claude Code · Codex · OpenCode · Gemini CLI" src="https://img.shields.io/badge/Claude%20Code%20·%20Codex%20·%20OpenCode%20·%20Gemini%20CLI-0C0F0D?style=flat-square">
+  <img alt="Licença MIT" src="https://img.shields.io/badge/licença-MIT-087A42?style=flat-square">
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/readme/sala-mensagens-dark.png">
+    <img src="assets/readme/sala-mensagens-light.png" alt="A Sala da Equipe do AISENSE: quatro agentes combinando uma migração para OAuth pela linha do tempo" width="900">
+  </picture>
+</p>
 
 ---
 
-AISENSE é um aplicativo de desktop para **montar, operar e coordenar equipes de agentes de IA**.
-Cada equipe tem uma missão. Dentro da equipe você cria agentes, e cada agente é um **terminal real**
-rodando a IA que você escolher — Claude Code, Codex, OpenCode, Gemini CLI ou um shell puro onde você
-chama o que quiser.
+## Por que o AISENSE
 
-O diferencial: **os terminais conversam entre si**. Um agente pode mandar mensagem, fazer pergunta e
-esperar resposta de outro agente, delegar tarefas e acompanhar o quadro da equipe — tudo através de um
-barramento de mensagens nativo do AISENSE (CLI `aisense` + servidor MCP).
+Quem usa IA para trabalhar de verdade acaba com **seis abas de terminal abertas**: Claude Code numa,
+Codex na outra, OpenCode, mais uns shells soltos. Cada uma não sabe o que as outras estão fazendo,
+precisa ouvir de novo "você é o revisor, siga estas regras" a cada início, e **você** vira o fio
+entre elas — copiando a resposta de uma e colando na outra.
 
-E cada agente sobe **já sabendo o que fazer**: você configura skills por agente, e no boot do terminal
-o AISENSE materializa essas skills no diretório de trabalho e injeta o prompt de bootstrap.
+O AISENSE é o **ambiente de trabalho para equipes de agentes de IA**. Você monta a equipe uma vez;
+os agentes trabalham juntos, e você acompanha tudo numa tela só.
+
+## O que ele faz
+
+**👥 Equipes com missão.** Uma equipe tem missão, pasta de trabalho, memória e quadro próprios —
+"Squad Produto", "Time de Infra", "Pesquisa de Mercado". Comece de um modelo (Dupla Dev, Squad
+completo, Pesquisa, Operação) ou do zero.
+
+**🖥️ Cada agente é um terminal de verdade.** Um processo real num PTY real, com a IA que você já usa:
+Claude Code, Codex, OpenCode, Gemini CLI, um shell puro ou qualquer comando. Cores, TUIs, `htop`,
+editores — se funciona no seu terminal, funciona aqui. Veja 1, 4 ou 9 terminais lado a lado, ou foque
+em um com os outros em miniatura.
+
+**💬 Os agentes conversam entre si.** Todo agente tem um endereço (`@backend`) e fala com os colegas
+pela CLI `aisense` ou pelo servidor MCP: manda recado, pergunta e espera a resposta, avisa a equipe,
+posta num canal. Toda mensagem aparece na linha do tempo — nada acontece escondido.
+
+**🧠 Nasce sabendo o seu papel.** Skills em Markdown (compatíveis com as do Claude Code) dizem a cada
+agente quem ele é, quem são os colegas e como trabalhar. O terminal sobe já configurado — sem colar
+o mesmo prompt toda vez.
+
+**📋 Um quadro que os agentes usam.** Kanban por equipe onde os próprios agentes pegam o próximo
+cartão, movem, comentam e pedem revisão — com limite de trabalho em andamento, dependências e um
+portão de revisão antes do "feito".
+
+**🧭 Um coordenador, se você quiser.** Um agente `@coordenador` quebra o objetivo em cartões,
+distribui pelo papel de cada um e fecha o ciclo. Ações estruturais (criar agente, mudar autonomia)
+viram **proposta** para você aprovar.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/readme/sala-quadro-dark.png">
+    <img src="assets/readme/sala-quadro-light.png" alt="O quadro da equipe, com cartões atribuídos a cada agente" width="900">
+  </picture>
+</p>
+
+## Como funciona
 
 ```
-┌─ Equipes ─┬─ Squad Produto ──────────────────────────────────────────────┐
-│  ◍ Produto│  @arquiteto      @backend       @frontend      @revisor      │
-│  ◍ Infra  │  ┌───────────┐  ┌───────────┐  ┌───────────┐  ┌───────────┐  │
-│  ◍ Pesq.  │  │ claude    │  │ codex     │  │ opencode  │  │ claude    │  │
-│  +        │  │ ● pensando│  │ ● ocioso  │  │ ● ocioso  │  │ ● aguarda │  │
-│           │  └───────────┘  └───────────┘  └───────────┘  └───────────┘  │
-└───────────┴──────────────────────────────────────────────────────────────┘
+ você ── escreve a missão ──▶ @coordenador
+                                   │  aisense task add · aisense ask
+                    ┌──────────────┼──────────────┐
+                    ▼              ▼              ▼
+                @backend       @frontend       @revisor      ← cada um é um terminal real,
+              (Claude Code)   (OpenCode)       (Codex)          com a IA que você escolheu
+                    │              │              │
+                    └─── barramento do AISENSE ───┘          ← mensagens, canais e quadro
+                                   │
+                  linha do tempo · quadro · fluxo            ← o que você acompanha
 ```
+
+Dentro do terminal de qualquer agente, a equipe está a um comando de distância:
+
+```bash
+aisense agents                                   # quem está na equipe e o que cada um faz
+aisense ask @revisor "revisa o diff de HEAD~1"   # pergunta e espera a resposta
+aisense send #pesquisa "achei 3 fontes novas"    # posta no canal
+aisense task next                                # o próximo cartão que é seu
+```
+
+Runtimes com MCP (como Claude Code) recebem as mesmas ferramentas pelo `aisense-mcp`, sem digitar
+comando nenhum.
+
+## Para quem
+
+| Perfil | Uso típico |
+|---|---|
+| **Dev solo** | Dupla implementador + revisor no mesmo repositório, cada um na sua bancada (`git worktree`) |
+| **Tech lead** | Um agente por serviço e um coordenador distribuindo o trabalho pelo quadro |
+| **Pesquisa** | Vários agentes em fontes diferentes, um sintetizador consolidando o canal |
+| **Operações** | Terminais de longa duração monitorando, um agente triando alertas |
+
+## Princípios
+
+- **Local-first.** Seus dados ficam no seu disco. Sem conta, sem nuvem; a única conexão que o app faz
+  é procurar atualização — e dá para desligar.
+- **Sem lock-in.** O AISENSE não é cliente de nenhuma IA: ele **hospeda** a CLI que você já usa. Uma IA
+  nova é um arquivo TOML, sem recompilar nada.
+- **Você no volante.** Pausar, interromper, assumir o terminal e aprovar propostas estão sempre à mão.
+  Autonomia é opcional, por agente.
+- **Tudo visível.** Toda mensagem entre agentes é registrada e auditável na linha do tempo.
+
+## Status
+
+O AISENSE está em desenvolvimento ativo: equipes, terminais, skills, barramento, quadro, coordenação,
+configurações, atualização automática e o empacotamento para os três sistemas estão prontos. A
+**primeira versão pública (v0.1.0)** está sendo preparada — enquanto ela não sai, dá para compilar a
+partir do código (veja [Desenvolvimento](#desenvolvimento)).
 
 ## Instalação
 
-Baixe o instalador do seu sistema na página de
+Quando a v0.1.0 sair, baixe o instalador do seu sistema na página de
 [Releases](https://github.com/jjoaquim0/AISENSE/releases/latest):
 
 | Sistema | Arquivo | Como instalar |
@@ -103,23 +209,18 @@ Justificativa completa e alternativas descartadas: [`docs/03-stack.md`](docs/03-
 
 ## Roadmap
 
-| Fase | Entrega | Doc |
-|---|---|---|
-| 0 | Fundação: monorepo, Tauri, CI, tokens de design | [FASE-00](docs/fases/FASE-00-fundacao.md) |
-| 1 | Terminal Core: PTY em Rust + xterm.js | [FASE-01](docs/fases/FASE-01-terminal-core.md) |
-| 2 | Equipes e agentes: CRUD, SQLite, adaptadores | [FASE-02](docs/fases/FASE-02-equipes-agentes.md) |
-| 3 | Sala da Equipe: grid, foco, ciclo de vida | [FASE-03](docs/fases/FASE-03-sala-da-equipe.md) |
-| 4 | Sistema de Skills | [FASE-04](docs/fases/FASE-04-skills.md) |
-| 5 | Barramento: agentes conversando entre si | [FASE-05](docs/fases/FASE-05-barramento.md) |
-| 6 | Quadro Kanban compartilhado com os agentes | [FASE-06](docs/fases/FASE-06-quadro-kanban.md) |
-| 7 | Coordenação: agente coordenador, vista Fluxo, canais | [FASE-07](docs/fases/FASE-07-coordenacao.md) |
-| 8 | Acabamento: temas, a11y, performance | [FASE-08](docs/fases/FASE-08-acabamento.md) |
-| 9 | Distribuição: instaladores, auto-update | [FASE-09](docs/fases/FASE-09-distribuicao.md) |
+O plano é dividido em 10 fases, todas com o que foi feito e o que falta registrado em
+[`docs/fases/`](docs/fases/). O estado de hoje está em [`docs/ESTADO.md`](docs/ESTADO.md).
 
 ## Para agentes de IA que forem desenvolver este projeto
 
 Leia **[`AGENTS.md`](AGENTS.md)** antes de qualquer coisa. Ele define o ritual de início de sessão,
 onde encontrar o estado atual do projeto e como registrar o que você fez.
+
+## Marca
+
+Logo, cores e fontes seguem o [manual de marca](docs/marca/manual-de-marca.html). Os arquivos do
+logo estão em [`assets/logo/`](assets/logo/).
 
 ## Licença
 

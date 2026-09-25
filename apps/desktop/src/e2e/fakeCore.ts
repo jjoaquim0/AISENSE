@@ -43,6 +43,15 @@ export interface FakeSeed {
    * só uma vez não serve: em dev o StrictMode roda cada efeito duas vezes.
    */
   failing?: string[];
+  /** Cartões no quadro da equipe semeada (screenshots de divulgação). */
+  cards?: {
+    title: string;
+    column: string;
+    assignee?: string;
+    labels?: string[];
+    priority?: 'low' | 'normal' | 'high' | 'urgent';
+    checklist?: [string, boolean][];
+  }[];
   /** Versão nova que o `update_check` encontra (F09-03). Ausente = já está na mais nova. */
   update?: { version: string; notes?: string };
 }
@@ -631,7 +640,36 @@ export function installFakeCore(): void {
           approverMustDiffer: false,
           requiresCommands: [],
         })),
-        cards: [],
+        cards: (seed.cards ?? []).map((c, i) => {
+          const assignee = agents.find((a) => a.teamId === teamId && a.handle === c.assignee);
+          return {
+            id: `tsk_${i + 1}`,
+            teamId,
+            columnId: `col_${c.column}`,
+            columnSlug: c.column,
+            title: c.title,
+            body: '',
+            assignee: assignee?.id ?? null,
+            assigneeHandle: assignee?.handle ?? null,
+            createdBy: null,
+            parentId: null,
+            position: i,
+            priority: c.priority ?? 'normal',
+            labels: c.labels ?? [],
+            checklist: (c.checklist ?? []).map(([text, done]) => ({ text, done })),
+            links: [],
+            blockReason: null,
+            blockedBy: [],
+            comments: 0,
+            version: 1,
+            archivedAt: null,
+            approvedBy: null,
+            approvedAt: null,
+            columnSince: now() - (i + 1) * 600_000,
+            createdAt: now() - (i + 2) * 3_600_000,
+            updatedAt: now() - i * 60_000,
+          };
+        }),
         agents: agents
           .filter((a) => a.teamId === teamId)
           .map((a) => ({ id: a.id, handle: a.handle, color: a.color })),
